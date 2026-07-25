@@ -47,6 +47,13 @@
   #gomStatusLine{
     font-size:12.5px;color:var(--blue);margin-bottom:10px;font-weight:600;
   }
+  #gomBar.floating{
+    position:sticky;top:55px;z-index:14;background:var(--card);
+    border:1px solid var(--blue);border-radius:10px;
+    padding:10px 10px 2px;margin-bottom:10px;
+    box-shadow:0 4px 10px rgba(0,0,0,.08);
+  }
+  #gomBar.floating #gomStatusLine{margin-bottom:8px;}
 
   /* Action bar (giống bảng sản phẩm sàn TMĐT) */
   .action-bar{
@@ -171,12 +178,14 @@
 
     <div id="errArea"></div>
 
-    <div class="row" id="gomRow">
-      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
-      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
-      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
+    <div id="gomBar">
+      <div class="row" id="gomRow">
+        <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
+        <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
+        <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
+      </div>
+      <div id="gomStatusLine" style="display:none;"></div>
     </div>
-    <div id="gomStatusLine" style="display:none;"></div>
 
     <div id="list"></div>
   </section>
@@ -236,6 +245,7 @@ const tasksCol = collection(db, "tasks");
 let allProducts = [];
 let selected = new Set();
 let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
+let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "ghim" (tô sáng) tại 1 thời điểm
 let editorSaveHandler = null;
 
 // ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
@@ -292,6 +302,7 @@ function applyModeUI(){
   document.getElementById("manageActionBar").style.display = isManage ? "flex" : "none";
   document.getElementById("selectAllRow").style.display = isManage ? "flex" : "none";
   document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
+  document.getElementById("gomBar").style.display = isManage ? "none" : "block";
   if(isManage){
     document.getElementById("gomStatusLine").style.display = "none";
   } else {
@@ -309,6 +320,7 @@ function exitGomMode(){
   gomBtn.textContent = "📦 Gom sản phẩm";
   gomBtn.classList.remove("active");
   gomStatusLine.style.display = "none";
+  document.getElementById("gomBar").classList.remove("floating");
 }
 
 gomBtn.addEventListener("click", () => {
@@ -320,6 +332,7 @@ gomBtn.addEventListener("click", () => {
     gomDoneBtn.style.display = "inline-block";
     gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
     gomBtn.classList.add("active");
+    document.getElementById("gomBar").classList.add("floating");
     updateGomStatusLine();
   } else {
     // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
@@ -453,11 +466,12 @@ function renderTiersSelectionHtml(p){
     const chips = lastTier.map(v => {
       const variant = label + ": " + v;
       const key = p.id + "__" + variant;
-      const sel = taskSelections.get(key);
-      const qty = sel ? sel.qty : 0;
-      return `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">
+      const active = isChipActive(key);
+      const cur = taskSelections.get(key);
+      const qty = cur ? cur.qty : 0;
+      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
           <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-          ${sel ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
         </button>`;
     }).join("");
     return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
@@ -491,21 +505,23 @@ function renderList(){
           return `<span class="vchip static">${escapeHtml(v)}</span>`;
         }
         const key = p.id + "__" + v;
-        const sel = taskSelections.get(key);
-        const qty = sel ? sel.qty : 0;
-        return `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">
+        const active = isChipActive(key);
+        const cur = taskSelections.get(key);
+        const qty = cur ? cur.qty : 0;
+        return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
             <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-            ${sel ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+            ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
           </button>`;
       }).join("");
     } else if(!isManage){
       // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
       const key = p.id;
-      const sel = taskSelections.get(key);
-      const qty = sel ? sel.qty : 0;
-      variantsHtml = `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${sel ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
-          ${sel ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+      const active = isChipActive(key);
+      const cur = taskSelections.get(key);
+      const qty = cur ? cur.qty : 0;
+      variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+          <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
+          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
         </button>`;
     }
     div.innerHTML = `
@@ -534,10 +550,14 @@ function renderList(){
           let cur = taskSelections.get(key);
           if(act === "remove"){
             taskSelections.delete(key);
+            if(pinnedKey === key) pinnedKey = null;
           } else if(act === "minus"){
             if(cur){
               cur.qty -= 1;
-              if(cur.qty <= 0) taskSelections.delete(key);
+              if(cur.qty <= 0){
+                taskSelections.delete(key);
+                if(pinnedKey === key) pinnedKey = null;
+              }
             }
           } else {
             if(!cur){
@@ -545,6 +565,7 @@ function renderList(){
               taskSelections.set(key, cur);
             }
             cur.qty += 1;
+            if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
           }
           renderList();
         });
@@ -555,6 +576,17 @@ function renderList(){
   updateActionBar();
   updateSelectAllState(filtered);
   updateTaskBar();
+}
+
+// Xác định 1 phân loại có đang được tô sáng (ghim) trong danh sách hay không.
+// - Trong chế độ gom: mọi sp thuộc nhóm đang gom đều tô sáng (giữ nguyên như trước).
+// - Ngoài chế độ gom: chỉ phân loại vừa chọn gần nhất (đang ghim) mới tô sáng;
+//   các đơn lẻ đã chốt trước đó vẫn nằm trong giỏ hàng nhưng không còn tô sáng.
+function isChipActive(key){
+  const cur = taskSelections.get(key);
+  if(!cur) return false;
+  if(gomMode) return cur.orderId === currentGroupId;
+  return key === pinnedKey;
 }
 
 function updateTaskBar(){
@@ -602,7 +634,9 @@ function renderSelectedModal(){
   body.innerHTML = html;
   body.querySelectorAll(".selremove").forEach(btn => {
     btn.addEventListener("click", () => {
-      taskSelections.delete(btn.dataset.key);
+      const key = btn.dataset.key;
+      taskSelections.delete(key);
+      if(pinnedKey === key) pinnedKey = null;
       renderSelectedModal();
       renderList();
     });
@@ -652,6 +686,7 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
     }
     taskSelections.clear();
     groupNames.clear();
+    pinnedKey = null;
     exitGomMode();
     renderList();
     alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
