@@ -205,7 +205,6 @@
   .order-item input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
   .order-item .info{flex:1;min-width:0;}
   .order-item .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
-  .order-item .name.done{color:var(--muted);text-decoration:line-through;}
   .order-item .meta{font-size:13px;color:var(--muted);margin-top:2px;}
   .order-item .row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
   .order-item button.mini{
@@ -261,6 +260,24 @@
   .batchbar .done-btn{background:var(--green);color:#fff;}
   .batchbar .del-btn{background:var(--red);color:#fff;}
 
+  .listToolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:4px 2px 10px;
+  }
+  .selectAllRow{
+    display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;
+  }
+  .selectAllRow input{width:20px;height:20px;accent-color:var(--blue);}
+  .clearAllBtn{
+    border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;
+    background:#fde8e8;color:var(--red);cursor:pointer;
+  }
+  .batchbar .ship-btn{background:var(--blue);color:#fff;}
+  .shipped-badge{
+    display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;
+    color:var(--blue);background:var(--blue-bg);border-radius:8px;padding:2px 7px;
+  }
+
   .status-line{
     font-size:11px;
     text-align:center;
@@ -293,6 +310,10 @@
 <main>
   <div class="quicklink"><a href="catalog.html">+ Thêm danh sách công việc</a></div>
   <div id="errArea"></div>
+  <div class="listToolbar" id="listToolbar">
+    <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
+    <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
+  </div>
   <div id="list"></div>
 </main>
 
@@ -301,6 +322,7 @@
 <div class="batchbar" id="batchbar">
   <span id="batchCount">0 đã chọn</span>
   <button class="done-btn" id="batchDone"></button>
+  <button class="ship-btn" id="batchShip" style="display:none;">🚚 Đã giao</button>
   <button class="del-btn" id="batchDel">Xóa</button>
 </div>
 
@@ -339,6 +361,8 @@ const connStatus = document.getElementById("connStatus");
 const batchbar = document.getElementById("batchbar");
 const addbar = document.getElementById("addbar");
 const errArea = document.getElementById("errArea");
+const selectAllBox = document.getElementById("selectAllBox");
+const clearAllBtn = document.getElementById("clearAllBtn");
 
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
@@ -384,10 +408,34 @@ document.querySelectorAll(".tab").forEach(t => {
     currentTab = t.dataset.tab;
     selected.clear();
     addbar.style.display = currentTab === "in" ? "flex" : "none";
+    clearAllBtn.style.display = currentTab === "xong" ? "inline-block" : "none";
     render();
   });
 });
 addbar.style.display = "flex";
+
+// ---- Chọn tất cả ----
+selectAllBox.addEventListener("change", () => {
+  const shown = getShown();
+  if(selectAllBox.checked) shown.forEach(t => selected.add(t.id));
+  else shown.forEach(t => selected.delete(t.id));
+  updateBatchBar();
+  render();
+});
+
+// ---- Làm sạch (xóa toàn bộ sản phẩm đã xong) ----
+clearAllBtn.addEventListener("click", async () => {
+  const items = allTasks.filter(t => t.status === "xong");
+  if(items.length === 0) return;
+  if(!confirm(`Xóa toàn bộ ${items.length} sản phẩm đã xong? Không thể hoàn tác.`)) return;
+  try{
+    for(const it of items){
+      await deleteDoc(doc(db, "tasks", it.id));
+    }
+    selected.clear();
+    updateBatchBar();
+  }catch(e){ showError("Không làm sạch được danh sách: " + e.message); }
+});
 
 // ---- Search ----
 document.getElementById("searchTask").addEventListener("input", e => {
@@ -465,14 +513,7 @@ function groupShown(shown){
 }
 
 // ---- Render ----
-function render(){
-  const badgeIn = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
-  const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
-  const badgeXong = allTasks.filter(t => t.status === "xong").length;
-  document.getElementById("badge-in").textContent = badgeIn;
-  document.getElementById("badge-dong_goi").textContent = badgeDG;
-  document.getElementById("badge-xong").textContent = badgeXong;
-
+function getShown(){
   let shown;
   if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in");
   else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
@@ -484,6 +525,26 @@ function render(){
       (t.orderName || "").toLowerCase().includes(searchTerm)
     );
   }
+  return shown;
+}
+
+function updateSelectAllBox(shown){
+  const n = shown.length;
+  const nSel = shown.filter(t => selected.has(t.id)).length;
+  selectAllBox.checked = n > 0 && nSel === n;
+  selectAllBox.indeterminate = nSel > 0 && nSel < n;
+}
+
+function render(){
+  const badgeIn = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
+  const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
+  const badgeXong = allTasks.filter(t => t.status === "xong").length;
+  document.getElementById("badge-in").textContent = badgeIn;
+  document.getElementById("badge-dong_goi").textContent = badgeDG;
+  document.getElementById("badge-xong").textContent = badgeXong;
+
+  const shown = getShown();
+  updateSelectAllBox(shown);
 
   list.innerHTML = "";
   if(shown.length === 0){
@@ -610,8 +671,14 @@ function renderItem(t){
     setTimeout(() => nameInput.focus(), 0);
   } else {
     const nameDiv = document.createElement("div");
-    nameDiv.className = "name" + (t.status === "xong" ? " done" : "");
+    nameDiv.className = "name";
     nameDiv.textContent = t.name;
+    if(currentTab === "xong" && t.shipped){
+      const badge = document.createElement("span");
+      badge.className = "shipped-badge";
+      badge.textContent = "🚚 Đã giao";
+      nameDiv.appendChild(badge);
+    }
     const metaDiv = document.createElement("div");
     metaDiv.className = "meta";
     metaDiv.textContent = "SL: " + (t.qty || 1);
@@ -647,6 +714,14 @@ function renderItem(t){
       revBtn.textContent = "↩ Lùi lại";
       revBtn.addEventListener("click", () => revertStatus(t));
       actions.appendChild(revBtn);
+    }
+
+    if(currentTab === "xong"){
+      const shipBtn = document.createElement("button");
+      shipBtn.className = "mini" + (t.shipped ? "" : " primary");
+      shipBtn.textContent = t.shipped ? "↩ Bỏ đã giao" : "🚚 Đã giao";
+      shipBtn.addEventListener("click", () => toggleShipped(t));
+      actions.appendChild(shipBtn);
     }
 
     const editBtn = document.createElement("button");
@@ -714,6 +789,18 @@ async function revertStatus(t){
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
 }
 
+async function toggleShipped(t){
+  try{
+    await updateDoc(doc(db, "tasks", t.id), { shipped: !t.shipped, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
+}
+
+async function markShipped(id, value){
+  try{
+    await updateDoc(doc(db, "tasks", id), { shipped: value, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
+}
+
 async function packWholeOrder(orderId){
   const items = allTasks.filter(t => t.orderId === orderId && t.status === "cho_dong_goi");
   try{
@@ -763,9 +850,29 @@ async function renameOrder(orderId, newName){
 function updateBatchBar(){
   const n = selected.size;
   document.getElementById("batchCount").textContent = n + " đã chọn";
-  document.getElementById("batchDone").textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
-  batchbar.classList.toggle("show", n > 0 && currentTab !== "xong");
+  const doneBtn = document.getElementById("batchDone");
+  const shipBtn = document.getElementById("batchShip");
+  if(currentTab === "xong"){
+    doneBtn.style.display = "none";
+    shipBtn.style.display = "inline-block";
+  } else {
+    doneBtn.style.display = "inline-block";
+    doneBtn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+    shipBtn.style.display = "none";
+  }
+  batchbar.classList.toggle("show", n > 0);
 }
+
+document.getElementById("batchShip").addEventListener("click", async () => {
+  const ids = Array.from(selected);
+  try{
+    for(const id of ids){
+      await markShipped(id, true);
+    }
+  }catch(e){ showError("Lỗi khi đánh dấu đã giao theo lô: " + e.message); }
+  selected.clear();
+  updateBatchBar();
+});
 
 document.getElementById("batchDone").addEventListener("click", async () => {
   const ids = Array.from(selected);
