@@ -114,6 +114,19 @@
     border-radius:8px;
   }
 
+  .quicklink{padding:10px 12px 0 12px;}
+  .quicklink a{
+    display:block;
+    text-align:center;
+    background:var(--blue-bg);
+    color:var(--blue);
+    font-weight:600;
+    font-size:14px;
+    padding:11px 12px;
+    border-radius:8px;
+    text-decoration:none;
+  }
+
   main{padding:12px 12px 0 12px;}
   .empty{
     text-align:center;
@@ -203,6 +216,12 @@
   .order-item button.mini.warnbtn{background:var(--amber-bg);color:var(--amber);}
   .order-item button.mini.danger{background:#fde8e8;color:var(--red);}
 
+  .note-preview{
+    margin-top:5px;font-size:12.5px;color:var(--blue);background:var(--blue-bg);
+    padding:6px 8px;border-radius:6px;word-break:break-word;cursor:pointer;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+
   .note-box{margin-top:8px;}
   .note-box textarea{
     width:100%;font-size:13px;padding:8px 9px;border:1px solid var(--border);
@@ -272,12 +291,12 @@
 </div>
 
 <main>
+  <div class="quicklink"><a href="catalog.html">+ Thêm danh sách công việc</a></div>
   <div id="errArea"></div>
   <div id="list"></div>
 </main>
 
 <div class="status-line" id="connStatus"></div>
-<div class="status-line"><a href="catalog.html" style="color:var(--muted);">Quản lý danh mục sản phẩm →</a></div>
 
 <div class="batchbar" id="batchbar">
   <span id="batchCount">0 đã chọn</span>
@@ -324,6 +343,27 @@ const errArea = document.getElementById("errArea");
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
+}
+
+// ---- Helper: commit an edit (save) either on explicit click or on click-away ----
+// Attaches a "focusout" listener to containerEl; if focus moves to something
+// outside containerEl, commitFn() runs automatically (click ra ngoài = lưu & đóng).
+// The returned function can be wired to a "Lưu" button so both paths share
+// the same one-shot commit (no double-submit).
+function attachClickAwayCommit(containerEl, commitFn){
+  let committed = false;
+  const commit = () => {
+    if(committed) return;
+    committed = true;
+    commitFn();
+  };
+  containerEl.addEventListener("focusout", () => {
+    setTimeout(() => {
+      if(!containerEl.isConnected) return; // already closed/removed (e.g. Hủy)
+      if(!containerEl.contains(document.activeElement)) commit();
+    }, 0);
+  });
+  return commit;
 }
 
 // ---- Helpers: id / name generation for orders ----
@@ -480,10 +520,12 @@ function renderOrderBox(g){
     const saveBtn = document.createElement("button");
     saveBtn.className = "save-icon";
     saveBtn.textContent = "Lưu";
-    saveBtn.addEventListener("click", () => renameOrder(g.orderId, input.value));
-    input.addEventListener("keydown", e => { if(e.key === "Enter") renameOrder(g.orderId, input.value); });
+    const commit = attachClickAwayCommit(header, () => renameOrder(g.orderId, input.value));
+    saveBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", e => { if(e.key === "Enter") commit(); });
     header.appendChild(input);
     header.appendChild(saveBtn);
+    setTimeout(() => input.focus(), 0);
   } else {
     const title = document.createElement("div");
     title.className = "order-title";
@@ -554,16 +596,18 @@ function renderItem(t){
     const saveBtn = document.createElement("button");
     saveBtn.className = "mini primary";
     saveBtn.textContent = "Lưu";
-    saveBtn.addEventListener("click", () => saveTaskEdit(t.id, nameInput.value, qtyInput.value));
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "mini";
     cancelBtn.textContent = "Hủy";
+    const commit = attachClickAwayCommit(fields, () => saveTaskEdit(t.id, nameInput.value, qtyInput.value));
+    saveBtn.addEventListener("click", commit);
     cancelBtn.addEventListener("click", () => { editingTaskIds.delete(t.id); render(); });
     fields.appendChild(nameInput);
     fields.appendChild(qtyInput);
     fields.appendChild(saveBtn);
     fields.appendChild(cancelBtn);
     info.appendChild(fields);
+    setTimeout(() => nameInput.focus(), 0);
   } else {
     const nameDiv = document.createElement("div");
     nameDiv.className = "name" + (t.status === "xong" ? " done" : "");
@@ -573,6 +617,18 @@ function renderItem(t){
     metaDiv.textContent = "SL: " + (t.qty || 1);
     info.appendChild(nameDiv);
     info.appendChild(metaDiv);
+
+    // Xem trước ghi chú ngay trên danh sách (không cần bấm Sửa mới thấy).
+    // Dùng dạng xem trước thay vì tooltip vì tooltip cần hover, không dùng
+    // được trên điện thoại (chạm) — xem trước luôn hiện + bấm vào để sửa
+    // là cách hoạt động tốt trên di động hơn.
+    if(t.note && !openNotes.has(t.id)){
+      const preview = document.createElement("div");
+      preview.className = "note-preview";
+      preview.textContent = "📝 " + t.note;
+      preview.addEventListener("click", () => { openNotes.add(t.id); render(); });
+      info.appendChild(preview);
+    }
 
     const actions = document.createElement("div");
     actions.className = "row-actions";
@@ -625,10 +681,16 @@ function renderItem(t){
       const saveNoteBtn = document.createElement("button");
       saveNoteBtn.className = "note-save";
       saveNoteBtn.textContent = "Lưu ghi chú";
-      saveNoteBtn.addEventListener("click", () => saveNote(t.id, ta.value));
+      const commit = attachClickAwayCommit(noteBox, async () => {
+        await saveNote(t.id, ta.value);
+        openNotes.delete(t.id);
+        render();
+      });
+      saveNoteBtn.addEventListener("click", commit);
       noteBox.appendChild(ta);
       noteBox.appendChild(saveNoteBtn);
       info.appendChild(noteBox);
+      setTimeout(() => ta.focus(), 0);
     }
   }
 
@@ -668,6 +730,7 @@ async function saveTaskEdit(id, name, qty){
   try{
     await updateDoc(doc(db, "tasks", id), { name: n, qty: q, updatedAt: serverTimestamp() });
     editingTaskIds.delete(id);
+    render();
   }catch(e){ showError("Không lưu được thay đổi: " + e.message); }
 }
 
@@ -692,6 +755,7 @@ async function renameOrder(orderId, newName){
       await updateDoc(doc(db, "tasks", it.id), { orderName: n, updatedAt: serverTimestamp() });
     }
     editingOrderIds.delete(orderId);
+    render();
   }catch(e){ showError("Không đổi được tên đơn: " + e.message); }
 }
 
