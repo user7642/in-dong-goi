@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hướng dẫn sử dụng - Quản lý In &amp; Đóng gói</title>
+<style>
+  :root{
+    --bg:#f5f6f7;
+    --card:#ffffff;
+    --border:#e2e4e7;
+    --text:#1a1d21;
+    --muted:#6b7280;
+    --blue:#2563eb;
+    --blue-bg:#eaf1ff;
+    --amber:#b45309;
+    --amber-bg:#fef3e0;
+    --green:#15803d;
+    --green-bg:#e8f7ec;
+    --red:#dc2626;
+    --gray-bg:#eceef0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:40px;
+    line-height:1.55;
+  }
+  header{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:18px 16px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  a.back{font-size:13px;color:var(--blue);text-decoration:none;display:block;margin-bottom:6px;}
+  h1{font-size:19px;margin:0;font-weight:700;}
+  .subtitle{font-size:13.5px;color:var(--muted);margin-top:4px;}
+
+  main{padding:14px;max-width:680px;margin:0 auto;}
+
+  .intro-card{
+    background:var(--blue-bg);
+    border:1px solid #bcd3fb;
+    border-radius:12px;
+    padding:14px 16px;
+    margin-bottom:16px;
+    font-size:14.5px;
+    color:#1e3a6b;
+  }
+  .intro-card b{color:var(--blue);}
+
+  .toc{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:18px;
+  }
+  .toc-title{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em;}
+  .toc a{
+    display:block;
+    font-size:14.5px;
+    color:var(--text);
+    text-decoration:none;
+    padding:7px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .toc a:last-child{border-bottom:none;}
+  .toc a:before{content:"→ ";color:var(--blue);}
+
+  /* ---- Accordion ---- */
+  .acc-item{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:12px;
+    overflow:hidden;
+    scroll-margin-top:16px;
+  }
+  .acc-item.open{border-color:var(--blue);}
+  .acc-head{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:15px 16px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .acc-head .emoji{font-size:20px;flex-shrink:0;}
+  .acc-head .label{flex:1;font-size:15.5px;font-weight:700;}
+  .acc-head .chevron{
+    font-size:13px;color:var(--muted);
+    transition:transform .18s ease;
+    flex-shrink:0;
+  }
+  .acc-item.open .acc-head .chevron{transform:rotate(180deg);color:var(--blue);}
+  .acc-item.open .acc-head{background:var(--blue-bg);}
+  .acc-body{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .22s ease;
+  }
+  .acc-body-inner{
+    padding:2px 16px 18px 16px;
+    font-size:14.5px;
+  }
+
+  .acc-body-inner h3{
+    font-size:14px;
+    margin:16px 0 8px;
+    color:var(--blue);
+    font-weight:700;
+  }
+  .acc-body-inner h3:first-child{margin-top:2px;}
+  .acc-body-inner p{margin:8px 0;}
+  .acc-body-inner ul, .acc-body-inner ol{margin:8px 0;padding-left:20px;}
+  .acc-body-inner li{margin-bottom:6px;}
+
+  .step{
+    display:flex;gap:10px;
+    background:var(--gray-bg);
+    border-radius:10px;
+    padding:10px 12px;
+    margin-bottom:8px;
+    align-items:flex-start;
+  }
+  .step .num{
+    flex-shrink:0;width:22px;height:22px;border-radius:50%;
+    background:var(--blue);color:#fff;font-size:12px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .step .txt{flex:1;}
+
+  .tip{
+    background:var(--green-bg);color:var(--green);
+    border-radius:10px;padding:10px 12px;font-size:13.5px;margin:10px 0;
+    border:1px solid #bfe3c9;
+  }
+  .warn{
+    background:var(--amber-bg);color:var(--amber);
+    border-radius:10px;padding:10px 12px;font-size:13.5px;margin:10px 0;
+    border:1px solid #f3d9a8;
+  }
+  .warn b, .tip b{font-weight:700;}
+
+  .btn-sample{
+    display:inline-block;
+    border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:600;
+    margin:2px 2px 2px 0;
+  }
+  .bs-blue{background:var(--blue-bg);color:var(--blue);}
+  .bs-green{background:var(--green-bg);color:var(--green);}
+  .bs-amber{background:var(--amber-bg);color:var(--amber);}
+  .bs-red{background:#fde8e8;color:var(--red);}
+  .bs-gray{background:var(--gray-bg);color:var(--text);}
+
+  table.linefmt{
+    width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;
+  }
+  table.linefmt th, table.linefmt td{
+    border:1px solid var(--border);padding:8px;text-align:left;vertical-align:top;
+  }
+  table.linefmt th{background:var(--gray-bg);font-weight:700;}
+  code{
+    background:var(--gray-bg);padding:2px 6px;border-radius:5px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+
+  .tabs-demo{display:flex;gap:6px;margin:10px 0;}
+  .tabs-demo span{
+    flex:1;text-align:center;padding:8px 4px;font-size:12.5px;font-weight:700;
+    border-radius:8px;background:var(--gray-bg);color:var(--muted);
+  }
+  .tabs-demo span.on{background:var(--blue-bg);color:var(--blue);}
+
+  footer{
+    text-align:center;padding:24px 14px 10px;
+    color:var(--muted);font-size:12.5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="index.html">← Về trang chính</a>
+  <h1>📖 Hướng dẫn sử dụng</h1>
+  <div class="subtitle">Bộ công cụ Quản lý In &amp; Đóng gói</div>
+</header>
+
+<main>
+
+  <div class="intro-card">
+    👋 Trang này giải thích <b>từng nút, từng bước</b> trong hệ thống — dành cho người
+    mới, không cần biết gì về máy tính hay công nghệ. Cứ đọc từ trên xuống,
+    hoặc bấm vào mục bạn cần ở danh sách bên dưới để nhảy tới ngay.
+    Mỗi mục bấm vào sẽ <b>mở ra</b>, bấm mục khác thì mục cũ <b>tự đóng lại</b> —
+    không bị rối mắt.
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">Đi nhanh tới mục</div>
+    <a href="#m0">Hệ thống này dùng để làm gì?</a>
+    <a href="#m1">Trang chính có gì? (3 tab: In / Đóng gói / Đã xong)</a>
+    <a href="#m2">Cách thêm 1 việc mới nhanh (gõ tay)</a>
+    <a href="#m3">Xử lý từng sản phẩm — các nút nghĩa là gì?</a>
+    <a href="#m4">"Đơn hàng" là gì? Đóng gói cả đơn một lần</a>
+    <a href="#m5">Chọn nhiều sản phẩm cùng lúc (thao tác hàng loạt)</a>
+    <a href="#m6">Tìm kiếm &amp; ghi chú</a>
+    <a href="#m7">Trang "Thêm danh sách công việc" — chọn từ danh mục có sẵn</a>
+    <a href="#m8">Gom nhiều sản phẩm thành 1 đơn hàng</a>
+    <a href="#m9">Quản lý danh mục sản phẩm (dành cho người phụ trách)</a>
+    <a href="#m10">Quy trình làm việc mỗi ngày — tóm tắt siêu ngắn</a>
+    <a href="#m11">Câu hỏi thường gặp / Lỗi thường gặp</a>
+  </div>
+
+  <!-- M0 -->
+  <div class="acc-item" id="m0">
+    <div class="acc-head">
+      <span class="emoji">🎯</span>
+      <span class="label">Hệ thống này dùng để làm gì?</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>
+        Đây là một trang web <b>theo dõi công việc In và Đóng gói</b> sản phẩm.
+        Mỗi sản phẩm cần làm sẽ đi qua 3 giai đoạn, giống như đi qua 3 "trạm":
+      </p>
+      <div class="tabs-demo">
+        <span class="on">🖨️ In</span>
+        <span>📦 Đóng gói</span>
+        <span>✅ Đã xong</span>
+      </div>
+      <p>
+        Khi in xong 1 sản phẩm → bấm nút để nó chuyển sang trạm "Đóng gói".
+        Khi đóng gói xong → bấm nút để nó chuyển sang trạm "Đã xong".
+        Ai cũng nhìn vào trang này là biết ngay việc gì đang in, việc gì đang chờ đóng gói.
+      </p>
+      <div class="tip">
+        💡 Trang web này <b>tự động lưu mọi thứ</b> ngay khi bạn bấm, không cần
+        bấm nút "Lưu" hay "Save" riêng. Nhiều người mở cùng lúc trên nhiều điện
+        thoại/máy tính khác nhau cũng sẽ luôn thấy dữ liệu giống nhau, cập nhật
+        gần như ngay lập tức.
+      </div>
+      <div class="warn">
+        ⚠️ Cần có <b>kết nối Internet (Wifi hoặc 4G)</b> thì trang mới hoạt động
+        được. Nếu mất mạng, phía dưới trang chính sẽ hiện dòng chữ báo lỗi màu đỏ.
+      </div>
+      <p>Hệ thống có <b>2 trang chính</b>:</p>
+      <ul>
+        <li><b>Trang chính (index.html)</b> — nơi theo dõi và xử lý công việc hàng ngày (3 tab In / Đóng gói / Đã xong).</li>
+        <li><b>Trang danh mục (catalog.html)</b> — nơi thêm việc mới bằng cách chọn từ danh sách sản phẩm có sẵn, và nơi quản lý (thêm/sửa/xóa) danh sách sản phẩm đó.</li>
+      </ul>
+    </div></div>
+  </div>
+
+  <!-- M1 -->
+  <div class="acc-item" id="m1">
+    <div class="acc-head">
+      <span class="emoji">🏠</span>
+      <span class="label">Trang chính có gì? (3 tab)</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Mở trang chính lên, trên cùng là 3 nút gọi là "tab", bấm vào tab nào thì xem danh sách của tab đó:</p>
+      <h3>🖨️ Tab "In"</h3>
+      <p>Danh sách những sản phẩm <b>đang chờ in hoặc đang in</b>. Đây cũng là nơi bạn thêm việc mới bằng cách gõ tay (xem mục "Cách thêm 1 việc mới nhanh").</p>
+      <h3>📦 Tab "Đóng gói"</h3>
+      <p>Danh sách những sản phẩm <b>đã in xong, đang chờ đóng gói</b>.</p>
+      <h3>✅ Tab "Đã xong"</h3>
+      <p>Danh sách những sản phẩm <b>đã đóng gói xong</b>, sẵn sàng giao. Ở đây bạn còn có thể đánh dấu "Đã giao" cho từng sản phẩm.</p>
+      <div class="tip">
+        💡 Bên cạnh tên mỗi tab có 1 <b>số màu</b> — đó là số lượng việc đang có
+        trong tab đó. Nhìn số này là biết ngay hôm nay còn bao nhiêu việc mỗi loại.
+      </div>
+    </div></div>
+  </div>
+
+  <!-- M2 -->
+  <div class="acc-item" id="m2">
+    <div class="acc-head">
+      <span class="emoji">➕</span>
+      <span class="label">Cách thêm 1 việc mới nhanh (gõ tay)</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Dùng cách này khi cần thêm nhanh 1 sản phẩm lẻ, không cần chọn từ danh mục.</p>
+      <div class="step"><div class="num">1</div><div class="txt">Ở tab <b>"In"</b> của trang chính, tìm ô có chữ <i>"Tên sản phẩm..."</i> ngay phía trên danh sách.</div></div>
+      <div class="step"><div class="num">2</div><div class="txt">Gõ tên sản phẩm vào ô đó.</div></div>
+      <div class="step"><div class="num">3</div><div class="txt">Ô nhỏ bên cạnh (ghi "SL") là <b>số lượng</b> — mặc định là 1, bạn có thể sửa lại số khác.</div></div>
+      <div class="step"><div class="num">4</div><div class="txt">Bấm nút <span class="btn-sample bs-blue">+</span> màu xanh (hoặc bấm phím Enter trên bàn phím) để thêm vào danh sách.</div></div>
+      <p>Sản phẩm mới sẽ hiện ngay trong tab "In", được xem là <b>1 đơn hàng riêng</b> (đơn hàng sẽ được đặt tên tự động dạng "Đơn ABC").</p>
+      <div class="tip">💡 Muốn thêm nhiều sản phẩm cùng lúc và gom chúng thành 1 đơn hàng chung? Xem mục <b>"Trang Thêm danh sách công việc"</b> và <b>"Gom nhiều sản phẩm thành 1 đơn hàng"</b> bên dưới — cách đó nhanh hơn nhiều khi có nhiều sản phẩm.</div>
+    </div></div>
+  </div>
+
+  <!-- M3 -->
+  <div class="acc-item" id="m3">
+    <div class="acc-head">
+      <span class="emoji">🔘</span>
+      <span class="label">Xử lý từng sản phẩm — các nút nghĩa là gì?</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Mỗi sản phẩm trong danh sách có vài nút nhỏ bên dưới. Ý nghĩa từng nút:</p>
+
+      <p><span class="btn-sample bs-blue">Đã in xong</span> — chỉ có ở tab "In". Bấm khi sản phẩm này đã in xong, nó sẽ <b>tự chuyển sang tab "Đóng gói"</b>.</p>
+
+      <p><span class="btn-sample bs-blue">Đã đóng gói</span> — chỉ có ở tab "Đóng gói". Bấm khi sản phẩm này đã đóng gói xong, nó sẽ <b>tự chuyển sang tab "Đã xong"</b>.</p>
+
+      <p><span class="btn-sample bs-amber">↩ Lùi lại</span> — có ở tab "Đóng gói" và "Đã xong". Dùng khi <b>bấm nhầm</b> hoặc cần làm lại — sản phẩm sẽ quay về trạm trước đó.</p>
+
+      <p><span class="btn-sample bs-blue">🚚 Đã giao</span> — chỉ có ở tab "Đã xong". Đánh dấu sản phẩm đã giao cho khách. Bấm lại lần nữa để bỏ đánh dấu nếu lỡ tay.</p>
+
+      <p><span class="btn-sample bs-gray">✏️ Sửa</span> — sửa lại tên hoặc số lượng của sản phẩm nếu gõ sai lúc đầu. Sửa xong bấm <b>"Lưu"</b>, hoặc bấm ra chỗ khác trên màn hình thì hệ thống cũng tự lưu giúp bạn.</p>
+
+      <p><span class="btn-sample bs-gray">📝 Ghi chú</span> — thêm 1 dòng ghi chú riêng cho sản phẩm này (ví dụ: "khách yêu cầu gói giấy đỏ"). Nếu sản phẩm đã có ghi chú, bên cạnh chữ "Ghi chú" sẽ có 1 <b>chấm xanh •</b> để bạn biết là có ghi chú chưa đọc. Ghi chú cũng hiện sẵn ngay bên dưới tên sản phẩm để không cần bấm vào mới thấy.</p>
+
+      <p><span class="btn-sample bs-red">🗑 Xóa</span> — xóa hẳn sản phẩm này khỏi danh sách. Hệ thống sẽ hỏi lại 1 lần <i>"Xóa việc này?"</i> để chắc chắn bạn không bấm nhầm.</p>
+
+      <div class="warn">⚠️ Nút <b>Xóa</b> không thể hoàn tác (không lấy lại được). Nếu không chắc, hãy dùng nút <b>Sửa</b> hoặc <b>↩ Lùi lại</b> thay vì Xóa.</div>
+    </div></div>
+  </div>
+
+  <!-- M4 -->
+  <div class="acc-item" id="m4">
+    <div class="acc-head">
+      <span class="emoji">🧺</span>
+      <span class="label">"Đơn hàng" là gì? Đóng gói cả đơn một lần</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>
+        Trong danh sách, các sản phẩm được <b>gom lại theo từng khung có viền</b> —
+        mỗi khung là 1 "đơn hàng" (có thể là đơn của 1 khách, hoặc 1 lô sản phẩm bạn tự gom).
+        Phía trên mỗi khung có tên đơn (ví dụ "Đơn ABC"), bấm vào biểu tượng
+        <span class="btn-sample bs-gray">✏️</span> bên cạnh tên để đổi tên đơn cho dễ nhớ
+        (ví dụ đổi thành tên khách hàng).
+      </p>
+      <h3>Ở tab "Đóng gói" có thêm phần đặc biệt:</h3>
+      <ul>
+        <li>Nếu đơn hàng đó <b>còn sản phẩm chưa in xong</b>, khung sẽ có viền
+          <b style="color:var(--amber)">màu vàng cam</b> và dòng chữ báo <i>"Đơn chưa đủ — còn ... sản phẩm đang in"</i>.</li>
+        <li>Nếu đơn hàng đó đã <b>in xong toàn bộ</b>, khung sẽ có viền
+          <b style="color:var(--green)">màu xanh lá</b>, dòng chữ báo <i>"Đủ hàng — có thể đóng gói cả đơn"</i>,
+          và xuất hiện nút to màu xanh lá <span class="btn-sample bs-green">📦 Đóng gói cả đơn</span>.</li>
+      </ul>
+      <p>
+        Bấm nút <b>"Đóng gói cả đơn"</b> thì <b>toàn bộ sản phẩm trong đơn đó</b> sẽ
+        chuyển sang tab "Đã xong" cùng 1 lúc — không cần bấm từng sản phẩm một.
+      </p>
+      <div class="tip">💡 Mẹo: nhìn màu viền khung là biết ngay đơn nào đã sẵn sàng đóng gói (xanh lá) và đơn nào cần chờ (vàng cam), không cần đọc kỹ từng dòng.</div>
+    </div></div>
+  </div>
+
+  <!-- M5 -->
+  <div class="acc-item" id="m5">
+    <div class="acc-head">
+      <span class="emoji">☑️</span>
+      <span class="label">Chọn nhiều sản phẩm cùng lúc (thao tác hàng loạt)</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Khi có nhiều sản phẩm cần xử lý giống nhau (ví dụ 10 sản phẩm cùng in xong 1 lượt), không cần bấm từng cái — tick chọn rồi xử lý 1 lần:</p>
+      <div class="step"><div class="num">1</div><div class="txt">Bấm vào <b>ô vuông nhỏ</b> bên trái mỗi sản phẩm muốn chọn (giống ô tick chọn thông thường).</div></div>
+      <div class="step"><div class="num">2</div><div class="txt">Muốn chọn hết tất cả trong danh sách đang xem, bấm vào ô <b>"Chọn tất cả"</b> phía trên danh sách.</div></div>
+      <div class="step"><div class="num">3</div><div class="txt">Khi đã chọn ít nhất 1 sản phẩm, phía <b>dưới cùng màn hình</b> sẽ hiện 1 thanh đen với các nút hành động.</div></div>
+      <div class="step"><div class="num">4</div><div class="txt">Bấm nút hành động phù hợp: chuyển trạng thái hàng loạt, đánh dấu "Đã giao" hàng loạt (chỉ ở tab Đã xong), hoặc <span class="btn-sample bs-red">Xóa</span> hàng loạt.</div></div>
+      <p>Riêng ở tab <b>"Đã xong"</b> còn có thêm nút <span class="btn-sample bs-red">🧹 Làm sạch</span> ở phía trên danh sách — bấm nút này để <b>xóa toàn bộ</b> sản phẩm đã hoàn tất trong 1 lần (dùng khi muốn dọn sạch danh sách cũ, ví dụ đầu tháng mới).</p>
+      <div class="warn">⚠️ "Làm sạch" và "Xóa hàng loạt" đều không thể hoàn tác — hệ thống sẽ hỏi lại trước khi xóa thật.</div>
+    </div></div>
+  </div>
+
+  <!-- M6 -->
+  <div class="acc-item" id="m6">
+    <div class="acc-head">
+      <span class="emoji">🔍</span>
+      <span class="label">Tìm kiếm &amp; ghi chú</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Danh sách nhiều quá, khó tìm? Dùng ô <b>"🔍 Tìm việc theo tên hoặc tên đơn..."</b> ngay phía trên danh sách của trang chính. Gõ vài chữ trong tên sản phẩm hoặc tên đơn hàng, danh sách sẽ tự lọc chỉ hiện những gì khớp.</p>
+      <p>Về ghi chú: xem lại mục <b>"Xử lý từng sản phẩm"</b> ở phần nút <span class="btn-sample bs-gray">📝 Ghi chú</span> phía trên.</p>
+    </div></div>
+  </div>
+
+  <!-- M7 -->
+  <div class="acc-item" id="m7">
+    <div class="acc-head">
+      <span class="emoji">🗂️</span>
+      <span class="label">Trang "Thêm danh sách công việc" — chọn từ danh mục có sẵn</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>
+        Nếu shop đã có sẵn danh sách các mặt hàng hay in/đóng gói (ví dụ: các mẫu
+        tranh, sách, với nhiều lựa chọn khổ giấy, màu sắc...), dùng trang này để
+        thêm việc <b>nhanh hơn nhiều</b> so với gõ tay từng cái.
+      </p>
+      <div class="step"><div class="num">1</div><div class="txt">Từ trang chính, bấm vào ô xanh <b>"+ Thêm danh sách công việc"</b> ngay phía trên danh sách.</div></div>
+      <div class="step"><div class="num">2</div><div class="txt">Trang mới mở ra, mặc định đang ở tab <b>"➕ Thêm việc"</b>.</div></div>
+      <div class="step"><div class="num">3</div><div class="txt">Bạn sẽ thấy danh sách toàn bộ sản phẩm đã có sẵn trong kho dữ liệu. Có thể gõ vào ô tìm kiếm để lọc nhanh.</div></div>
+      <div class="step"><div class="num">4</div><div class="txt">Mỗi sản phẩm hiện các <b>nút lựa chọn (phân loại)</b> riêng — ví dụ khổ A2, A3, hoặc màu sắc. Bấm vào 1 lựa chọn để chọn nó.</div></div>
+      <div class="step"><div class="num">5</div><div class="txt">Bấm nhiều lần vào cùng 1 lựa chọn để <b>tăng số lượng</b> (mỗi lần bấm +1). Khi đã chọn, nút đổi sang <b>màu xanh đậm</b> và hiện số lượng kèm 2 nút nhỏ: dấu <b>−</b> (bớt 1) và dấu <b>×</b> (bỏ chọn hẳn).</div></div>
+      <div class="step"><div class="num">6</div><div class="txt">Chọn xong bao nhiêu sản phẩm tùy ý, phía dưới cùng màn hình sẽ hiện <b>thanh xanh lá</b> với số lượng đã chọn.</div></div>
+      <div class="step"><div class="num">7</div><div class="txt">Bấm <b>"📋 Xem đã chọn"</b> để xem lại toàn bộ danh sách đã chọn trước khi gửi đi — có thể bấm "Xóa" ở từng dòng nếu chọn nhầm.</div></div>
+      <div class="step"><div class="num">8</div><div class="txt">Khi đã ưng ý, bấm nút <b>"Thêm vào danh sách hôm nay"</b>. Toàn bộ sẽ được gửi sang trang chính, xuất hiện ngay trong tab "In".</div></div>
+      <div class="tip">💡 Sản phẩm <b>không có phân loại</b> (ví dụ chỉ có 1 loại duy nhất) sẽ hiện 1 nút to ghi <i>"➕ Chọn sản phẩm này"</i> — bấm vào để chọn, cách dùng giống hệt các nút phân loại khác.</div>
+    </div></div>
+  </div>
+
+  <!-- M8 -->
+  <div class="acc-item" id="m8">
+    <div class="acc-head">
+      <span class="emoji">📦</span>
+      <span class="label">Gom nhiều sản phẩm thành 1 đơn hàng</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>
+        Bình thường, mỗi sản phẩm bạn chọn ở trang "Thêm việc" sẽ trở thành <b>1 đơn
+        hàng riêng lẻ</b>. Nếu 1 khách đặt <b>nhiều sản phẩm khác nhau cùng lúc</b>
+        và bạn muốn chúng nằm chung 1 đơn (để sau này đóng gói cả đơn 1 lần —
+        xem mục "Đơn hàng là gì" ở trên), hãy dùng chức năng <b>Gom sản phẩm</b>:
+      </p>
+      <div class="step"><div class="num">1</div><div class="txt">Ở trang "Thêm danh sách công việc", tab "➕ Thêm việc", bấm nút <b>"📦 Gom sản phẩm"</b>.</div></div>
+      <div class="step"><div class="num">2</div><div class="txt">Nút đổi thành <b>"📦 Đang gom (bấm để hủy)"</b> và hiện thêm ô nhập <b>tên đơn</b> — gõ tên khách hàng hoặc để trống (hệ thống tự đặt tên).</div></div>
+      <div class="step"><div class="num">3</div><div class="txt">Chọn các sản phẩm/phân loại như bình thường — trong lúc đang "gom", tất cả sản phẩm bạn chọn sẽ <b>tự động thuộc cùng 1 đơn</b>.</div></div>
+      <div class="step"><div class="num">4</div><div class="txt">Chọn xong, bấm nút <b>"✅ Xong"</b> để chốt đơn này lại. Muốn gom tiếp 1 đơn khác, bấm lại "📦 Gom sản phẩm" và lặp lại các bước trên.</div></div>
+      <div class="step"><div class="num">5</div><div class="txt">Cuối cùng bấm <b>"Thêm vào danh sách hôm nay"</b> như bình thường để gửi tất cả sang trang chính.</div></div>
+      <div class="tip">💡 Nếu bấm "📦 Đang gom (bấm để hủy)" để hủy giữa chừng, các sản phẩm đã chọn trong lúc gom sẽ <b>không bị mất</b> — chỉ tách trở lại thành các đơn lẻ riêng từng cái.</div>
+    </div></div>
+  </div>
+
+  <!-- M9 -->
+  <div class="acc-item" id="m9">
+    <div class="acc-head">
+      <span class="emoji">🛠️</span>
+      <span class="label">Quản lý danh mục sản phẩm (dành cho người phụ trách)</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>
+        Mục này dùng để <b>thêm mới / sửa / xóa</b> các sản phẩm nằm trong "kho
+        dữ liệu" — tức là danh sách mà mọi người chọn ở mục trên (Thêm danh sách
+        công việc). Thường chỉ người quản lý cần dùng phần này; nhân viên in/đóng
+        gói hàng ngày không cần đụng tới.
+      </p>
+      <div class="step"><div class="num">1</div><div class="txt">Mở trang "Thêm danh sách công việc", bấm tab <b>"🗂 Quản lý danh mục"</b> ở trên cùng.</div></div>
+
+      <h3>Cách 1 — Nhập nhanh nhiều sản phẩm cùng lúc (dán danh sách)</h3>
+      <p>Dùng ô to ở trên để dán/gõ nhiều dòng, <b>mỗi dòng là 1 sản phẩm</b>. Có 3 cách viết 1 dòng:</p>
+      <table class="linefmt">
+        <tr><th>Kiểu</th><th>Cách viết</th><th>Ví dụ</th></tr>
+        <tr>
+          <td>Không có lựa chọn nào (sản phẩm đơn giản)</td>
+          <td><code>Tên sản phẩm</code></td>
+          <td><code>Bút chì màu 12 màu</code></td>
+        </tr>
+        <tr>
+          <td>Có 1 tầng lựa chọn (ví dụ chỉ chọn khổ giấy)</td>
+          <td><code>Tên sản phẩm | lựa chọn 1, lựa chọn 2</code></td>
+          <td><code>Lược sử Việt Nam | A0, A1, A2, A3</code></td>
+        </tr>
+        <tr>
+          <td>Có 2 tầng lựa chọn (ví dụ vừa chọn chủ đề, vừa chọn khổ giấy)</td>
+          <td><code>Tên sản phẩm | tầng 1a, tầng 1b | tầng 2a, tầng 2b</code></td>
+          <td><code>Bộ tranh kỹ năng | An toàn trong nhà, An toàn ngoài trời | A2, A3</code></td>
+        </tr>
+      </table>
+      <p>Dán/gõ xong, bấm nút <b>"Nhập danh sách"</b>. Hệ thống sẽ tự báo kết quả: bao nhiêu sản phẩm mới, bao nhiêu sản phẩm được gộp thêm lựa chọn, bao nhiêu dòng bị bỏ qua vì sai cách viết.</p>
+      <div class="tip">💡 Nếu tên sản phẩm bạn dán <b>đã có sẵn</b> trong danh mục, hệ thống sẽ tự <b>gộp thêm lựa chọn mới</b> vào sản phẩm cũ, không tạo ra sản phẩm trùng lặp — bạn không cần lo xóa cái cũ trước.</div>
+      <p>Nếu ô nhập quá nhỏ khó nhìn, bấm nút <b>"⤢ Mở rộng toàn màn hình"</b> để gõ/dán thoải mái hơn, xong bấm "Lưu".</p>
+
+      <h3>Cách 2 — Sửa hoặc xóa từng sản phẩm</h3>
+      <p>Phía dưới là danh sách toàn bộ sản phẩm đang có. Có ô <b>"Tìm theo từ khóa..."</b> để lọc nhanh.</p>
+      <ul>
+        <li>Bấm nút <span class="btn-sample bs-gray">✏️ Sửa</span> bên cạnh 1 sản phẩm để sửa tên hoặc lựa chọn của nó (dùng đúng cách viết 1 dòng ở bảng trên), rồi bấm "Lưu".</li>
+        <li>Tick chọn ô vuông bên trái 1 hoặc nhiều sản phẩm, rồi bấm nút <span class="btn-sample bs-red">Xóa</span> ở thanh phía trên để xóa các sản phẩm đã chọn khỏi danh mục.</li>
+      </ul>
+      <div class="warn">⚠️ Xóa ở đây là xóa khỏi <b>kho danh mục</b> (không còn hiện ra để chọn nữa) — không ảnh hưởng tới các việc đã thêm vào trang chính từ trước.</div>
+    </div></div>
+  </div>
+
+  <!-- M10 -->
+  <div class="acc-item" id="m10">
+    <div class="acc-head">
+      <span class="emoji">⚡</span>
+      <span class="label">Quy trình làm việc mỗi ngày — tóm tắt siêu ngắn</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Nếu không muốn đọc hết ở trên, chỉ cần nhớ quy trình 4 bước này:</p>
+      <div class="step"><div class="num">1</div><div class="txt"><b>Thêm việc:</b> gõ tay nhanh ở tab "In", hoặc bấm "+ Thêm danh sách công việc" để chọn từ danh mục có sẵn.</div></div>
+      <div class="step"><div class="num">2</div><div class="txt"><b>In xong 1 sản phẩm nào:</b> bấm nút "Đã in xong" ở sản phẩm đó (hoặc chọn nhiều rồi bấm hàng loạt).</div></div>
+      <div class="step"><div class="num">3</div><div class="txt"><b>Đóng gói:</b> qua tab "Đóng gói", nếu khung đơn hàng chuyển màu xanh lá thì bấm "📦 Đóng gói cả đơn"; nếu vẫn còn màu vàng cam thì đóng gói từng sản phẩm bằng nút "Đã đóng gói".</div></div>
+      <div class="step"><div class="num">4</div><div class="txt"><b>Giao hàng:</b> qua tab "Đã xong", khi giao cho khách xong thì bấm "🚚 Đã giao".</div></div>
+      <p>Bấm nhầm ở đâu thì dùng nút <b>"↩ Lùi lại"</b> để quay về bước trước, không cần xóa làm lại từ đầu.</p>
+    </div></div>
+  </div>
+
+  <!-- M11 -->
+  <div class="acc-item" id="m11">
+    <div class="acc-head">
+      <span class="emoji">❓</span>
+      <span class="label">Câu hỏi thường gặp / Lỗi thường gặp</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <h3>Trang báo dòng chữ đỏ "Lỗi kết nối..." ở dưới cùng thì làm sao?</h3>
+      <p>Kiểm tra lại Wifi/4G trên điện thoại hoặc máy tính. Trang cần có Internet mới hoạt động được. Có mạng lại thì trang sẽ tự kết nối lại, không cần tải lại trang.</p>
+
+      <h3>Có cần bấm "Lưu" sau mỗi lần thao tác không?</h3>
+      <p>Không cần. Mọi thao tác (thêm, sửa, chuyển trạng thái, xóa...) đều được lưu lại ngay lập tức. Riêng khi <b>Sửa</b> tên/số lượng hoặc <b>Ghi chú</b>, nhớ bấm nút "Lưu" (hoặc bấm ra ngoài ô đang sửa) để chắc chắn thay đổi được ghi nhận.</p>
+
+      <h3>Bấm nhầm nút "Xóa" thì có lấy lại được không?</h3>
+      <p>Không. Xóa là xóa vĩnh viễn. Vì vậy hệ thống luôn hỏi lại 1 câu xác nhận trước khi xóa thật — đọc kỹ trước khi bấm "OK"/"Đồng ý".</p>
+
+      <h3>Người khác thêm việc trên điện thoại của họ, sao trên máy tôi không thấy?</h3>
+      <p>Thường sẽ tự hiện ra sau vài giây nếu có Internet. Nếu vẫn không thấy, thử tải lại trang (kéo màn hình xuống rồi thả ra, hoặc bấm nút làm mới của trình duyệt).</p>
+
+      <h3>Muốn đổi tên đơn hàng sau khi đã tạo thì làm sao?</h3>
+      <p>Ở trang chính, tại khung đơn hàng đó, bấm biểu tượng <span class="btn-sample bs-gray">✏️</span> cạnh tên đơn, gõ tên mới rồi bấm "Lưu".</p>
+
+      <h3>Sản phẩm không có lựa chọn nào (như size, màu) thì chọn kiểu gì ở trang "Thêm việc"?</h3>
+      <p>Sẽ có 1 nút to ghi "➕ Chọn sản phẩm này" — bấm vào để thêm, bấm nhiều lần để tăng số lượng, giống hệt cách dùng các nút lựa chọn khác.</p>
+
+      <h3>Dán danh sách sản phẩm vào ô nhập nhưng báo "dòng bỏ qua (sai định dạng)"?</h3>
+      <p>Kiểm tra lại dòng đó có tên sản phẩm không (không được để trống), và nếu có lựa chọn thì phải cách nhau bằng dấu gạch đứng <code>|</code> đúng như bảng hướng dẫn ở mục "Quản lý danh mục sản phẩm".</p>
+    </div></div>
+  </div>
+
+</main>
+
+<footer>
+  Cần thêm hỗ trợ? Liên hệ người đã bàn giao hệ thống này cho bạn.
+</footer>
+
+<script>
+  const items = document.querySelectorAll(".acc-item");
+  items.forEach(item => {
+    const head = item.querySelector(".acc-head");
+    const body = item.querySelector(".acc-body");
+    head.addEventListener("click", () => {
+      const willOpen = !item.classList.contains("open");
+      // Đóng tất cả các mục khác (chỉ mở 1 mục tại 1 thời điểm)
+      items.forEach(other => {
+        if(other !== item){
+          other.classList.remove("open");
+          other.querySelector(".acc-body").style.maxHeight = null;
+        }
+      });
+      if(willOpen){
+        item.classList.add("open");
+        body.style.maxHeight = body.scrollHeight + "px";
+      } else {
+        item.classList.remove("open");
+        body.style.maxHeight = null;
+      }
+    });
+  });
+
+  // Nếu truy cập bằng link có #m3 v.v. thì tự mở đúng mục đó
+  function openFromHash(){
+    const id = location.hash.replace("#","");
+    if(!id) return;
+    const target = document.getElementById(id);
+    if(!target || !target.classList.contains("acc-item")) return;
+    items.forEach(other => {
+      other.classList.remove("open");
+      other.querySelector(".acc-body").style.maxHeight = null;
+    });
+    target.classList.add("open");
+    const body = target.querySelector(".acc-body");
+    body.style.maxHeight = body.scrollHeight + "px";
+    setTimeout(() => target.scrollIntoView({behavior:"smooth", block:"start"}), 60);
+  }
+  window.addEventListener("hashchange", openFromHash);
+  openFromHash();
+</script>
+
+</body>
+</html>
