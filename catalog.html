@@ -87,8 +87,24 @@
     padding:12px 14px;display:none;align-items:center;gap:10px;z-index:30;
   }
   .taskbar.show{display:flex;}
-  .taskbar span{flex:1;font-size:14px;}
   .taskbar button{border:none;border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
+  .taskbar .countBadge{
+    flex:0 0 auto;background:rgba(255,255,255,.25);border-radius:999px;
+    min-width:28px;height:28px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:14px;
+  }
+  .taskbar .viewBtn{
+    flex:1;background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
+  }
+  .taskbar #sendToIndexBtn{flex:0 0 auto;}
+
+  /* Modal xem danh sách đã chọn */
+  .selgroup{margin-bottom:14px;}
+  .selgroup-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px;}
+  .selrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;}
+  .selrow:last-child{border-bottom:none;}
+  .selrow .selname{flex:1;}
+  .selrow .selremove{background:var(--gray-bg);color:var(--red);font-size:12px;padding:5px 9px;flex-shrink:0;}
 
   .editor-overlay{
     position:fixed;inset:0;background:var(--bg);z-index:50;
@@ -146,6 +162,7 @@
     <div class="row" id="gomRow">
       <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
       <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
+      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
     </div>
     <div id="gomStatusLine" style="display:none;"></div>
 
@@ -155,7 +172,8 @@
 </main>
 
 <div class="taskbar" id="taskbar">
-  <span id="taskCount">Đã chọn 0 phân loại</span>
+  <span id="taskCount" class="countBadge">0</span>
+  <button class="viewBtn" id="viewSelectedBtn" type="button">📋 Xem đã chọn</button>
   <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
 </div>
 
@@ -166,6 +184,15 @@
   <div class="editor-actions">
     <button class="btn-outline" id="editorCancel">Hủy</button>
     <button class="btn-green" id="editorSave">Lưu</button>
+  </div>
+</div>
+
+<div class="editor-overlay" id="selectedOverlay">
+  <h3>Sản phẩm đã chọn</h3>
+  <p class="muted" style="margin-top:0;">Chạm "Xóa" để bỏ chọn 1 phân loại. Đóng lại để tiếp tục chọn thêm.</p>
+  <div id="selectedListBody" style="flex:1;overflow:auto;"></div>
+  <div class="editor-actions">
+    <button class="btn-outline" id="selectedCloseBtn">Đóng</button>
   </div>
 </div>
 
@@ -206,6 +233,7 @@ let mode = "task";
 // ---- Gom sản phẩm (grouping into one order) ----
 let gomMode = false;
 let currentGroupId = null;
+let groupNames = new Map(); // orderId đã "Xong" -> tên đơn (hoặc null = tự sinh mã)
 
 const errArea = document.getElementById("errArea");
 function showError(msg){
@@ -236,6 +264,7 @@ document.querySelectorAll(".tab").forEach(t => {
 const gomBtn = document.getElementById("gomBtn");
 const groupNameInput = document.getElementById("groupNameInput");
 const gomStatusLine = document.getElementById("gomStatusLine");
+const gomDoneBtn = document.getElementById("gomDoneBtn");
 
 function updateGomStatusLine(){
   if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
@@ -259,12 +288,24 @@ function applyModeUI(){
 }
 applyModeUI();
 
+function exitGomMode(){
+  gomMode = false;
+  currentGroupId = null;
+  groupNameInput.value = "";
+  groupNameInput.style.display = "none";
+  gomDoneBtn.style.display = "none";
+  gomBtn.textContent = "📦 Gom sản phẩm";
+  gomBtn.classList.remove("active");
+  gomStatusLine.style.display = "none";
+}
+
 gomBtn.addEventListener("click", () => {
   if(!gomMode){
     gomMode = true;
     currentGroupId = newOrderId();
     groupNameInput.style.display = "block";
     groupNameInput.value = "";
+    gomDoneBtn.style.display = "inline-block";
     gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
     gomBtn.classList.add("active");
     updateGomStatusLine();
@@ -275,15 +316,22 @@ gomBtn.addEventListener("click", () => {
         val.orderId = newOrderId();
       }
     }
-    gomMode = false;
-    currentGroupId = null;
-    groupNameInput.style.display = "none";
-    gomBtn.textContent = "📦 Gom sản phẩm";
-    gomBtn.classList.remove("active");
-    gomStatusLine.style.display = "none";
+    exitGomMode();
     renderList();
   }
 });
+
+gomDoneBtn.addEventListener("click", () => {
+  // Xong: chốt các sp đã chọn trong nhóm này thành 1 đơn, thoát chế độ gom
+  // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ
+  if(currentGroupId){
+    const nm = groupNameInput.value.trim();
+    groupNames.set(currentGroupId, nm || null);
+  }
+  exitGomMode();
+  renderList();
+});
+
 groupNameInput.addEventListener("input", updateGomStatusLine);
 
 const q = query(catalogCol, orderBy("name", "asc"));
@@ -397,9 +445,64 @@ function renderList(){
 function updateTaskBar(){
   const bar = document.getElementById("taskbar");
   const n = taskSelections.size;
-  document.getElementById("taskCount").textContent = `Đã chọn ${n} phân loại`;
+  document.getElementById("taskCount").textContent = n;
   bar.classList.toggle("show", mode === "task" && n > 0);
+  if(n === 0) closeSelectedModal();
 }
+
+function getOrderLabel(orderId){
+  if(gomMode && orderId === currentGroupId){
+    const nm = groupNameInput.value.trim();
+    return (nm || "mã tự sinh") + " (đang gom)";
+  }
+  if(groupNames.has(orderId)){
+    return groupNames.get(orderId) || "Đơn gộp (mã tự sinh)";
+  }
+  return "Sản phẩm lẻ";
+}
+
+function renderSelectedModal(){
+  const body = document.getElementById("selectedListBody");
+  if(taskSelections.size === 0){
+    body.innerHTML = '<div class="muted">Chưa chọn sản phẩm nào.</div>';
+    return;
+  }
+  const groups = new Map();
+  for(const [key, val] of taskSelections.entries()){
+    if(!groups.has(val.orderId)) groups.set(val.orderId, []);
+    groups.get(val.orderId).push({ key, ...val });
+  }
+  let html = "";
+  for(const items of groups.values()){
+    const orderId = items[0].orderId;
+    html += `<div class="selgroup"><div class="selgroup-title">${escapeHtml(getOrderLabel(orderId))} — ${items.length} phân loại</div>`;
+    items.forEach(it => {
+      html += `<div class="selrow">
+        <span class="selname">${escapeHtml(it.productName)} — ${escapeHtml(it.variant)} ×${it.qty}</span>
+        <button type="button" class="selremove" data-key="${escapeHtml(it.key)}">Xóa</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+  body.querySelectorAll(".selremove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      taskSelections.delete(btn.dataset.key);
+      renderSelectedModal();
+      renderList();
+    });
+  });
+}
+
+function closeSelectedModal(){
+  document.getElementById("selectedOverlay").classList.remove("show");
+}
+
+document.getElementById("viewSelectedBtn").addEventListener("click", () => {
+  renderSelectedModal();
+  document.getElementById("selectedOverlay").classList.add("show");
+});
+document.getElementById("selectedCloseBtn").addEventListener("click", closeSelectedModal);
 
 document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
   if(taskSelections.size === 0) return;
@@ -412,6 +515,8 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
       let nm = null;
       if(gomMode && e.orderId === currentGroupId){
         nm = groupNameInput.value.trim() || null;
+      } else if(groupNames.has(e.orderId)){
+        nm = groupNames.get(e.orderId);
       }
       orderNames.set(e.orderId, nm || newOrderName());
     }
@@ -431,13 +536,8 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
       });
     }
     taskSelections.clear();
-    gomMode = false;
-    currentGroupId = null;
-    groupNameInput.value = "";
-    groupNameInput.style.display = "none";
-    gomBtn.textContent = "📦 Gom sản phẩm";
-    gomBtn.classList.remove("active");
-    gomStatusLine.style.display = "none";
+    groupNames.clear();
+    exitGomMode();
     renderList();
     alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
   }catch(err){
