@@ -48,11 +48,21 @@
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
   .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
-  .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:3px 9px;font-size:12px;margin:2px 4px 2px 0;}
+  .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 11px;font-size:13px;margin:3px 5px 3px 0;cursor:pointer;border:none;font-weight:600;}
+  .item .vchip.selected{background:var(--blue);color:#fff;}
+  .item .vchip .chipx{margin-left:7px;font-weight:700;opacity:.85;}
   .muted{color:var(--muted);font-size:13px;}
   .status{font-size:13px;margin-top:8px;min-height:18px;}
   .status.ok{color:var(--green);}
   .status.err{color:var(--red);}
+
+  .taskbar{
+    position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
+    padding:12px 14px;display:none;align-items:center;gap:10px;z-index:30;
+  }
+  .taskbar.show{display:flex;}
+  .taskbar span{flex:1;font-size:14px;}
+  .taskbar button{border:none;border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
 
   .editor-overlay{
     position:fixed;inset:0;background:var(--bg);z-index:50;
@@ -103,6 +113,11 @@
 
 </main>
 
+<div class="taskbar" id="taskbar">
+  <span id="taskCount">Đã chọn 0 phân loại</span>
+  <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
+</div>
+
 <div class="editor-overlay" id="editorOverlay">
   <h3 id="editorTitle">Sửa sản phẩm</h3>
   <p class="muted">Định dạng: <b>Từ khóa chính | phân loại 1, phân loại 2</b></p>
@@ -117,7 +132,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, query, orderBy
+  updateDoc, deleteDoc, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -132,9 +147,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const catalogCol = collection(db, "catalog");
+const tasksCol = collection(db, "tasks");
 
 let allProducts = [];
 let selected = new Set();
+let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty}
 let editorSaveHandler = null;
 
 const q = query(catalogCol, orderBy("name", "asc"));
@@ -178,7 +195,13 @@ function renderList(){
   filtered.forEach(p => {
     const div = document.createElement("div");
     div.className = "item";
-    const variantsHtml = (p.variants || []).map(v => `<span class="vchip">${escapeHtml(v)}</span>`).join("");
+    const variantsHtml = (p.variants && p.variants.length)
+      ? p.variants.map(v => {
+          const key = p.id + "__" + v;
+          const sel = taskSelections.get(key);
+          return `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">${escapeHtml(v)}${sel ? ` · ${sel.qty} <span class="chipx">×</span>` : ""}</button>`;
+        }).join("")
+      : "";
     div.innerHTML = `
       <input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>
       <div class="body">
@@ -195,11 +218,51 @@ function renderList(){
       updateSelectAllState(filtered);
     });
     div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+    div.querySelectorAll(".vchip").forEach(chip => {
+      chip.addEventListener("click", e => {
+        const key = chip.dataset.key;
+        const variant = key.slice(p.id.length + 2);
+        if(e.target.classList.contains("chipx")){
+          taskSelections.delete(key);
+        } else {
+          const cur = taskSelections.get(key) || { productName: p.name, variant, qty: 0 };
+          cur.qty += 1;
+          taskSelections.set(key, cur);
+        }
+        renderList();
+      });
+    });
     list.appendChild(div);
   });
   updateActionBar();
   updateSelectAllState(filtered);
+  updateTaskBar();
 }
+
+function updateTaskBar(){
+  const bar = document.getElementById("taskbar");
+  const n = taskSelections.size;
+  document.getElementById("taskCount").textContent = `Đã chọn ${n} phân loại`;
+  bar.classList.toggle("show", n > 0);
+}
+
+document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
+  if(taskSelections.size === 0) return;
+  const entries = Array.from(taskSelections.values());
+  for(const e of entries){
+    await addDoc(tasksCol, {
+      name: `${e.productName} — ${e.variant}`,
+      qty: e.qty,
+      status: "cho_in",
+      note: "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  }
+  taskSelections.clear();
+  renderList();
+  alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
+});
 
 function updateSelectAllState(filtered){
   const box = document.getElementById("selectAllBox");
