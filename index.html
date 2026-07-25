@@ -18,6 +18,7 @@
     --green:#15803d;
     --green-bg:#e8f7ec;
     --red:#dc2626;
+    --gray-bg:#eceef0;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
@@ -97,6 +98,22 @@
     cursor:pointer;
   }
 
+  .searchbar{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:8px 16px;
+    position:sticky;
+    top:106px;
+    z-index:18;
+  }
+  .searchbar input{
+    width:100%;
+    font-size:15px;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+
   main{padding:12px 12px 0 12px;}
   .empty{
     text-align:center;
@@ -105,37 +122,101 @@
     font-size:14px;
   }
 
-  .card{
-    background:var(--card);
+  .errbox{
+    background:#fde8e8;
+    color:var(--red);
+    border:1px solid #f5b8b8;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+
+  /* ---- Order box (grouping) ---- */
+  .order-box{
     border:1px solid var(--border);
     border-radius:12px;
-    padding:12px 14px;
-    margin-bottom:10px;
+    margin-bottom:12px;
+    overflow:hidden;
+    background:var(--card);
+  }
+  .order-box.warn{border-color:var(--amber);}
+  .order-box.ready{border-color:var(--green);}
+  .order-header{
     display:flex;
     align-items:center;
-    gap:10px;
+    justify-content:center;
+    gap:6px;
+    padding:10px 36px 10px 12px;
+    background:#fafbfc;
+    border-bottom:1px solid var(--border);
+    position:relative;
   }
-  .card input[type=checkbox]{
-    width:22px;height:22px;flex-shrink:0;accent-color:var(--blue);
-  }
-  .card .info{flex:1;min-width:0;}
-  .card .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
-  .card .meta{font-size:13px;color:var(--muted);margin-top:2px;}
-  .card .note{font-size:13px;color:var(--muted);margin-top:2px;font-style:italic;}
-  .card button.action{
-    flex-shrink:0;
-    border:none;
-    border-radius:8px;
-    padding:12px 14px;
+  .order-title{
     font-size:14px;
-    font-weight:600;
-    cursor:pointer;
-    white-space:nowrap;
+    font-weight:700;
+    text-align:center;
+    word-break:break-word;
   }
-  .status-cho_in .action{background:var(--blue-bg);color:var(--blue);}
-  .status-dang_in .action{background:var(--blue-bg);color:var(--blue);}
-  .status-cho_dong_goi .action{background:var(--amber-bg);color:var(--amber);}
-  .status-xong .info .name{color:var(--muted);text-decoration:line-through;}
+  .order-header .edit-icon{
+    position:absolute;
+    right:8px;top:50%;transform:translateY(-50%);
+    cursor:pointer;
+    font-size:14px;
+    color:var(--muted);
+    border:none;background:none;padding:6px;
+  }
+  .order-header input.order-title-input{
+    font-size:14px;font-weight:700;text-align:center;
+    border:1px solid var(--blue);border-radius:6px;padding:5px 8px;
+    flex:1;max-width:220px;
+  }
+  .order-header .save-icon{
+    border:none;background:var(--blue);color:#fff;border-radius:6px;
+    padding:6px 9px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .order-status-line{font-size:11.5px;text-align:center;padding:6px 12px 0;color:var(--muted);}
+  .order-status-line.warn{color:var(--amber);font-weight:600;}
+  .order-status-line.ready{color:var(--green);font-weight:600;}
+  .pack-all-wrap{padding:8px 12px 10px;text-align:center;}
+  .pack-all-btn{
+    background:var(--green);color:#fff;border:none;border-radius:8px;
+    padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+
+  .order-item{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:12px;border-bottom:1px solid var(--border);
+  }
+  .order-item:last-child{border-bottom:none;}
+  .order-item input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
+  .order-item .info{flex:1;min-width:0;}
+  .order-item .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
+  .order-item .name.done{color:var(--muted);text-decoration:line-through;}
+  .order-item .meta{font-size:13px;color:var(--muted);margin-top:2px;}
+  .order-item .row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .order-item button.mini{
+    border:none;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:600;cursor:pointer;
+    background:var(--gray-bg);color:var(--text);
+  }
+  .order-item button.mini.primary{background:var(--blue-bg);color:var(--blue);}
+  .order-item button.mini.warnbtn{background:var(--amber-bg);color:var(--amber);}
+  .order-item button.mini.danger{background:#fde8e8;color:var(--red);}
+
+  .note-box{margin-top:8px;}
+  .note-box textarea{
+    width:100%;font-size:13px;padding:8px 9px;border:1px solid var(--border);
+    border-radius:8px;min-height:54px;font-family:inherit;
+  }
+  .note-box .note-save{
+    margin-top:5px;font-size:12px;padding:6px 11px;border:none;border-radius:6px;
+    background:var(--blue);color:#fff;cursor:pointer;font-weight:600;
+  }
+  .note-dot{color:var(--blue);font-size:16px;line-height:0;margin-left:2px;}
+
+  .edit-fields{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;}
+  .edit-fields input[type=text]{flex:1;min-width:100px;font-size:14px;padding:8px 9px;border:1px solid var(--border);border-radius:8px;}
+  .edit-fields input[type=number]{width:60px;font-size:14px;padding:8px 6px;border:1px solid var(--border);border-radius:8px;text-align:center;}
 
   .batchbar{
     position:fixed;
@@ -161,10 +242,6 @@
   .batchbar .done-btn{background:var(--green);color:#fff;}
   .batchbar .del-btn{background:var(--red);color:#fff;}
 
-  .noteinput{
-    display:none;
-    margin-top:8px;
-  }
   .status-line{
     font-size:11px;
     text-align:center;
@@ -190,7 +267,12 @@
   <button id="addBtn">+</button>
 </div>
 
+<div class="searchbar">
+  <input type="text" id="searchTask" placeholder="🔍 Tìm việc theo tên hoặc tên đơn...">
+</div>
+
 <main>
+  <div id="errArea"></div>
   <div id="list"></div>
 </main>
 
@@ -226,11 +308,33 @@ const tasksCol = collection(db, "tasks");
 let currentTab = "in";
 let allTasks = [];
 let selected = new Set();
+let searchTerm = "";
+
+// UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
+let openNotes = new Set();
+let editingTaskIds = new Set();
+let editingOrderIds = new Set();
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
 const batchbar = document.getElementById("batchbar");
 const addbar = document.getElementById("addbar");
+const errArea = document.getElementById("errArea");
+
+function showError(msg){
+  errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
+  setTimeout(() => { errArea.innerHTML = ""; }, 6000);
+}
+
+// ---- Helpers: id / name generation for orders ----
+function randCode(len){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function newOrderName(){ return "Đơn " + randCode(3); }
 
 // ---- Tabs ----
 document.querySelectorAll(".tab").forEach(t => {
@@ -245,6 +349,12 @@ document.querySelectorAll(".tab").forEach(t => {
 });
 addbar.style.display = "flex";
 
+// ---- Search ----
+document.getElementById("searchTask").addEventListener("input", e => {
+  searchTerm = e.target.value.trim().toLowerCase();
+  render();
+});
+
 // ---- Add task ----
 document.getElementById("addBtn").addEventListener("click", addTask);
 document.getElementById("newName").addEventListener("keydown", e => { if(e.key === "Enter") addTask(); });
@@ -255,16 +365,22 @@ async function addTask(){
   const name = nameEl.value.trim();
   const qty = parseInt(qtyEl.value) || 1;
   if(!name) return;
-  await addDoc(tasksCol, {
-    name, qty,
-    status: "cho_in",
-    note: "",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  });
-  nameEl.value = "";
-  qtyEl.value = "1";
-  nameEl.focus();
+  try{
+    await addDoc(tasksCol, {
+      name, qty,
+      status: "cho_in",
+      note: "",
+      orderId: newOrderId(),
+      orderName: newOrderName(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    nameEl.value = "";
+    qtyEl.value = "1";
+    nameEl.focus();
+  }catch(e){
+    showError("Không thêm được việc mới: " + e.message);
+  }
 }
 
 // ---- Realtime listener ----
@@ -276,6 +392,37 @@ onSnapshot(q, snap => {
 }, err => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// ---- Grouping helpers ----
+function orderPackInfo(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  const pending = items.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
+  const readyToPack = items.filter(t => t.status === "cho_dong_goi").length;
+  const doneAlready = items.filter(t => t.status === "xong").length;
+  return {
+    total: items.length,
+    pending, readyToPack, doneAlready,
+    eligible: pending === 0 && readyToPack > 0
+  };
+}
+
+function groupShown(shown){
+  const order = [];
+  const map = new Map();
+  shown.forEach(t => {
+    const oid = t.orderId || t.id;
+    if(!map.has(oid)){
+      map.set(oid, { orderId: oid, orderName: t.orderName || t.name, items: [] });
+      order.push(oid);
+    }
+    map.get(oid).items.push(t);
+  });
+  return order.map(oid => map.get(oid));
+}
 
 // ---- Render ----
 function render(){
@@ -291,53 +438,261 @@ function render(){
   else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
   else shown = allTasks.filter(t => t.status === "xong").slice(-50).reverse();
 
+  if(searchTerm){
+    shown = shown.filter(t =>
+      (t.name || "").toLowerCase().includes(searchTerm) ||
+      (t.orderName || "").toLowerCase().includes(searchTerm)
+    );
+  }
+
   list.innerHTML = "";
   if(shown.length === 0){
-    const emptyMsg = currentTab === "in" ? "Chưa có việc nào. Thêm sản phẩm ở ô trên."
+    const emptyMsg = searchTerm ? "Không tìm thấy việc nào khớp."
+      : currentTab === "in" ? "Chưa có việc nào. Thêm sản phẩm ở ô trên."
       : currentTab === "dong_goi" ? "Chưa có sản phẩm nào chờ đóng gói."
       : "Chưa có sản phẩm nào hoàn tất.";
     list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
     return;
   }
 
-  shown.forEach(t => {
-    const card = document.createElement("div");
-    card.className = "card status-" + t.status;
+  const groups = groupShown(shown);
+  groups.forEach(g => list.appendChild(renderOrderBox(g)));
+}
 
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = selected.has(t.id);
-    cb.addEventListener("change", () => {
-      if(cb.checked) selected.add(t.id); else selected.delete(t.id);
-      updateBatchBar();
+function renderOrderBox(g){
+  const box = document.createElement("div");
+  box.className = "order-box";
+
+  let info = null;
+  if(currentTab === "dong_goi"){
+    info = orderPackInfo(g.orderId);
+    box.classList.add(info.eligible ? "ready" : "warn");
+  }
+
+  const header = document.createElement("div");
+  header.className = "order-header";
+
+  if(editingOrderIds.has(g.orderId)){
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "order-title-input";
+    input.value = g.orderName;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "save-icon";
+    saveBtn.textContent = "Lưu";
+    saveBtn.addEventListener("click", () => renameOrder(g.orderId, input.value));
+    input.addEventListener("keydown", e => { if(e.key === "Enter") renameOrder(g.orderId, input.value); });
+    header.appendChild(input);
+    header.appendChild(saveBtn);
+  } else {
+    const title = document.createElement("div");
+    title.className = "order-title";
+    title.textContent = g.orderName;
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-icon";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", () => {
+      editingOrderIds.add(g.orderId);
+      render();
     });
+    header.appendChild(title);
+    header.appendChild(editBtn);
+  }
+  box.appendChild(header);
 
-    const info = document.createElement("div");
-    info.className = "info";
-    info.innerHTML = `<div class="name">${escapeHtml(t.name)}</div><div class="meta">SL: ${t.qty || 1}</div>`;
+  if(currentTab === "dong_goi" && info){
+    const line = document.createElement("div");
+    line.className = "order-status-line " + (info.eligible ? "ready" : "warn");
+    line.textContent = info.eligible
+      ? "Đủ hàng — có thể đóng gói cả đơn"
+      : `Đơn chưa đủ — còn ${info.pending} sản phẩm đang in`;
+    box.appendChild(line);
 
-    card.appendChild(cb);
-    card.appendChild(info);
+    if(info.eligible){
+      const wrap = document.createElement("div");
+      wrap.className = "pack-all-wrap";
+      const btn = document.createElement("button");
+      btn.className = "pack-all-btn";
+      btn.textContent = "📦 Đóng gói cả đơn";
+      btn.addEventListener("click", () => packWholeOrder(g.orderId));
+      wrap.appendChild(btn);
+      box.appendChild(wrap);
+    }
+  }
+
+  g.items.forEach(t => box.appendChild(renderItem(t)));
+  return box;
+}
+
+function renderItem(t){
+  const row = document.createElement("div");
+  row.className = "order-item";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = selected.has(t.id);
+  cb.addEventListener("change", () => {
+    if(cb.checked) selected.add(t.id); else selected.delete(t.id);
+    updateBatchBar();
+  });
+  row.appendChild(cb);
+
+  const info = document.createElement("div");
+  info.className = "info";
+
+  if(editingTaskIds.has(t.id)){
+    info.innerHTML = `<div class="meta">Sửa việc:</div>`;
+    const fields = document.createElement("div");
+    fields.className = "edit-fields";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = t.name;
+    const qtyInput = document.createElement("input");
+    qtyInput.type = "number";
+    qtyInput.min = "1";
+    qtyInput.value = t.qty || 1;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "mini primary";
+    saveBtn.textContent = "Lưu";
+    saveBtn.addEventListener("click", () => saveTaskEdit(t.id, nameInput.value, qtyInput.value));
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "mini";
+    cancelBtn.textContent = "Hủy";
+    cancelBtn.addEventListener("click", () => { editingTaskIds.delete(t.id); render(); });
+    fields.appendChild(nameInput);
+    fields.appendChild(qtyInput);
+    fields.appendChild(saveBtn);
+    fields.appendChild(cancelBtn);
+    info.appendChild(fields);
+  } else {
+    const nameDiv = document.createElement("div");
+    nameDiv.className = "name" + (t.status === "xong" ? " done" : "");
+    nameDiv.textContent = t.name;
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "meta";
+    metaDiv.textContent = "SL: " + (t.qty || 1);
+    info.appendChild(nameDiv);
+    info.appendChild(metaDiv);
+
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
 
     if(currentTab !== "xong"){
-      const btn = document.createElement("button");
-      btn.className = "action";
-      btn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
-      btn.addEventListener("click", () => advanceStatus(t));
-      card.appendChild(btn);
+      const advBtn = document.createElement("button");
+      advBtn.className = "mini primary";
+      advBtn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+      advBtn.addEventListener("click", () => advanceStatus(t));
+      actions.appendChild(advBtn);
     }
 
-    list.appendChild(card);
-  });
+    if(currentTab === "dong_goi" || currentTab === "xong"){
+      const revBtn = document.createElement("button");
+      revBtn.className = "mini warnbtn";
+      revBtn.textContent = "↩ Lùi lại";
+      revBtn.addEventListener("click", () => revertStatus(t));
+      actions.appendChild(revBtn);
+    }
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "mini";
+    editBtn.textContent = "✏️ Sửa";
+    editBtn.addEventListener("click", () => { editingTaskIds.add(t.id); render(); });
+    actions.appendChild(editBtn);
+
+    const noteBtn = document.createElement("button");
+    noteBtn.className = "mini";
+    noteBtn.innerHTML = "📝 Ghi chú" + (t.note ? "<span class='note-dot'>•</span>" : "");
+    noteBtn.addEventListener("click", () => {
+      if(openNotes.has(t.id)) openNotes.delete(t.id); else openNotes.add(t.id);
+      render();
+    });
+    actions.appendChild(noteBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "mini danger";
+    delBtn.textContent = "🗑 Xóa";
+    delBtn.addEventListener("click", () => deleteTask(t.id));
+    actions.appendChild(delBtn);
+
+    info.appendChild(actions);
+
+    if(openNotes.has(t.id)){
+      const noteBox = document.createElement("div");
+      noteBox.className = "note-box";
+      const ta = document.createElement("textarea");
+      ta.placeholder = "Ghi chú cho việc này...";
+      ta.value = t.note || "";
+      const saveNoteBtn = document.createElement("button");
+      saveNoteBtn.className = "note-save";
+      saveNoteBtn.textContent = "Lưu ghi chú";
+      saveNoteBtn.addEventListener("click", () => saveNote(t.id, ta.value));
+      noteBox.appendChild(ta);
+      noteBox.appendChild(saveNoteBtn);
+      info.appendChild(noteBox);
+    }
+  }
+
+  row.appendChild(info);
+  return row;
 }
 
-function escapeHtml(s){
-  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
+// ---- Actions ----
 async function advanceStatus(t){
   const next = t.status === "cho_in" || t.status === "dang_in" ? "cho_dong_goi" : "xong";
-  await updateDoc(doc(db, "tasks", t.id), { status: next, updatedAt: serverTimestamp() });
+  try{
+    await updateDoc(doc(db, "tasks", t.id), { status: next, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không cập nhật được trạng thái: " + e.message); }
+}
+
+async function revertStatus(t){
+  const prev = t.status === "cho_dong_goi" ? "cho_in" : t.status === "xong" ? "cho_dong_goi" : null;
+  if(!prev) return;
+  try{
+    await updateDoc(doc(db, "tasks", t.id), { status: prev, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
+}
+
+async function packWholeOrder(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId && t.status === "cho_dong_goi");
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Không đóng gói được cả đơn: " + e.message); }
+}
+
+async function saveTaskEdit(id, name, qty){
+  const n = (name || "").trim();
+  const q = parseInt(qty) || 1;
+  if(!n){ showError("Tên sản phẩm không được để trống."); return; }
+  try{
+    await updateDoc(doc(db, "tasks", id), { name: n, qty: q, updatedAt: serverTimestamp() });
+    editingTaskIds.delete(id);
+  }catch(e){ showError("Không lưu được thay đổi: " + e.message); }
+}
+
+async function saveNote(id, note){
+  try{
+    await updateDoc(doc(db, "tasks", id), { note: note || "", updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không lưu được ghi chú: " + e.message); }
+}
+
+async function deleteTask(id){
+  if(!confirm("Xóa việc này?")) return;
+  try{
+    await deleteDoc(doc(db, "tasks", id));
+  }catch(e){ showError("Không xóa được: " + e.message); }
+}
+
+async function renameOrder(orderId, newName){
+  const n = (newName || "").trim() || newOrderName();
+  const items = allTasks.filter(t => t.orderId === orderId);
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { orderName: n, updatedAt: serverTimestamp() });
+    }
+    editingOrderIds.delete(orderId);
+  }catch(e){ showError("Không đổi được tên đơn: " + e.message); }
 }
 
 // ---- Batch actions ----
@@ -350,10 +705,12 @@ function updateBatchBar(){
 
 document.getElementById("batchDone").addEventListener("click", async () => {
   const ids = Array.from(selected);
-  for(const id of ids){
-    const t = allTasks.find(x => x.id === id);
-    if(t) await advanceStatus(t);
-  }
+  try{
+    for(const id of ids){
+      const t = allTasks.find(x => x.id === id);
+      if(t) await advanceStatus(t);
+    }
+  }catch(e){ showError("Lỗi khi xử lý theo lô: " + e.message); }
   selected.clear();
   updateBatchBar();
 });
@@ -361,9 +718,11 @@ document.getElementById("batchDone").addEventListener("click", async () => {
 document.getElementById("batchDel").addEventListener("click", async () => {
   if(!confirm("Xóa " + selected.size + " mục đã chọn?")) return;
   const ids = Array.from(selected);
-  for(const id of ids){
-    await deleteDoc(doc(db, "tasks", id));
-  }
+  try{
+    for(const id of ids){
+      await deleteDoc(doc(db, "tasks", id));
+    }
+  }catch(e){ showError("Không xóa được các mục đã chọn: " + e.message); }
   selected.clear();
   updateBatchBar();
 });
