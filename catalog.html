@@ -8,6 +8,7 @@
   :root{
     --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
     --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
+    --amber:#b45309; --amber-bg:#fef3e0;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
@@ -26,7 +27,20 @@
   .btn-blue{background:var(--blue);color:#fff;}
   .btn-green{background:var(--green);color:#fff;}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+  .btn-outline.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
   .searchbox{margin-bottom:10px;}
+
+  .errbox{
+    background:#fde8e8;color:var(--red);border:1px solid #f5b8b8;border-radius:8px;
+    padding:8px 12px;font-size:13px;margin-bottom:10px;
+  }
+
+  /* Gom sản phẩm bar */
+  #gomRow{margin-bottom:4px;}
+  #groupNameInput{flex:1;min-width:160px;}
+  #gomStatusLine{
+    font-size:12.5px;color:var(--blue);margin-bottom:10px;font-weight:600;
+  }
 
   /* Action bar (giống bảng sản phẩm sàn TMĐT) */
   .action-bar{
@@ -48,9 +62,14 @@
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
   .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
-  .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 11px;font-size:13px;margin:3px 5px 3px 0;cursor:pointer;border:none;font-weight:600;}
+  .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
   .item .vchip.selected{background:var(--blue);color:#fff;}
-  .item .vchip .chipx{margin-left:7px;font-weight:700;opacity:.85;}
+  .item .vchip .vlabel{cursor:pointer;padding:2px 4px;}
+  .item .vchip .qtytag{padding:2px 2px;}
+  .item .vchip .chipminus,.item .vchip .chipx{
+    margin-left:4px;font-weight:700;opacity:.85;cursor:pointer;padding:2px 6px;border-radius:8px;
+  }
+  .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
   .muted{color:var(--muted);font-size:13px;}
   .status{font-size:13px;margin-top:8px;min-height:18px;}
   .status.ok{color:var(--green);}
@@ -108,6 +127,15 @@
       <input type="checkbox" id="selectAllBox">
       <span>Chọn tất cả</span>
     </div>
+
+    <div id="errArea"></div>
+
+    <div class="row" id="gomRow">
+      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
+      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
+    </div>
+    <div id="gomStatusLine" style="display:none;"></div>
+
     <div id="list"></div>
   </section>
 
@@ -151,14 +179,73 @@ const tasksCol = collection(db, "tasks");
 
 let allProducts = [];
 let selected = new Set();
-let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty}
+let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
 let editorSaveHandler = null;
+
+// ---- Gom sản phẩm (grouping into one order) ----
+let gomMode = false;
+let currentGroupId = null;
+
+const errArea = document.getElementById("errArea");
+function showError(msg){
+  errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
+  setTimeout(() => { errArea.innerHTML = ""; }, 6000);
+}
+
+function randCode(len){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function newOrderName(){ return "Đơn " + randCode(3); }
+
+const gomBtn = document.getElementById("gomBtn");
+const groupNameInput = document.getElementById("groupNameInput");
+const gomStatusLine = document.getElementById("gomStatusLine");
+
+function updateGomStatusLine(){
+  if(!gomMode){ gomStatusLine.style.display = "none"; return; }
+  const name = groupNameInput.value.trim();
+  gomStatusLine.style.display = "block";
+  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
+}
+
+gomBtn.addEventListener("click", () => {
+  if(!gomMode){
+    gomMode = true;
+    currentGroupId = newOrderId();
+    groupNameInput.style.display = "block";
+    groupNameInput.value = "";
+    gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
+    gomBtn.classList.add("active");
+    updateGomStatusLine();
+  } else {
+    // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
+    for(const val of taskSelections.values()){
+      if(val.orderId === currentGroupId){
+        val.orderId = newOrderId();
+      }
+    }
+    gomMode = false;
+    currentGroupId = null;
+    groupNameInput.style.display = "none";
+    gomBtn.textContent = "📦 Gom sản phẩm";
+    gomBtn.classList.remove("active");
+    gomStatusLine.style.display = "none";
+    renderList();
+  }
+});
+groupNameInput.addEventListener("input", updateGomStatusLine);
 
 const q = query(catalogCol, orderBy("name", "asc"));
 onSnapshot(q, snap => {
   allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   document.getElementById("totalCount").textContent = allProducts.length;
   renderList();
+}, err => {
+  showError("Lỗi kết nối danh mục: " + err.message);
 });
 
 document.getElementById("searchBox").addEventListener("input", renderList);
@@ -199,7 +286,11 @@ function renderList(){
       ? p.variants.map(v => {
           const key = p.id + "__" + v;
           const sel = taskSelections.get(key);
-          return `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">${escapeHtml(v)}${sel ? ` · ${sel.qty} <span class="chipx">×</span>` : ""}</button>`;
+          const qty = sel ? sel.qty : 0;
+          return `<button type="button" class="vchip${sel ? " selected" : ""}" data-key="${escapeHtml(key)}">
+              <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
+              ${sel ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+            </button>`;
         }).join("")
       : "";
     div.innerHTML = `
@@ -222,12 +313,21 @@ function renderList(){
       chip.addEventListener("click", e => {
         const key = chip.dataset.key;
         const variant = key.slice(p.id.length + 2);
-        if(e.target.classList.contains("chipx")){
+        const act = e.target.dataset.act;
+        let cur = taskSelections.get(key);
+        if(act === "remove"){
           taskSelections.delete(key);
+        } else if(act === "minus"){
+          if(cur){
+            cur.qty -= 1;
+            if(cur.qty <= 0) taskSelections.delete(key);
+          }
         } else {
-          const cur = taskSelections.get(key) || { productName: p.name, variant, qty: 0 };
+          if(!cur){
+            cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId() };
+            taskSelections.set(key, cur);
+          }
           cur.qty += 1;
-          taskSelections.set(key, cur);
         }
         renderList();
       });
@@ -249,19 +349,45 @@ function updateTaskBar(){
 document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
   if(taskSelections.size === 0) return;
   const entries = Array.from(taskSelections.values());
-  for(const e of entries){
-    await addDoc(tasksCol, {
-      name: `${e.productName} — ${e.variant}`,
-      qty: e.qty,
-      status: "cho_in",
-      note: "",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+
+  // Xác định tên đơn cho từng orderId có trong lượt gửi này
+  const orderNames = new Map();
+  entries.forEach(e => {
+    if(!orderNames.has(e.orderId)){
+      let nm = null;
+      if(gomMode && e.orderId === currentGroupId){
+        nm = groupNameInput.value.trim() || null;
+      }
+      orderNames.set(e.orderId, nm || newOrderName());
+    }
+  });
+
+  try{
+    for(const e of entries){
+      await addDoc(tasksCol, {
+        name: `${e.productName} — ${e.variant}`,
+        qty: e.qty,
+        status: "cho_in",
+        note: "",
+        orderId: e.orderId,
+        orderName: orderNames.get(e.orderId),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+    taskSelections.clear();
+    gomMode = false;
+    currentGroupId = null;
+    groupNameInput.value = "";
+    groupNameInput.style.display = "none";
+    gomBtn.textContent = "📦 Gom sản phẩm";
+    gomBtn.classList.remove("active");
+    gomStatusLine.style.display = "none";
+    renderList();
+    alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
+  }catch(err){
+    showError("Không gửi được sang danh sách hôm nay: " + err.message);
   }
-  taskSelections.clear();
-  renderList();
-  alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
 });
 
 function updateSelectAllState(filtered){
@@ -286,8 +412,12 @@ function updateActionBar(){
 document.getElementById("topDelBtn").addEventListener("click", async () => {
   if(selected.size === 0) return;
   if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
-  for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
-  selected.clear();
+  try{
+    for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
+    selected.clear();
+  }catch(e){
+    showError("Không xóa được sản phẩm đã chọn: " + e.message);
+  }
 });
 
 document.getElementById("bulkBtn").addEventListener("click", async () => {
@@ -300,23 +430,28 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
     return;
   }
   let created = 0, merged = 0, skipped = 0;
-  for(const line of lines){
-    const parsed = parseLine(line);
-    if(!parsed){ skipped++; continue; }
-    const existing = allProducts.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
-    if(existing){
-      const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
-      await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
-      merged++;
-    } else {
-      await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants });
-      created++;
+  try{
+    for(const line of lines){
+      const parsed = parseLine(line);
+      if(!parsed){ skipped++; continue; }
+      const existing = allProducts.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
+      if(existing){
+        const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
+        await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
+        merged++;
+      } else {
+        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants });
+        created++;
+      }
     }
+    statusEl.textContent = `Xong: ${created} sp mới, ${merged} sp gộp thêm phân loại, ${skipped} dòng bỏ qua (sai định dạng).`;
+    statusEl.className = "status ok";
+    document.getElementById("bulkInput").value = "";
+    closeFullscreen();
+  }catch(e){
+    statusEl.textContent = "Lỗi khi nhập danh sách: " + e.message;
+    statusEl.className = "status err";
   }
-  statusEl.textContent = `Xong: ${created} sp mới, ${merged} sp gộp thêm phân loại, ${skipped} dòng bỏ qua (sai định dạng).`;
-  statusEl.className = "status ok";
-  document.getElementById("bulkInput").value = "";
-  closeFullscreen();
 });
 
 const bulkTextarea = document.getElementById("bulkInput");
@@ -347,8 +482,13 @@ function openEditor(product){
       alert("Định dạng không hợp lệ, cần có: Từ khóa chính | phân loại");
       return false;
     }
-    await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants });
-    return true;
+    try{
+      await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants });
+      return true;
+    }catch(e){
+      showError("Không lưu được sản phẩm: " + e.message);
+      return false;
+    }
   });
 }
 
