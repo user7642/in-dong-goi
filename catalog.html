@@ -10,8 +10,8 @@
     --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);padding-bottom:90px;}
-  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:10;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;}
   h1{font-size:18px;margin:0;font-weight:600;}
   a.back{font-size:13px;color:var(--blue);text-decoration:none;}
   main{padding:14px;max-width:640px;margin:0 auto;}
@@ -26,35 +26,33 @@
   .btn-blue{background:var(--blue);color:#fff;}
   .btn-green{background:var(--green);color:#fff;}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
-  .btn-icon{background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 10px;font-size:13px;}
-  .toolbtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:9px 12px;}
   .searchbox{margin-bottom:10px;}
+
+  /* Action bar (giống bảng sản phẩm sàn TMĐT) */
+  .action-bar{
+    position:sticky;top:55px;z-index:12;
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:10px 12px;margin-bottom:10px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .action-bar span{font-size:13px;color:var(--muted);flex:1;}
+  .action-bar button{font-size:13px;padding:8px 14px;}
+  .action-bar .del-btn{background:var(--gray-bg);color:var(--muted);cursor:not-allowed;}
+  .action-bar .del-btn.enabled{background:var(--red);color:#fff;cursor:pointer;}
+  .selectall{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;color:var(--muted);}
+  .selectall input{width:20px;height:20px;accent-color:var(--blue);}
+
   .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
-  .item.inactive{opacity:.55;}
   .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
   .item .body{flex:1;min-width:0;}
-  .item .name{font-size:15px;font-weight:600;margin-bottom:6px;}
-  .item .hiddenTag{font-size:11px;color:var(--red);font-weight:600;margin-left:6px;}
+  .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
+  .item .name{font-size:15px;font-weight:600;}
+  .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
   .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:3px 9px;font-size:12px;margin:2px 4px 2px 0;}
-  .item .actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-  .item .actions button{font-size:13px;padding:7px 10px;}
   .muted{color:var(--muted);font-size:13px;}
   .status{font-size:13px;margin-top:8px;min-height:18px;}
   .status.ok{color:var(--green);}
   .status.err{color:var(--red);}
-  .selectall{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;color:var(--muted);}
-  .selectall input{width:20px;height:20px;accent-color:var(--blue);}
-
-  .batchbar{
-    position:fixed;bottom:0;left:0;right:0;background:var(--text);color:#fff;
-    padding:12px 14px;display:none;align-items:center;gap:8px;z-index:30;flex-wrap:wrap;
-  }
-  .batchbar.show{display:flex;}
-  .batchbar span{flex:1;font-size:14px;min-width:80px;}
-  .batchbar button{border:none;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;}
-  .batchbar .hide-btn{background:#4b5563;color:#fff;}
-  .batchbar .show-btn{background:var(--green);color:#fff;}
-  .batchbar .del-btn{background:var(--red);color:#fff;}
 
   .editor-overlay{
     position:fixed;inset:0;background:var(--bg);z-index:50;
@@ -91,6 +89,11 @@
   <section>
     <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
+
+    <div class="action-bar">
+      <span id="selCount">Đã chọn 0 sản phẩm</span>
+      <button class="del-btn" id="topDelBtn">Xóa</button>
+    </div>
     <div class="selectall">
       <input type="checkbox" id="selectAllBox">
       <span>Chọn tất cả</span>
@@ -99,13 +102,6 @@
   </section>
 
 </main>
-
-<div class="batchbar" id="batchbar">
-  <span id="batchCount">0 đã chọn</span>
-  <button class="show-btn" id="batchShow">Hiện lại</button>
-  <button class="hide-btn" id="batchHide">Ẩn</button>
-  <button class="del-btn" id="batchDel">Xóa</button>
-</div>
 
 <div class="editor-overlay" id="editorOverlay">
   <h3 id="editorTitle">Sửa sản phẩm</h3>
@@ -175,42 +171,33 @@ function renderList(){
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
-    updateBatchBar();
+    updateActionBar();
     updateSelectAllState(filtered);
     return;
   }
   filtered.forEach(p => {
-    const isActive = p.active !== false;
     const div = document.createElement("div");
-    div.className = "item" + (isActive ? "" : " inactive");
+    div.className = "item";
     const variantsHtml = (p.variants || []).map(v => `<span class="vchip">${escapeHtml(v)}</span>`).join("");
     div.innerHTML = `
       <input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>
       <div class="body">
-        <div class="name">${escapeHtml(p.name)}${isActive ? "" : '<span class="hiddenTag">Đã ẩn</span>'}</div>
-        <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
-        <div class="actions">
-          <button class="btn-icon editBtn">✏️ Sửa</button>
-          <button class="toolbtn toggleBtn">${isActive ? "Ẩn sản phẩm này" : "Hiện lại"}</button>
-          <button class="btn-icon delBtn" style="color:var(--red);">🗑 Xóa</button>
+        <div class="titlerow">
+          <div class="name">${escapeHtml(p.name)}</div>
+          <button class="editBtn">✏️ Sửa</button>
         </div>
+        <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
       </div>
     `;
     div.querySelector(".rowCheck").addEventListener("change", e => {
       if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
-      updateBatchBar();
+      updateActionBar();
       updateSelectAllState(filtered);
     });
     div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
-    div.querySelector(".toggleBtn").addEventListener("click", () => {
-      updateDoc(doc(db, "catalog", p.id), { active: !isActive });
-    });
-    div.querySelector(".delBtn").addEventListener("click", () => {
-      if(confirm(`Xóa sản phẩm "${p.name}"?`)) deleteDoc(doc(db, "catalog", p.id));
-    });
     list.appendChild(div);
   });
-  updateBatchBar();
+  updateActionBar();
   updateSelectAllState(filtered);
 }
 
@@ -227,22 +214,14 @@ document.getElementById("selectAllBox").addEventListener("change", e => {
   renderList();
 });
 
-function updateBatchBar(){
-  const bar = document.getElementById("batchbar");
+function updateActionBar(){
   const n = selected.size;
-  document.getElementById("batchCount").textContent = n + " đã chọn";
-  bar.classList.toggle("show", n > 0);
+  document.getElementById("selCount").textContent = `Đã chọn ${n} sản phẩm`;
+  document.getElementById("topDelBtn").classList.toggle("enabled", n > 0);
 }
 
-document.getElementById("batchHide").addEventListener("click", async () => {
-  for(const id of selected) await updateDoc(doc(db, "catalog", id), { active: false });
-  selected.clear();
-});
-document.getElementById("batchShow").addEventListener("click", async () => {
-  for(const id of selected) await updateDoc(doc(db, "catalog", id), { active: true });
-  selected.clear();
-});
-document.getElementById("batchDel").addEventListener("click", async () => {
+document.getElementById("topDelBtn").addEventListener("click", async () => {
+  if(selected.size === 0) return;
   if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
   for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
   selected.clear();
@@ -267,7 +246,7 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
       await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
       merged++;
     } else {
-      await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, active: true });
+      await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants });
       created++;
     }
   }
