@@ -7,10 +7,10 @@
 <style>
   :root{
     --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
-    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626;
+    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);padding-bottom:40px;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);padding-bottom:90px;}
   header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:10;}
   h1{font-size:18px;margin:0;font-weight:600;}
   a.back{font-size:13px;color:var(--blue);text-decoration:none;}
@@ -20,32 +20,52 @@
   input[type=text],textarea{
     width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;
   }
-  textarea{min-height:110px;resize:vertical;}
-  .row{display:flex;gap:8px;margin-bottom:8px;}
-  .row input{flex:1;}
-  button{
-    border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;
-  }
+  textarea{min-height:130px;resize:vertical;line-height:1.5;}
+  .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
+  button{border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;}
   .btn-blue{background:var(--blue);color:#fff;}
   .btn-green{background:var(--green);color:#fff;}
   .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
-  .tag{
-    display:inline-flex;align-items:center;gap:5px;background:var(--blue-bg);color:var(--blue);
-    border-radius:14px;padding:5px 10px;font-size:13px;margin:3px 4px 3px 0;
-  }
-  .tag button{background:none;border:none;color:var(--blue);font-size:15px;padding:0;line-height:1;cursor:pointer;}
-  .tagbox{border:1px solid var(--border);border-radius:8px;padding:8px;min-height:44px;margin-bottom:8px;}
+  .btn-icon{background:transparent;border:1px solid var(--border);color:var(--muted);padding:8px 10px;font-size:13px;}
+  .toolbtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:9px 12px;}
   .searchbox{margin-bottom:10px;}
-  .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
+  .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
+  .item.inactive{opacity:.55;}
+  .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
+  .item .body{flex:1;min-width:0;}
   .item .name{font-size:15px;font-weight:600;margin-bottom:6px;}
-  .item .variants{margin-bottom:8px;}
+  .item .hiddenTag{font-size:11px;color:var(--red);font-weight:600;margin-left:6px;}
   .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:3px 9px;font-size:12px;margin:2px 4px 2px 0;}
-  .item .actions{display:flex;gap:8px;}
-  .item .actions button{font-size:13px;padding:8px 12px;}
+  .item .actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .item .actions button{font-size:13px;padding:7px 10px;}
   .muted{color:var(--muted);font-size:13px;}
   .status{font-size:13px;margin-top:8px;min-height:18px;}
   .status.ok{color:var(--green);}
   .status.err{color:var(--red);}
+  .selectall{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;color:var(--muted);}
+  .selectall input{width:20px;height:20px;accent-color:var(--blue);}
+
+  .batchbar{
+    position:fixed;bottom:0;left:0;right:0;background:var(--text);color:#fff;
+    padding:12px 14px;display:none;align-items:center;gap:8px;z-index:30;flex-wrap:wrap;
+  }
+  .batchbar.show{display:flex;}
+  .batchbar span{flex:1;font-size:14px;min-width:80px;}
+  .batchbar button{border:none;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;cursor:pointer;}
+  .batchbar .hide-btn{background:#4b5563;color:#fff;}
+  .batchbar .show-btn{background:var(--green);color:#fff;}
+  .batchbar .del-btn{background:var(--red);color:#fff;}
+
+  .editor-overlay{
+    position:fixed;inset:0;background:var(--bg);z-index:50;
+    display:none;flex-direction:column;padding:14px;
+  }
+  .editor-overlay.show{display:flex;}
+  .editor-overlay h3{font-size:16px;margin:0 0 8px 0;}
+  .editor-overlay p.muted{margin:0 0 10px 0;}
+  .editor-overlay textarea{flex:1;min-height:200px;font-size:15px;}
+  .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
+  .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
 </style>
 </head>
 <body>
@@ -58,42 +78,50 @@
 <main>
 
   <section>
-    <h2>Nhập nhanh hàng loạt (dán danh sách)</h2>
-    <p class="muted" style="margin-top:0;">Mỗi dòng 1 sản phẩm, định dạng: <b>Từ khóa chính | phân loại 1, phân loại 2</b>. Nếu sản phẩm đã có, phân loại mới sẽ được gộp thêm, không tạo trùng.</p>
+    <h2>Nhập / sửa danh sách (dán vào đây)</h2>
+    <p class="muted" style="margin-top:0;">Mỗi dòng 1 sản phẩm: <b>Từ khóa chính | phân loại 1, phân loại 2</b>. Chỉ 1 sản phẩm thì gõ đúng 1 dòng. Sản phẩm đã có sẽ được gộp thêm phân loại mới, không tạo trùng.</p>
     <textarea id="bulkInput" placeholder="Lược sử Việt Nam | A0, A1, A2, A3&#10;Bảng chữ cái cho bé | A1, A2, A3"></textarea>
-    <div style="margin-top:8px;">
+    <div class="row" style="margin-top:8px;">
       <button class="btn-blue" id="bulkBtn">Nhập danh sách</button>
+      <button class="btn-outline" id="expandBtn" type="button">⤢ Mở rộng toàn màn hình</button>
     </div>
     <div class="status" id="bulkStatus"></div>
   </section>
 
   <section>
-    <h2>Thêm 1 sản phẩm</h2>
-    <div class="row">
-      <input type="text" id="newProdName" placeholder="Từ khóa chính, vd: Lược sử Việt Nam">
-    </div>
-    <div class="tagbox" id="newTagBox"></div>
-    <div class="row">
-      <input type="text" id="newVariantInput" placeholder="Gõ phân loại rồi Enter, vd: A0">
-      <button class="btn-outline" id="addVariantBtn">+</button>
-    </div>
-    <button class="btn-green" id="saveProdBtn">Lưu sản phẩm</button>
-    <div class="status" id="addStatus"></div>
-  </section>
-
-  <section>
     <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
+    <div class="selectall">
+      <input type="checkbox" id="selectAllBox">
+      <span>Chọn tất cả</span>
+    </div>
     <div id="list"></div>
   </section>
 
 </main>
 
+<div class="batchbar" id="batchbar">
+  <span id="batchCount">0 đã chọn</span>
+  <button class="show-btn" id="batchShow">Hiện lại</button>
+  <button class="hide-btn" id="batchHide">Ẩn</button>
+  <button class="del-btn" id="batchDel">Xóa</button>
+</div>
+
+<div class="editor-overlay" id="editorOverlay">
+  <h3 id="editorTitle">Sửa sản phẩm</h3>
+  <p class="muted">Định dạng: <b>Từ khóa chính | phân loại 1, phân loại 2</b></p>
+  <textarea id="editorTextarea"></textarea>
+  <div class="editor-actions">
+    <button class="btn-outline" id="editorCancel">Hủy</button>
+    <button class="btn-green" id="editorSave">Lưu</button>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, query, orderBy, getDocs
+  updateDoc, deleteDoc, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -110,9 +138,9 @@ const db = getFirestore(app);
 const catalogCol = collection(db, "catalog");
 
 let allProducts = [];
-let newTags = [];
+let selected = new Set();
+let editorSaveHandler = null;
 
-// ---- Realtime list ----
 const q = query(catalogCol, orderBy("name", "asc"));
 onSnapshot(q, snap => {
   allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -122,100 +150,104 @@ onSnapshot(q, snap => {
 
 document.getElementById("searchBox").addEventListener("input", renderList);
 
-function renderList(){
+function parseLine(line){
+  const parts = line.split("|");
+  const name = parts[0].trim();
+  if(!name) return null;
+  const variants = parts.length > 1
+    ? parts.slice(1).join("|").split(",").map(s => s.trim()).filter(Boolean)
+    : [];
+  return { name, variants };
+}
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function getFiltered(){
   const kw = document.getElementById("searchBox").value.trim().toLowerCase();
+  return allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
+}
+
+function renderList(){
   const list = document.getElementById("list");
-  const filtered = allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
+  const filtered = getFiltered();
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    updateBatchBar();
+    updateSelectAllState(filtered);
     return;
   }
   filtered.forEach(p => {
+    const isActive = p.active !== false;
     const div = document.createElement("div");
-    div.className = "item";
+    div.className = "item" + (isActive ? "" : " inactive");
     const variantsHtml = (p.variants || []).map(v => `<span class="vchip">${escapeHtml(v)}</span>`).join("");
     div.innerHTML = `
-      <div class="name">${escapeHtml(p.name)}</div>
-      <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
-      <div class="actions">
-        <button class="btn-outline editBtn">Sửa</button>
-        <button class="btn-outline delBtn" style="color:var(--red);">Xóa</button>
+      <input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>
+      <div class="body">
+        <div class="name">${escapeHtml(p.name)}${isActive ? "" : '<span class="hiddenTag">Đã ẩn</span>'}</div>
+        <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
+        <div class="actions">
+          <button class="btn-icon editBtn">✏️ Sửa</button>
+          <button class="toolbtn toggleBtn">${isActive ? "Ẩn sản phẩm này" : "Hiện lại"}</button>
+          <button class="btn-icon delBtn" style="color:var(--red);">🗑 Xóa</button>
+        </div>
       </div>
     `;
-    div.querySelector(".delBtn").addEventListener("click", async () => {
-      if(confirm(`Xóa sản phẩm "${p.name}"?`)) await deleteDoc(doc(db, "catalog", p.id));
+    div.querySelector(".rowCheck").addEventListener("change", e => {
+      if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
+      updateBatchBar();
+      updateSelectAllState(filtered);
     });
-    div.querySelector(".editBtn").addEventListener("click", () => openEdit(p));
+    div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+    div.querySelector(".toggleBtn").addEventListener("click", () => {
+      updateDoc(doc(db, "catalog", p.id), { active: !isActive });
+    });
+    div.querySelector(".delBtn").addEventListener("click", () => {
+      if(confirm(`Xóa sản phẩm "${p.name}"?`)) deleteDoc(doc(db, "catalog", p.id));
+    });
     list.appendChild(div);
   });
+  updateBatchBar();
+  updateSelectAllState(filtered);
 }
 
-function openEdit(p){
-  const newName = prompt("Sửa từ khóa chính:", p.name);
-  if(newName === null) return;
-  const variantsStr = prompt("Sửa danh sách phân loại (cách nhau bằng dấu phẩy):", (p.variants || []).join(", "));
-  if(variantsStr === null) return;
-  const variants = variantsStr.split(",").map(s => s.trim()).filter(Boolean);
-  updateDoc(doc(db, "catalog", p.id), { name: newName.trim(), variants });
+function updateSelectAllState(filtered){
+  const box = document.getElementById("selectAllBox");
+  const idsShown = filtered.map(p => p.id);
+  box.checked = idsShown.length > 0 && idsShown.every(id => selected.has(id));
 }
 
-// ---- Add single product ----
-function renderTagBox(){
-  const box = document.getElementById("newTagBox");
-  box.innerHTML = "";
-  newTags.forEach((t, i) => {
-    const span = document.createElement("span");
-    span.className = "tag";
-    span.innerHTML = `${escapeHtml(t)} <button data-i="${i}">×</button>`;
-    span.querySelector("button").addEventListener("click", () => {
-      newTags.splice(i, 1);
-      renderTagBox();
-    });
-    box.appendChild(span);
-  });
-}
-renderTagBox();
-
-function addVariantFromInput(){
-  const el = document.getElementById("newVariantInput");
-  const v = el.value.trim();
-  if(v && !newTags.includes(v)){
-    newTags.push(v);
-    renderTagBox();
-  }
-  el.value = "";
-}
-document.getElementById("addVariantBtn").addEventListener("click", addVariantFromInput);
-document.getElementById("newVariantInput").addEventListener("keydown", e => {
-  if(e.key === "Enter"){ e.preventDefault(); addVariantFromInput(); }
+document.getElementById("selectAllBox").addEventListener("change", e => {
+  const filtered = getFiltered();
+  if(e.target.checked) filtered.forEach(p => selected.add(p.id));
+  else filtered.forEach(p => selected.delete(p.id));
+  renderList();
 });
 
-document.getElementById("saveProdBtn").addEventListener("click", async () => {
-  const nameEl = document.getElementById("newProdName");
-  const name = nameEl.value.trim();
-  const statusEl = document.getElementById("addStatus");
-  if(!name){
-    statusEl.textContent = "Vui lòng nhập từ khóa chính.";
-    statusEl.className = "status err";
-    return;
-  }
-  const existing = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
-  if(existing){
-    const merged = Array.from(new Set([...(existing.variants || []), ...newTags]));
-    await updateDoc(doc(db, "catalog", existing.id), { variants: merged });
-  } else {
-    await addDoc(catalogCol, { name, variants: newTags });
-  }
-  statusEl.textContent = "Đã lưu.";
-  statusEl.className = "status ok";
-  nameEl.value = "";
-  newTags = [];
-  renderTagBox();
-  setTimeout(() => { statusEl.textContent = ""; }, 2000);
+function updateBatchBar(){
+  const bar = document.getElementById("batchbar");
+  const n = selected.size;
+  document.getElementById("batchCount").textContent = n + " đã chọn";
+  bar.classList.toggle("show", n > 0);
+}
+
+document.getElementById("batchHide").addEventListener("click", async () => {
+  for(const id of selected) await updateDoc(doc(db, "catalog", id), { active: false });
+  selected.clear();
+});
+document.getElementById("batchShow").addEventListener("click", async () => {
+  for(const id of selected) await updateDoc(doc(db, "catalog", id), { active: true });
+  selected.clear();
+});
+document.getElementById("batchDel").addEventListener("click", async () => {
+  if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
+  for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
+  selected.clear();
 });
 
-// ---- Bulk import ----
 document.getElementById("bulkBtn").addEventListener("click", async () => {
   const raw = document.getElementById("bulkInput").value;
   const statusEl = document.getElementById("bulkStatus");
@@ -227,30 +259,66 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
   }
   let created = 0, merged = 0, skipped = 0;
   for(const line of lines){
-    const parts = line.split("|");
-    if(parts.length < 2){ skipped++; continue; }
-    const name = parts[0].trim();
-    const variants = parts.slice(1).join("|").split(",").map(s => s.trim()).filter(Boolean);
-    if(!name){ skipped++; continue; }
-    const existing = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+    const parsed = parseLine(line);
+    if(!parsed){ skipped++; continue; }
+    const existing = allProducts.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
     if(existing){
-      const mergedVariants = Array.from(new Set([...(existing.variants || []), ...variants]));
+      const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
       await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
       merged++;
     } else {
-      await addDoc(catalogCol, { name, variants });
-      allProducts.push({ id: "temp", name, variants });
+      await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, active: true });
       created++;
     }
   }
   statusEl.textContent = `Xong: ${created} sp mới, ${merged} sp gộp thêm phân loại, ${skipped} dòng bỏ qua (sai định dạng).`;
   statusEl.className = "status ok";
   document.getElementById("bulkInput").value = "";
+  closeFullscreen();
 });
 
-function escapeHtml(s){
-  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const bulkTextarea = document.getElementById("bulkInput");
+document.getElementById("expandBtn").addEventListener("click", () => {
+  openEditorRaw("Nhập / sửa danh sách", bulkTextarea.value, async (text) => {
+    bulkTextarea.value = text;
+    return true;
+  });
+});
+
+function closeFullscreen(){
+  document.getElementById("editorOverlay").classList.remove("show");
 }
+
+function openEditorRaw(title, initialText, onSave){
+  document.getElementById("editorTitle").textContent = title;
+  document.getElementById("editorTextarea").value = initialText;
+  document.getElementById("editorOverlay").classList.add("show");
+  editorSaveHandler = onSave;
+}
+
+function openEditor(product){
+  const line = product.name + (product.variants && product.variants.length ? " | " + product.variants.join(", ") : "");
+  openEditorRaw("Sửa: " + product.name, line, async (text) => {
+    const firstLine = text.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
+    const parsed = parseLine(firstLine);
+    if(!parsed){
+      alert("Định dạng không hợp lệ, cần có: Từ khóa chính | phân loại");
+      return false;
+    }
+    await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants });
+    return true;
+  });
+}
+
+document.getElementById("editorCancel").addEventListener("click", closeFullscreen);
+document.getElementById("editorSave").addEventListener("click", async () => {
+  const text = document.getElementById("editorTextarea").value;
+  if(editorSaveHandler){
+    const result = await editorSaveHandler(text);
+    if(result === false) return;
+  }
+  closeFullscreen();
+});
 </script>
 </body>
 </html>
