@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Quản lý danh mục sản phẩm</title>
+<style>
+  :root{
+    --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
+    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);padding-bottom:40px;}
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:10;}
+  h1{font-size:18px;margin:0;font-weight:600;}
+  a.back{font-size:13px;color:var(--blue);text-decoration:none;}
+  main{padding:14px;max-width:640px;margin:0 auto;}
+  section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+  h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
+  input[type=text],textarea{
+    width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;
+  }
+  textarea{min-height:110px;resize:vertical;}
+  .row{display:flex;gap:8px;margin-bottom:8px;}
+  .row input{flex:1;}
+  button{
+    border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .btn-blue{background:var(--blue);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;background:var(--blue-bg);color:var(--blue);
+    border-radius:14px;padding:5px 10px;font-size:13px;margin:3px 4px 3px 0;
+  }
+  .tag button{background:none;border:none;color:var(--blue);font-size:15px;padding:0;line-height:1;cursor:pointer;}
+  .tagbox{border:1px solid var(--border);border-radius:8px;padding:8px;min-height:44px;margin-bottom:8px;}
+  .searchbox{margin-bottom:10px;}
+  .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
+  .item .name{font-size:15px;font-weight:600;margin-bottom:6px;}
+  .item .variants{margin-bottom:8px;}
+  .item .vchip{display:inline-block;background:var(--green-bg);color:var(--green);border-radius:12px;padding:3px 9px;font-size:12px;margin:2px 4px 2px 0;}
+  .item .actions{display:flex;gap:8px;}
+  .item .actions button{font-size:13px;padding:8px 12px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .status{font-size:13px;margin-top:8px;min-height:18px;}
+  .status.ok{color:var(--green);}
+  .status.err{color:var(--red);}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="index.html">← Về trang chính</a>
+  <h1 style="margin-top:6px;">Quản lý danh mục sản phẩm</h1>
+</header>
+
+<main>
+
+  <section>
+    <h2>Nhập nhanh hàng loạt (dán danh sách)</h2>
+    <p class="muted" style="margin-top:0;">Mỗi dòng 1 sản phẩm, định dạng: <b>Từ khóa chính | phân loại 1, phân loại 2</b>. Nếu sản phẩm đã có, phân loại mới sẽ được gộp thêm, không tạo trùng.</p>
+    <textarea id="bulkInput" placeholder="Lược sử Việt Nam | A0, A1, A2, A3&#10;Bảng chữ cái cho bé | A1, A2, A3"></textarea>
+    <div style="margin-top:8px;">
+      <button class="btn-blue" id="bulkBtn">Nhập danh sách</button>
+    </div>
+    <div class="status" id="bulkStatus"></div>
+  </section>
+
+  <section>
+    <h2>Thêm 1 sản phẩm</h2>
+    <div class="row">
+      <input type="text" id="newProdName" placeholder="Từ khóa chính, vd: Lược sử Việt Nam">
+    </div>
+    <div class="tagbox" id="newTagBox"></div>
+    <div class="row">
+      <input type="text" id="newVariantInput" placeholder="Gõ phân loại rồi Enter, vd: A0">
+      <button class="btn-outline" id="addVariantBtn">+</button>
+    </div>
+    <button class="btn-green" id="saveProdBtn">Lưu sản phẩm</button>
+    <div class="status" id="addStatus"></div>
+  </section>
+
+  <section>
+    <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
+    <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
+    <div id="list"></div>
+  </section>
+
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, doc,
+  updateDoc, deleteDoc, query, orderBy, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
+  authDomain: "in-dong-goi.firebaseapp.com",
+  projectId: "in-dong-goi",
+  storageBucket: "in-dong-goi.firebasestorage.app",
+  messagingSenderId: "532007763879",
+  appId: "1:532007763879:web:8d752aa4d86fd317ca0082"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const catalogCol = collection(db, "catalog");
+
+let allProducts = [];
+let newTags = [];
+
+// ---- Realtime list ----
+const q = query(catalogCol, orderBy("name", "asc"));
+onSnapshot(q, snap => {
+  allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById("totalCount").textContent = allProducts.length;
+  renderList();
+});
+
+document.getElementById("searchBox").addEventListener("input", renderList);
+
+function renderList(){
+  const kw = document.getElementById("searchBox").value.trim().toLowerCase();
+  const list = document.getElementById("list");
+  const filtered = allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
+  list.innerHTML = "";
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    return;
+  }
+  filtered.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "item";
+    const variantsHtml = (p.variants || []).map(v => `<span class="vchip">${escapeHtml(v)}</span>`).join("");
+    div.innerHTML = `
+      <div class="name">${escapeHtml(p.name)}</div>
+      <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
+      <div class="actions">
+        <button class="btn-outline editBtn">Sửa</button>
+        <button class="btn-outline delBtn" style="color:var(--red);">Xóa</button>
+      </div>
+    `;
+    div.querySelector(".delBtn").addEventListener("click", async () => {
+      if(confirm(`Xóa sản phẩm "${p.name}"?`)) await deleteDoc(doc(db, "catalog", p.id));
+    });
+    div.querySelector(".editBtn").addEventListener("click", () => openEdit(p));
+    list.appendChild(div);
+  });
+}
+
+function openEdit(p){
+  const newName = prompt("Sửa từ khóa chính:", p.name);
+  if(newName === null) return;
+  const variantsStr = prompt("Sửa danh sách phân loại (cách nhau bằng dấu phẩy):", (p.variants || []).join(", "));
+  if(variantsStr === null) return;
+  const variants = variantsStr.split(",").map(s => s.trim()).filter(Boolean);
+  updateDoc(doc(db, "catalog", p.id), { name: newName.trim(), variants });
+}
+
+// ---- Add single product ----
+function renderTagBox(){
+  const box = document.getElementById("newTagBox");
+  box.innerHTML = "";
+  newTags.forEach((t, i) => {
+    const span = document.createElement("span");
+    span.className = "tag";
+    span.innerHTML = `${escapeHtml(t)} <button data-i="${i}">×</button>`;
+    span.querySelector("button").addEventListener("click", () => {
+      newTags.splice(i, 1);
+      renderTagBox();
+    });
+    box.appendChild(span);
+  });
+}
+renderTagBox();
+
+function addVariantFromInput(){
+  const el = document.getElementById("newVariantInput");
+  const v = el.value.trim();
+  if(v && !newTags.includes(v)){
+    newTags.push(v);
+    renderTagBox();
+  }
+  el.value = "";
+}
+document.getElementById("addVariantBtn").addEventListener("click", addVariantFromInput);
+document.getElementById("newVariantInput").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); addVariantFromInput(); }
+});
+
+document.getElementById("saveProdBtn").addEventListener("click", async () => {
+  const nameEl = document.getElementById("newProdName");
+  const name = nameEl.value.trim();
+  const statusEl = document.getElementById("addStatus");
+  if(!name){
+    statusEl.textContent = "Vui lòng nhập từ khóa chính.";
+    statusEl.className = "status err";
+    return;
+  }
+  const existing = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if(existing){
+    const merged = Array.from(new Set([...(existing.variants || []), ...newTags]));
+    await updateDoc(doc(db, "catalog", existing.id), { variants: merged });
+  } else {
+    await addDoc(catalogCol, { name, variants: newTags });
+  }
+  statusEl.textContent = "Đã lưu.";
+  statusEl.className = "status ok";
+  nameEl.value = "";
+  newTags = [];
+  renderTagBox();
+  setTimeout(() => { statusEl.textContent = ""; }, 2000);
+});
+
+// ---- Bulk import ----
+document.getElementById("bulkBtn").addEventListener("click", async () => {
+  const raw = document.getElementById("bulkInput").value;
+  const statusEl = document.getElementById("bulkStatus");
+  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  if(lines.length === 0){
+    statusEl.textContent = "Chưa có nội dung để nhập.";
+    statusEl.className = "status err";
+    return;
+  }
+  let created = 0, merged = 0, skipped = 0;
+  for(const line of lines){
+    const parts = line.split("|");
+    if(parts.length < 2){ skipped++; continue; }
+    const name = parts[0].trim();
+    const variants = parts.slice(1).join("|").split(",").map(s => s.trim()).filter(Boolean);
+    if(!name){ skipped++; continue; }
+    const existing = allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if(existing){
+      const mergedVariants = Array.from(new Set([...(existing.variants || []), ...variants]));
+      await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
+      merged++;
+    } else {
+      await addDoc(catalogCol, { name, variants });
+      allProducts.push({ id: "temp", name, variants });
+      created++;
+    }
+  }
+  statusEl.textContent = `Xong: ${created} sp mới, ${merged} sp gộp thêm phân loại, ${skipped} dòng bỏ qua (sai định dạng).`;
+  statusEl.className = "status ok";
+  document.getElementById("bulkInput").value = "";
+});
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+</script>
+</body>
+</html>
