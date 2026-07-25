@@ -48,7 +48,7 @@
     font-size:12.5px;color:var(--blue);margin-bottom:10px;font-weight:600;
   }
   #gomBar.floating{
-    position:sticky;top:55px;z-index:14;background:var(--card);
+    position:sticky;top:var(--header-h, 90px);z-index:14;background:var(--card);
     border:1px solid var(--blue);border-radius:10px;
     padding:10px 10px 2px;margin-bottom:10px;
     box-shadow:0 4px 10px rgba(0,0,0,.08);
@@ -57,7 +57,7 @@
 
   /* Action bar (giống bảng sản phẩm sàn TMĐT) */
   .action-bar{
-    position:sticky;top:55px;z-index:12;
+    position:sticky;top:var(--header-h, 90px);z-index:12;
     background:var(--card);border:1px solid var(--border);border-radius:10px;
     padding:10px 12px;margin-bottom:10px;
     display:flex;align-items:center;gap:10px;
@@ -262,6 +262,16 @@ function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
 }
+
+// Header là sticky nên các thanh nổi khác (gomBar, action-bar) phải bắt đầu
+// ngay dưới header — tính chiều cao thực tế thay vì hard-code để tránh bị che.
+function syncHeaderHeight(){
+  const h = document.querySelector("header").offsetHeight;
+  document.documentElement.style.setProperty("--header-h", h + "px");
+}
+window.addEventListener("resize", syncHeaderHeight);
+syncHeaderHeight();
+setTimeout(syncHeaderHeight, 300);
 
 function randCode(len){
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -588,6 +598,15 @@ function isChipActive(key){
   if(gomMode) return cur.orderId === currentGroupId;
   return key === pinnedKey;
 }
+
+// Nhấp ra ngoài 1 chip phân loại (nút/chỗ khác trên trang) cũng tự bỏ ghim,
+// giống như khi chọn 1 phân loại khác — chỉ áp dụng ngoài chế độ gom.
+document.addEventListener("click", e => {
+  if(gomMode || !pinnedKey) return;
+  if(e.target.closest(".vchip")) return; // để handler riêng của chip xử lý
+  pinnedKey = null;
+  renderList();
+});
 
 function updateTaskBar(){
   const bar = document.getElementById("taskbar");
