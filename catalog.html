@@ -13,8 +13,14 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
   header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;}
-  h1{font-size:18px;margin:0;font-weight:600;}
-  a.back{font-size:13px;color:var(--blue);text-decoration:none;}
+  h1{font-size:18px;margin:0;font-weight:600;text-align:center;}
+  a.back{font-size:13px;color:var(--blue);text-decoration:none;display:block;text-align:center;margin-bottom:6px;}
+  .tabs{display:flex;gap:6px;margin-top:12px;}
+  .tab{
+    flex:1;text-align:center;padding:10px 4px;font-size:14px;font-weight:600;
+    color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;user-select:none;
+  }
+  .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
   main{padding:14px;max-width:640px;margin:0 auto;}
   section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
   h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
@@ -64,6 +70,7 @@
   .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
   .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
   .item .vchip.selected{background:var(--blue);color:#fff;}
+  .item .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
   .item .vchip .vlabel{cursor:pointer;padding:2px 4px;}
   .item .vchip .qtytag{padding:2px 2px;}
   .item .vchip .chipminus,.item .vchip .chipx{
@@ -93,18 +100,24 @@
   .editor-overlay textarea{flex:1;min-height:200px;font-size:15px;}
   .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
   .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
+
+  footer{text-align:center;padding:18px 14px 28px;}
 </style>
 </head>
 <body>
 
 <header>
   <a class="back" href="index.html">← Về trang chính</a>
-  <h1 style="margin-top:6px;">Quản lý danh mục sản phẩm</h1>
+  <h1 id="pageTitle">Thêm danh sách công việc</h1>
+  <div class="tabs">
+    <div class="tab active" data-mode="task">➕ Thêm việc</div>
+    <div class="tab" data-mode="manage">🗂 Quản lý danh mục</div>
+  </div>
 </header>
 
 <main>
 
-  <section>
+  <section id="manageSection" style="display:none;">
     <h2>Nhập / sửa danh sách (dán vào đây)</h2>
     <p class="muted" style="margin-top:0;">Mỗi dòng 1 sản phẩm: <b>Từ khóa chính | phân loại 1, phân loại 2</b>. Chỉ 1 sản phẩm thì gõ đúng 1 dòng. Sản phẩm đã có sẽ được gộp thêm phân loại mới, không tạo trùng.</p>
     <textarea id="bulkInput" placeholder="Lược sử Việt Nam | A0, A1, A2, A3&#10;Bảng chữ cái cho bé | A1, A2, A3"></textarea>
@@ -119,11 +132,11 @@
     <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
 
-    <div class="action-bar">
+    <div class="action-bar" id="manageActionBar" style="display:none;">
       <span id="selCount">Đã chọn 0 sản phẩm</span>
       <button class="del-btn" id="topDelBtn">Xóa</button>
     </div>
-    <div class="selectall">
+    <div class="selectall" id="selectAllRow" style="display:none;">
       <input type="checkbox" id="selectAllBox">
       <span>Chọn tất cả</span>
     </div>
@@ -156,6 +169,10 @@
   </div>
 </div>
 
+<footer>
+  <a class="back" href="index.html">← Về trang chính</a>
+</footer>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -182,6 +199,10 @@ let selected = new Set();
 let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
 let editorSaveHandler = null;
 
+// ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
+// 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
+let mode = "task";
+
 // ---- Gom sản phẩm (grouping into one order) ----
 let gomMode = false;
 let currentGroupId = null;
@@ -201,12 +222,38 @@ function randCode(len){
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function newOrderName(){ return "Đơn " + randCode(3); }
 
+// ---- Chuyển chế độ ----
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    mode = t.dataset.mode;
+    applyModeUI();
+    renderList();
+  });
+});
+
+function applyModeUI(){
+  const isManage = mode === "manage";
+  document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
+  document.getElementById("manageSection").style.display = isManage ? "block" : "none";
+  document.getElementById("manageActionBar").style.display = isManage ? "flex" : "none";
+  document.getElementById("selectAllRow").style.display = isManage ? "flex" : "none";
+  document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
+  if(isManage){
+    document.getElementById("gomStatusLine").style.display = "none";
+  } else {
+    updateGomStatusLine();
+  }
+}
+applyModeUI();
+
 const gomBtn = document.getElementById("gomBtn");
 const groupNameInput = document.getElementById("groupNameInput");
 const gomStatusLine = document.getElementById("gomStatusLine");
 
 function updateGomStatusLine(){
-  if(!gomMode){ gomStatusLine.style.display = "none"; return; }
+  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
   const name = groupNameInput.value.trim();
   gomStatusLine.style.display = "block";
   gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
@@ -272,11 +319,13 @@ function getFiltered(){
 function renderList(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
+  const isManage = mode === "manage";
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
     updateActionBar();
     updateSelectAllState(filtered);
+    updateTaskBar();
     return;
   }
   filtered.forEach(p => {
@@ -284,6 +333,9 @@ function renderList(){
     div.className = "item";
     const variantsHtml = (p.variants && p.variants.length)
       ? p.variants.map(v => {
+          if(isManage){
+            return `<span class="vchip static">${escapeHtml(v)}</span>`;
+          }
           const key = p.id + "__" + v;
           const sel = taskSelections.get(key);
           const qty = sel ? sel.qty : 0;
@@ -294,44 +346,47 @@ function renderList(){
         }).join("")
       : "";
     div.innerHTML = `
-      <input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>
+      ${isManage ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
       <div class="body">
         <div class="titlerow">
           <div class="name">${escapeHtml(p.name)}</div>
-          <button class="editBtn">✏️ Sửa</button>
+          ${isManage ? `<button class="editBtn">✏️ Sửa</button>` : ""}
         </div>
         <div class="variants">${variantsHtml || '<span class="muted">Chưa có phân loại</span>'}</div>
       </div>
     `;
-    div.querySelector(".rowCheck").addEventListener("change", e => {
-      if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
-      updateActionBar();
-      updateSelectAllState(filtered);
-    });
-    div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
-    div.querySelectorAll(".vchip").forEach(chip => {
-      chip.addEventListener("click", e => {
-        const key = chip.dataset.key;
-        const variant = key.slice(p.id.length + 2);
-        const act = e.target.dataset.act;
-        let cur = taskSelections.get(key);
-        if(act === "remove"){
-          taskSelections.delete(key);
-        } else if(act === "minus"){
-          if(cur){
-            cur.qty -= 1;
-            if(cur.qty <= 0) taskSelections.delete(key);
-          }
-        } else {
-          if(!cur){
-            cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId() };
-            taskSelections.set(key, cur);
-          }
-          cur.qty += 1;
-        }
-        renderList();
+    if(isManage){
+      div.querySelector(".rowCheck").addEventListener("change", e => {
+        if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
+        updateActionBar();
+        updateSelectAllState(filtered);
       });
-    });
+      div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+    } else {
+      div.querySelectorAll(".vchip").forEach(chip => {
+        chip.addEventListener("click", e => {
+          const key = chip.dataset.key;
+          const variant = key.slice(p.id.length + 2);
+          const act = e.target.dataset.act;
+          let cur = taskSelections.get(key);
+          if(act === "remove"){
+            taskSelections.delete(key);
+          } else if(act === "minus"){
+            if(cur){
+              cur.qty -= 1;
+              if(cur.qty <= 0) taskSelections.delete(key);
+            }
+          } else {
+            if(!cur){
+              cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId() };
+              taskSelections.set(key, cur);
+            }
+            cur.qty += 1;
+          }
+          renderList();
+        });
+      });
+    }
     list.appendChild(div);
   });
   updateActionBar();
@@ -343,7 +398,7 @@ function updateTaskBar(){
   const bar = document.getElementById("taskbar");
   const n = taskSelections.size;
   document.getElementById("taskCount").textContent = `Đã chọn ${n} phân loại`;
-  bar.classList.toggle("show", n > 0);
+  bar.classList.toggle("show", mode === "task" && n > 0);
 }
 
 document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
