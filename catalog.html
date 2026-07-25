@@ -233,6 +233,17 @@ document.querySelectorAll(".tab").forEach(t => {
   });
 });
 
+const gomBtn = document.getElementById("gomBtn");
+const groupNameInput = document.getElementById("groupNameInput");
+const gomStatusLine = document.getElementById("gomStatusLine");
+
+function updateGomStatusLine(){
+  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
+  const name = groupNameInput.value.trim();
+  gomStatusLine.style.display = "block";
+  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
+}
+
 function applyModeUI(){
   const isManage = mode === "manage";
   document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
@@ -247,17 +258,6 @@ function applyModeUI(){
   }
 }
 applyModeUI();
-
-const gomBtn = document.getElementById("gomBtn");
-const groupNameInput = document.getElementById("groupNameInput");
-const gomStatusLine = document.getElementById("gomStatusLine");
-
-function updateGomStatusLine(){
-  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
-  const name = groupNameInput.value.trim();
-  gomStatusLine.style.display = "block";
-  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
-}
 
 gomBtn.addEventListener("click", () => {
   if(!gomMode){
