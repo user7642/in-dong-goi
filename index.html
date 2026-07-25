@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Quản lý In & Đóng gói</title>
+<style>
+  :root{
+    --bg:#f5f6f7;
+    --card:#ffffff;
+    --border:#e2e4e7;
+    --text:#1a1d21;
+    --muted:#6b7280;
+    --blue:#2563eb;
+    --blue-bg:#eaf1ff;
+    --amber:#b45309;
+    --amber-bg:#fef3e0;
+    --green:#15803d;
+    --green-bg:#e8f7ec;
+    --red:#dc2626;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:90px;
+  }
+  header{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:14px 16px 0 16px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  h1{font-size:18px;margin:0 0 12px 0;font-weight:600;}
+  .tabs{display:flex;gap:6px;}
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:12px 4px;
+    font-size:15px;
+    font-weight:600;
+    color:var(--muted);
+    border-bottom:3px solid transparent;
+    cursor:pointer;
+    user-select:none;
+  }
+  .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+  .count-badge{
+    display:inline-block;
+    background:var(--border);
+    color:var(--text);
+    border-radius:10px;
+    font-size:12px;
+    padding:1px 7px;
+    margin-left:5px;
+  }
+  .tab.active .count-badge{background:var(--blue);color:#fff;}
+
+  .addbar{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:10px 16px;
+    display:flex;
+    gap:8px;
+    position:sticky;
+    top:53px;
+    z-index:19;
+  }
+  .addbar input[type=text]{
+    flex:1;
+    min-width:0;
+    font-size:16px;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+  .addbar input[type=number]{
+    width:64px;
+    font-size:16px;
+    padding:11px 6px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    text-align:center;
+  }
+  .addbar button{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:0 16px;
+    font-size:22px;
+    font-weight:600;
+    cursor:pointer;
+  }
+
+  main{padding:12px 12px 0 12px;}
+  .empty{
+    text-align:center;
+    color:var(--muted);
+    padding:60px 20px;
+    font-size:14px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .card input[type=checkbox]{
+    width:22px;height:22px;flex-shrink:0;accent-color:var(--blue);
+  }
+  .card .info{flex:1;min-width:0;}
+  .card .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
+  .card .meta{font-size:13px;color:var(--muted);margin-top:2px;}
+  .card .note{font-size:13px;color:var(--muted);margin-top:2px;font-style:italic;}
+  .card button.action{
+    flex-shrink:0;
+    border:none;
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .status-cho_in .action{background:var(--blue-bg);color:var(--blue);}
+  .status-dang_in .action{background:var(--blue-bg);color:var(--blue);}
+  .status-cho_dong_goi .action{background:var(--amber-bg);color:var(--amber);}
+  .status-xong .info .name{color:var(--muted);text-decoration:line-through;}
+
+  .batchbar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--text);
+    color:#fff;
+    padding:12px 14px;
+    display:none;
+    align-items:center;
+    gap:10px;
+    z-index:30;
+  }
+  .batchbar.show{display:flex;}
+  .batchbar span{flex:1;font-size:14px;}
+  .batchbar button{
+    border:none;
+    border-radius:8px;
+    padding:11px 14px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .batchbar .done-btn{background:var(--green);color:#fff;}
+  .batchbar .del-btn{background:var(--red);color:#fff;}
+
+  .noteinput{
+    display:none;
+    margin-top:8px;
+  }
+  .status-line{
+    font-size:11px;
+    text-align:center;
+    color:var(--muted);
+    padding:8px 0 2px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Quản lý In &amp; Đóng gói</h1>
+  <div class="tabs">
+    <div class="tab active" data-tab="in">In <span class="count-badge" id="badge-in">0</span></div>
+    <div class="tab" data-tab="dong_goi">Đóng gói <span class="count-badge" id="badge-dong_goi">0</span></div>
+    <div class="tab" data-tab="xong">Đã xong <span class="count-badge" id="badge-xong">0</span></div>
+  </div>
+</header>
+
+<div class="addbar" id="addbar">
+  <input type="text" id="newName" placeholder="Tên sản phẩm...">
+  <input type="number" id="newQty" placeholder="SL" value="1" min="1">
+  <button id="addBtn">+</button>
+</div>
+
+<main>
+  <div id="list"></div>
+</main>
+
+<div class="status-line" id="connStatus"></div>
+
+<div class="batchbar" id="batchbar">
+  <span id="batchCount">0 đã chọn</span>
+  <button class="done-btn" id="batchDone"></button>
+  <button class="del-btn" id="batchDel">Xóa</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, doc,
+  updateDoc, deleteDoc, serverTimestamp, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
+  authDomain: "in-dong-goi.firebaseapp.com",
+  projectId: "in-dong-goi",
+  storageBucket: "in-dong-goi.firebasestorage.app",
+  messagingSenderId: "532007763879",
+  appId: "1:532007763879:web:8d752aa4d86fd317ca0082"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const tasksCol = collection(db, "tasks");
+
+let currentTab = "in";
+let allTasks = [];
+let selected = new Set();
+
+const list = document.getElementById("list");
+const connStatus = document.getElementById("connStatus");
+const batchbar = document.getElementById("batchbar");
+const addbar = document.getElementById("addbar");
+
+// ---- Tabs ----
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    currentTab = t.dataset.tab;
+    selected.clear();
+    addbar.style.display = currentTab === "in" ? "flex" : "none";
+    render();
+  });
+});
+addbar.style.display = "flex";
+
+// ---- Add task ----
+document.getElementById("addBtn").addEventListener("click", addTask);
+document.getElementById("newName").addEventListener("keydown", e => { if(e.key === "Enter") addTask(); });
+
+async function addTask(){
+  const nameEl = document.getElementById("newName");
+  const qtyEl = document.getElementById("newQty");
+  const name = nameEl.value.trim();
+  const qty = parseInt(qtyEl.value) || 1;
+  if(!name) return;
+  await addDoc(tasksCol, {
+    name, qty,
+    status: "cho_in",
+    note: "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  nameEl.value = "";
+  qtyEl.value = "1";
+  nameEl.focus();
+}
+
+// ---- Realtime listener ----
+const q = query(tasksCol, orderBy("createdAt", "asc"));
+onSnapshot(q, snap => {
+  allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  connStatus.textContent = "";
+  render();
+}, err => {
+  connStatus.textContent = "Lỗi kết nối: " + err.message;
+});
+
+// ---- Render ----
+function render(){
+  const badgeIn = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
+  const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
+  const badgeXong = allTasks.filter(t => t.status === "xong").length;
+  document.getElementById("badge-in").textContent = badgeIn;
+  document.getElementById("badge-dong_goi").textContent = badgeDG;
+  document.getElementById("badge-xong").textContent = badgeXong;
+
+  let shown;
+  if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in");
+  else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
+  else shown = allTasks.filter(t => t.status === "xong").slice(-50).reverse();
+
+  list.innerHTML = "";
+  if(shown.length === 0){
+    const emptyMsg = currentTab === "in" ? "Chưa có việc nào. Thêm sản phẩm ở ô trên."
+      : currentTab === "dong_goi" ? "Chưa có sản phẩm nào chờ đóng gói."
+      : "Chưa có sản phẩm nào hoàn tất.";
+    list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    return;
+  }
+
+  shown.forEach(t => {
+    const card = document.createElement("div");
+    card.className = "card status-" + t.status;
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = selected.has(t.id);
+    cb.addEventListener("change", () => {
+      if(cb.checked) selected.add(t.id); else selected.delete(t.id);
+      updateBatchBar();
+    });
+
+    const info = document.createElement("div");
+    info.className = "info";
+    info.innerHTML = `<div class="name">${escapeHtml(t.name)}</div><div class="meta">SL: ${t.qty || 1}</div>`;
+
+    card.appendChild(cb);
+    card.appendChild(info);
+
+    if(currentTab !== "xong"){
+      const btn = document.createElement("button");
+      btn.className = "action";
+      btn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+      btn.addEventListener("click", () => advanceStatus(t));
+      card.appendChild(btn);
+    }
+
+    list.appendChild(card);
+  });
+}
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+async function advanceStatus(t){
+  const next = t.status === "cho_in" || t.status === "dang_in" ? "cho_dong_goi" : "xong";
+  await updateDoc(doc(db, "tasks", t.id), { status: next, updatedAt: serverTimestamp() });
+}
+
+// ---- Batch actions ----
+function updateBatchBar(){
+  const n = selected.size;
+  document.getElementById("batchCount").textContent = n + " đã chọn";
+  document.getElementById("batchDone").textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+  batchbar.classList.toggle("show", n > 0 && currentTab !== "xong");
+}
+
+document.getElementById("batchDone").addEventListener("click", async () => {
+  const ids = Array.from(selected);
+  for(const id of ids){
+    const t = allTasks.find(x => x.id === id);
+    if(t) await advanceStatus(t);
+  }
+  selected.clear();
+  updateBatchBar();
+});
+
+document.getElementById("batchDel").addEventListener("click", async () => {
+  if(!confirm("Xóa " + selected.size + " mục đã chọn?")) return;
+  const ids = Array.from(selected);
+  for(const id of ids){
+    await deleteDoc(doc(db, "tasks", id));
+  }
+  selected.clear();
+  updateBatchBar();
+});
+</script>
+</body>
+</html>
