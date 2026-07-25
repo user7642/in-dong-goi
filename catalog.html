@@ -348,7 +348,10 @@ groupNameInput.addEventListener("input", updateGomStatusLine);
 
 const q = query(catalogCol, orderBy("name", "asc"));
 onSnapshot(q, snap => {
-  allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  allProducts = snap.docs.map(d => {
+    const data = d.data();
+    return { id: d.id, ...data, tiers: tiersFromFirestore(data.tiers) };
+  });
   document.getElementById("totalCount").textContent = allProducts.length;
   renderList();
 }, err => {
@@ -384,6 +387,19 @@ function cartesianProduct(arrays){
     acc.forEach(prefix => arr.forEach(v => result.push([...prefix, v])));
     return result;
   }, [[]]);
+}
+
+// Firestore không cho phép lưu mảng lồng mảng trực tiếp (nested array).
+// Nội bộ code vẫn dùng tiers dạng [["a","b"],["c","d"]] cho tiện xử lý,
+// nhưng khi ghi lên Firestore phải bọc từng tầng trong 1 object.
+function tiersToFirestore(tiers){
+  if(!tiers) return null;
+  return tiers.map(arr => ({ values: arr }));
+}
+
+function tiersFromFirestore(tiers){
+  if(!tiers) return null;
+  return tiers.map(t => Array.isArray(t) ? t : (t.values || []));
 }
 
 function mergeTiers(existingTiers, newTiers){
@@ -692,7 +708,7 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
       if(existing){
         if(parsed.tiers){
           const mergedTiers = mergeTiers(existing.tiers, parsed.tiers);
-          await updateDoc(doc(db, "catalog", existing.id), { tiers: mergedTiers });
+          await updateDoc(doc(db, "catalog", existing.id), { tiers: tiersToFirestore(mergedTiers) });
         } else if(parsed.variants.length){
           const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
           await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
@@ -700,7 +716,7 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
         // dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên, không cần cập nhật gì thêm
         merged++;
       } else {
-        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: parsed.tiers || null });
+        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers) });
         created++;
       }
     }
@@ -743,7 +759,7 @@ function openEditor(product){
       return false;
     }
     try{
-      await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants, tiers: parsed.tiers || null });
+      await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers) });
       return true;
     }catch(e){
       showError("Không lưu được sản phẩm: " + e.message);
