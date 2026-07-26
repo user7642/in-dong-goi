@@ -591,6 +591,25 @@ function groupShown(shown){
   return order.map(oid => map.get(oid));
 }
 
+// Cho biết những orderId nào sẽ KHÔNG còn item nào sau khi xóa các id trong
+// deletedIds — dùng để biết đơn nào "trống hẳn" (từ đó dọn phiếu giao đính
+// kèm nếu cần). So sánh trên allTasks HIỆN TẠI (trước khi xóa thật sự), nên
+// phải gọi hàm này trước khi deleteDoc(), không phải sau.
+function orderIdsBecomingEmpty(deletedIds){
+  const deletedSet = new Set(deletedIds);
+  const affectedOrderIds = new Set(
+    allTasks
+      .filter(t => deletedSet.has(t.id))
+      .map(t => t.orderId || t.id)
+  );
+  const result = [];
+  affectedOrderIds.forEach(oid => {
+    const remaining = allTasks.some(t => t.orderId === oid && !deletedSet.has(t.id));
+    if(!remaining) result.push(oid);
+  });
+  return result;
+}
+
 // ---- Render ----
 function getShown(){
   let shown;
@@ -1070,7 +1089,7 @@ async function deleteShipLabelFileIfExists(orderId){
 
 // Tải file về máy trực tiếp (không mở tab mới): fetch nguyên byte gốc thành
 // blob rồi tự trigger tải — cách này bắt buộc phải dùng vì URL nằm khác domain
-// (Firebase Storage), thẻ <a download> trỏ thẳng URL cross-domain sẽ bị trình
+// (Cloudinary), thẻ <a download> trỏ thẳng URL cross-domain sẽ bị trình
 // duyệt mở tab xem thay vì tải về.
 async function downloadShipLabel(url, orderName){
   try{
@@ -1087,7 +1106,7 @@ async function downloadShipLabel(url, orderName){
     a.remove();
     setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
   }catch(e){
-    showError("Không tải được phiếu giao (có thể do cấu hình CORS trên Storage bucket): " + e.message);
+    showError("Không tải được phiếu giao (có thể do cấu hình CORS trên Cloudinary): " + e.message);
   }
 }
 
