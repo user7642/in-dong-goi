@@ -208,6 +208,22 @@
     padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
   }
 
+  /* Phiếu giao (mã đơn vận) đính kèm PDF — dùng chung cho cả đơn hàng, không
+     phải theo từng sản phẩm, nên đặt ngay dưới order-header. */
+  .ship-label-row{
+    padding:9px 12px;
+    border-bottom:1px solid var(--border);
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:#fbfcfd;
+  }
+  .ship-label-row button{
+    border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .ship-label-row .attach-btn{background:var(--blue-bg);color:var(--blue);}
+  .ship-label-row .download-btn{background:var(--green-bg);color:var(--green);}
+  .ship-label-row .remove-btn{background:#fde8e8;color:var(--red);}
+  .ship-label-row button[disabled]{opacity:.6;cursor:default;}
+
   .order-item{
     display:flex;align-items:flex-start;gap:10px;
     padding:12px;border-bottom:1px solid var(--border);
@@ -355,6 +371,9 @@ import {
   updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
@@ -367,6 +386,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const tasksCol = collection(db, "tasks");
 
 let currentTab = "in";
@@ -378,6 +398,8 @@ let searchTerm = "";
 let openNotes = new Set();
 let editingTaskIds = new Set();
 let editingOrderIds = new Set();
+// orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
+let uploadingShipLabelIds = new Set();
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -451,10 +473,12 @@ clearAllBtn.addEventListener("click", async () => {
   const items = allTasks.filter(t => t.status === "xong");
   if(items.length === 0) return;
   if(!confirm(`Xóa toàn bộ ${items.length} sản phẩm đã xong? Không thể hoàn tác.`)) return;
+  const emptiedOrders = orderIdsBecomingEmpty(items.map(it => it.id));
   try{
     for(const it of items){
       await deleteDoc(doc(db, "tasks", it.id));
     }
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
     selected.clear();
     updateBatchBar();
   }catch(e){ showError("Không làm sạch được danh sách: " + e.message); }
@@ -500,9 +524,67 @@ onSnapshot(q, snap => {
   allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   connStatus.textContent = "";
   render();
+  purgeExpiredXong();
 }, err => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
+
+// ---- Dọn file phiếu giao PDF theo vòng đời document ----
+
+// Trả về danh sách orderId sẽ "hết sạch item" NẾU xóa các id trong deletedIds
+// khỏi allTasks hiện tại — dùng để biết đơn nào cần xóa luôn file PDF dùng
+// chung. Chỉ xóa file khi đây là item CUỐI CÙNG còn lại của đơn, tránh xóa
+// nhầm file khi đơn vẫn còn item khác đang tham chiếu tới cùng 1 phiếu giao.
+function orderIdsBecomingEmpty(deletedIds){
+  const idSet = new Set(deletedIds);
+  const remainingByOrder = new Map(); // orderId -> số item còn lại sau khi xóa
+  allTasks.forEach(t => {
+    const oid = t.orderId || t.id;
+    if(!remainingByOrder.has(oid)) remainingByOrder.set(oid, 0);
+    if(!idSet.has(t.id)) remainingByOrder.set(oid, remainingByOrder.get(oid) + 1);
+  });
+  const emptied = [];
+  deletedIds.forEach(id => {
+    const t = allTasks.find(x => x.id === id);
+    if(!t) return;
+    const oid = t.orderId || t.id;
+    if(remainingByOrder.get(oid) === 0 && !emptied.includes(oid)) emptied.push(oid);
+  });
+  return emptied;
+}
+
+async function deleteShipLabelFileIfExists(orderId){
+  try{
+    await deleteObject(ref(storage, `ship-labels/${orderId}.pdf`));
+  }catch(e){
+    // Bỏ qua: đơn này có thể chưa từng đính kèm phiếu giao (file không tồn tại) —
+    // không phải lỗi cần báo cho người dùng.
+  }
+}
+
+// Quét chủ động các item "xong" đã quá hạn expireAt và xóa NGAY (doc + file
+// PDF kèm theo), thay vì trông chờ hoàn toàn vào Firestore TTL — vì TTL chạy
+// nền phía server, không có cách nào tự gọi kèm việc xóa file Storage. TTL
+// server vẫn để nguyên, đóng vai trò lưới an toàn dự phòng (vd nhỡ lâu ngày
+// không ai mở app) — chạy trùng ở đây không sao vì deleteDoc/deleteObject
+// trên dữ liệu đã bị xóa chỉ lặng lẽ báo lỗi "không tồn tại" và được bỏ qua.
+async function purgeExpiredXong(){
+  const now = Date.now();
+  const expired = allTasks.filter(t =>
+    t.status === "xong" && t.expireAt && typeof t.expireAt.toMillis === "function" && t.expireAt.toMillis() <= now
+  );
+  if(expired.length === 0) return;
+  const ids = expired.map(t => t.id);
+  const emptiedOrders = orderIdsBecomingEmpty(ids);
+  try{
+    for(const it of expired){
+      await deleteDoc(doc(db, "tasks", it.id));
+    }
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
+  }catch(e){
+    // Dọn dẹp nền — không làm phiền người dùng bằng lỗi nền không quan trọng.
+  }
+}
 
 function escapeHtml(s){
   return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -526,10 +608,14 @@ function groupShown(shown){
   shown.forEach(t => {
     const oid = t.orderId || t.id;
     if(!map.has(oid)){
-      map.set(oid, { orderId: oid, orderName: t.orderName || t.name, items: [] });
+      map.set(oid, { orderId: oid, orderName: t.orderName || t.name, shipLabelUrl: "", items: [] });
       order.push(oid);
     }
-    map.get(oid).items.push(t);
+    const g = map.get(oid);
+    // shipLabelUrl được ghi lặp lên mọi item cùng orderId (giống orderName) —
+    // chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
+    if(!g.shipLabelUrl && t.shipLabelUrl) g.shipLabelUrl = t.shipLabelUrl;
+    g.items.push(t);
   });
   return order.map(oid => map.get(oid));
 }
@@ -628,6 +714,7 @@ function renderOrderBox(g){
     header.appendChild(editBtn);
   }
   box.appendChild(header);
+  box.appendChild(renderShipLabelRow(g));
 
   if(currentTab === "dong_goi" && info){
     const line = document.createElement("div");
@@ -651,6 +738,62 @@ function renderOrderBox(g){
 
   g.items.forEach(t => box.appendChild(renderItem(t)));
   return box;
+}
+
+// Khu vực đính kèm/tải phiếu giao (PDF chứa mã đơn vận) — 1 file dùng chung
+// cho cả đơn hàng (order-level), khác với "🔗 File in" ở từng sản phẩm.
+function renderShipLabelRow(g){
+  const rowEl = document.createElement("div");
+  rowEl.className = "ship-label-row";
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/pdf";
+  fileInput.style.display = "none";
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    if(f) uploadShipLabel(g.orderId, f);
+    fileInput.value = "";
+  });
+  rowEl.appendChild(fileInput);
+
+  if(uploadingShipLabelIds.has(g.orderId)){
+    const busyBtn = document.createElement("button");
+    busyBtn.className = "attach-btn";
+    busyBtn.disabled = true;
+    busyBtn.textContent = "⏳ Đang tải lên...";
+    rowEl.appendChild(busyBtn);
+    return rowEl;
+  }
+
+  if(g.shipLabelUrl){
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "download-btn";
+    dlBtn.textContent = "⬇️ Tải phiếu giao";
+    dlBtn.addEventListener("click", () => downloadShipLabel(g.shipLabelUrl, g.orderName));
+    rowEl.appendChild(dlBtn);
+
+    const replaceBtn = document.createElement("button");
+    replaceBtn.className = "attach-btn";
+    replaceBtn.textContent = "🔄 Thay file";
+    replaceBtn.addEventListener("click", () => fileInput.click());
+    rowEl.appendChild(replaceBtn);
+
+    const rmBtn = document.createElement("button");
+    rmBtn.className = "remove-btn";
+    rmBtn.textContent = "🗑";
+    rmBtn.title = "Xóa phiếu giao";
+    rmBtn.addEventListener("click", () => removeShipLabel(g.orderId));
+    rowEl.appendChild(rmBtn);
+  } else {
+    const attachBtn = document.createElement("button");
+    attachBtn.className = "attach-btn";
+    attachBtn.textContent = "📎 Đính kèm phiếu giao (PDF)";
+    attachBtn.addEventListener("click", () => fileInput.click());
+    rowEl.appendChild(attachBtn);
+  }
+
+  return rowEl;
 }
 
 function renderItem(t){
@@ -888,9 +1031,78 @@ async function saveNote(id, note){
 
 async function deleteTask(id){
   if(!confirm("Xóa việc này?")) return;
+  const emptiedOrders = orderIdsBecomingEmpty([id]);
   try{
     await deleteDoc(doc(db, "tasks", id));
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
   }catch(e){ showError("Không xóa được: " + e.message); }
+}
+
+// ---- Phiếu giao (ship label PDF) — gắn theo order, không theo item ----
+
+// Tải file PDF lên Firebase Storage rồi ghi URL vào mọi item cùng orderId
+// (giống cách renameOrder() đồng bộ tên đơn). Dùng chung 1 path cố định theo
+// orderId nên lần tải lên sau tự ghi đè file cũ, không cần dọn rác thủ công.
+async function uploadShipLabel(orderId, file){
+  if(!file) return;
+  if(file.type !== "application/pdf"){
+    showError("Chỉ chấp nhận file PDF cho phiếu giao.");
+    return;
+  }
+  uploadingShipLabelIds.add(orderId);
+  render();
+  try{
+    const storageRef = ref(storage, `ship-labels/${orderId}.pdf`);
+    await uploadBytes(storageRef, file, { contentType: "application/pdf" });
+    const url = await getDownloadURL(storageRef);
+    const items = allTasks.filter(t => t.orderId === orderId);
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: url, updatedAt: serverTimestamp() });
+    }
+  }catch(e){
+    showError("Không tải lên được phiếu giao: " + e.message);
+  }finally{
+    uploadingShipLabelIds.delete(orderId);
+    render();
+  }
+}
+
+async function removeShipLabel(orderId){
+  if(!confirm("Xóa phiếu giao đã đính kèm cho đơn này?")) return;
+  try{
+    try{
+      await deleteObject(ref(storage, `ship-labels/${orderId}.pdf`));
+    }catch(e){
+      // Bỏ qua nếu file đã không còn tồn tại trên Storage (vd đã bị xóa trước đó).
+    }
+    const items = allTasks.filter(t => t.orderId === orderId);
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: deleteField(), updatedAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Không xóa được phiếu giao: " + e.message); }
+}
+
+// Tải file về máy trực tiếp (không mở tab mới): fetch nguyên byte gốc thành
+// blob rồi tự trigger tải — cách này bắt buộc phải dùng vì URL nằm khác domain
+// (Firebase Storage), thẻ <a download> trỏ thẳng URL cross-domain sẽ bị trình
+// duyệt mở tab xem thay vì tải về.
+async function downloadShipLabel(url, orderName){
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const safeName = (orderName || "don-hang").replace(/[^a-zA-Z0-9-_]+/g, "_");
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `phieu-giao-${safeName}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  }catch(e){
+    showError("Không tải được phiếu giao (có thể do cấu hình CORS trên Storage bucket): " + e.message);
+  }
 }
 
 async function renameOrder(orderId, newName){
@@ -948,10 +1160,12 @@ document.getElementById("batchDone").addEventListener("click", async () => {
 document.getElementById("batchDel").addEventListener("click", async () => {
   if(!confirm("Xóa " + selected.size + " mục đã chọn?")) return;
   const ids = Array.from(selected);
+  const emptiedOrders = orderIdsBecomingEmpty(ids);
   try{
     for(const id of ids){
       await deleteDoc(doc(db, "tasks", id));
     }
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
   }catch(e){ showError("Không xóa được các mục đã chọn: " + e.message); }
   selected.clear();
   updateBatchBar();
