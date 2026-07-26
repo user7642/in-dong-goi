@@ -9,10 +9,14 @@
     --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
     --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
     --amber:#b45309; --amber-bg:#fef3e0;
+    --maxw:680px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
-  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;}
+  /* Header, main, footer và các thanh sticky/fixed đều dùng chung 1 độ rộng
+     tối đa (--maxw), canh giữa — để trên desktop mọi khối đều thẳng hàng
+     với nhau thay vì header chạy full-width còn nội dung bị bó hẹp lại. */
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;max-width:var(--maxw);margin:0 auto;}
   h1{font-size:18px;margin:0;font-weight:600;text-align:center;}
   a.back{font-size:13px;color:var(--blue);text-decoration:none;display:block;text-align:center;margin-bottom:6px;}
   .tabs{display:flex;gap:6px;margin-top:12px;}
@@ -21,7 +25,7 @@
     color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;user-select:none;
   }
   .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
-  main{padding:14px;max-width:640px;margin:0 auto;}
+  main{padding:14px;max-width:var(--maxw);margin:0 auto;}
   section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
   h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
   input[type=text],textarea{
@@ -29,6 +33,7 @@
   }
   textarea{min-height:130px;resize:vertical;line-height:1.5;}
   .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
+  .row-nowrap{flex-wrap:nowrap;}
   button{border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;}
   .btn-blue{background:var(--blue);color:#fff;}
   .btn-green{background:var(--green);color:#fff;}
@@ -105,6 +110,7 @@
   .taskbar{
     position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
     padding:12px 14px;display:none;align-items:center;gap:10px;z-index:30;
+    max-width:var(--maxw);margin:0 auto;border-radius:12px 12px 0 0;
   }
   .taskbar.show{display:flex;}
   .taskbar button{border:none;border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
@@ -127,8 +133,9 @@
   .selrow .selremove{background:var(--gray-bg);color:var(--red);font-size:12px;padding:5px 9px;flex-shrink:0;}
 
   .editor-overlay{
-    position:fixed;inset:0;background:var(--bg);z-index:50;
+    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:50;
     display:none;flex-direction:column;padding:14px;
+    max-width:var(--maxw);margin:0 auto;
   }
   .editor-overlay.show{display:flex;}
   .editor-overlay h3{font-size:16px;margin:0 0 8px 0;}
@@ -137,7 +144,7 @@
   .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
   .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
 
-  footer{text-align:center;padding:18px 14px 28px;}
+  footer{text-align:center;padding:18px 14px 28px;max-width:var(--maxw);margin:0 auto;}
 </style>
 </head>
 <body>
@@ -185,9 +192,9 @@
       Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.
     </p>
     <textarea id="bulkInput" placeholder="Bút chì màu 12 màu&#10;Lược sử Việt Nam | A0, A1, A2, A3&#10;Bộ tranh kỹ năng an toàn | An toàn trong nhà, An toàn ngoài trời | A2 (60x42 cm), A3 (42x30 cm)"></textarea>
-    <div class="row" style="margin-top:8px;">
-      <button class="btn-blue" id="bulkBtn">Nhập danh sách</button>
-      <button class="btn-outline" id="expandBtn" type="button">⤢ Mở rộng toàn màn hình</button>
+    <div class="row row-nowrap" style="margin-top:8px;">
+      <button class="btn-blue" id="bulkBtn" style="flex:1;">Nhập danh sách</button>
+      <button class="btn-outline" id="expandBtn" type="button" style="flex:1;">⤢ Mở rộng</button>
     </div>
     <div class="status" id="bulkStatus"></div>
   </section>
@@ -214,7 +221,7 @@
 
 <div class="editor-overlay" id="editorOverlay">
   <h3 id="editorTitle">Sửa sản phẩm</h3>
-  <p class="muted">Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)</p>
+  <p class="muted" id="editorDesc">Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)</p>
   <textarea id="editorTextarea"></textarea>
   <div class="editor-actions">
     <button class="btn-outline" id="editorCancel">Hủy</button>
@@ -984,6 +991,14 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
   }
 });
 
+// Giữ nguyên nội dung này khớp với đoạn <p class="muted"> tĩnh nằm dưới
+// ô #bulkInput ở trên — nếu sửa 1 chỗ thì nhớ sửa luôn chỗ kia.
+const BULK_FORMAT_HELP = `Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
+      1) Không phân loại: <b>Tên sản phẩm</b><br>
+      2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
+      3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
+      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.`;
+
 document.getElementById("exportBtn").addEventListener("click", () => {
   if(allProducts.length === 0){
     alert("Danh mục đang trống, chưa có gì để xuất.");
@@ -992,7 +1007,9 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   const text = allProducts.map(productToLine).join("\n");
   // Chỉ để xem / sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây không ghi gì
   // xuống Firestore, tránh nhầm lẫn với việc sửa từng sản phẩm.
-  openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true);
+  openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true,
+    `Đây là toàn bộ danh mục hiện có, mỗi dòng 1 sản phẩm theo đúng định dạng nhập liệu.<br>
+     Chỉ để xem và sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây sẽ không ghi gì xuống hệ thống.`);
 });
 
 const bulkTextarea = document.getElementById("bulkInput");
@@ -1000,15 +1017,16 @@ document.getElementById("expandBtn").addEventListener("click", () => {
   openEditorRaw("Nhập / sửa danh sách", bulkTextarea.value, async (text) => {
     bulkTextarea.value = text;
     return true;
-  });
+  }, BULK_FORMAT_HELP);
 });
 
 function closeFullscreen(){
   document.getElementById("editorOverlay").classList.remove("show");
 }
 
-function openEditorRaw(title, initialText, onSave){
+function openEditorRaw(title, initialText, onSave, descriptionHtml){
   document.getElementById("editorTitle").textContent = title;
+  document.getElementById("editorDesc").innerHTML = descriptionHtml;
   document.getElementById("editorTextarea").value = initialText;
   document.getElementById("editorOverlay").classList.add("show");
   editorSaveHandler = onSave;
@@ -1035,7 +1053,7 @@ function openEditor(product){
       showError("Không lưu được sản phẩm: " + e.message);
       return false;
     }
-  });
+  }, 'Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)');
 }
 
 document.getElementById("editorCancel").addEventListener("click", closeFullscreen);
