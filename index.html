@@ -347,7 +347,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, serverTimestamp, query, orderBy
+  updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
+  Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -791,18 +792,36 @@ function renderItem(t){
 }
 
 // ---- Actions ----
+
+// Số ngày lưu trữ tối đa cho các item ở tab "Đã xong" trước khi Firestore TTL
+// tự xoá (xem huong-dan.html / README về cách bật TTL policy trên field expireAt).
+// Chỉnh số này nếu muốn thay đổi thời gian giữ lịch sử đối soát.
+const XONG_RETENTION_DAYS = 7;
+
+function computeExpireAt(){
+  const ms = Date.now() + XONG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  return Timestamp.fromMillis(ms);
+}
+
 async function advanceStatus(t){
   const next = t.status === "cho_in" || t.status === "dang_in" ? "cho_dong_goi" : "xong";
+  const patch = { status: next, updatedAt: serverTimestamp() };
+  // Chỉ khi thật sự VÀO "xong" mới gắn hạn tự xoá (expireAt).
+  if(next === "xong") patch.expireAt = computeExpireAt();
   try{
-    await updateDoc(doc(db, "tasks", t.id), { status: next, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "tasks", t.id), patch);
   }catch(e){ showError("Không cập nhật được trạng thái: " + e.message); }
 }
 
 async function revertStatus(t){
   const prev = t.status === "cho_dong_goi" ? "cho_in" : t.status === "xong" ? "cho_dong_goi" : null;
   if(!prev) return;
+  const patch = { status: prev, updatedAt: serverTimestamp() };
+  // Ra khỏi "xong" thì phải xoá expireAt — nếu không, item có thể bị TTL
+  // xoá nhầm dù đang là việc chờ xử lý thật (chưa quay lại "xong" lần nữa).
+  if(t.status === "xong") patch.expireAt = deleteField();
   try{
-    await updateDoc(doc(db, "tasks", t.id), { status: prev, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "tasks", t.id), patch);
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
 }
 
@@ -822,7 +841,7 @@ async function packWholeOrder(orderId){
   const items = allTasks.filter(t => t.orderId === orderId && t.status === "cho_dong_goi");
   try{
     for(const it of items){
-      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp(), expireAt: computeExpireAt() });
     }
   }catch(e){ showError("Không đóng gói được cả đơn: " + e.message); }
 }
