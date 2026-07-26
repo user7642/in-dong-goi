@@ -50,6 +50,11 @@
      sticky riêng nữa vì đã nằm bên trong thẻ header (header đã sticky top:0). */
   .header-toolbar{margin-top:10px;}
   #gomRow{margin-bottom:4px;}
+  /* Khi chưa bấm "Gom sản phẩm", nút này đứng 1 mình trong hàng — cho nó
+     chiếm trọn chiều rộng thay vì co lại và lệch sang trái trông mất cân đối.
+     Khi đã kích hoạt (.active) thì trở lại kích thước tự nhiên để chia chỗ
+     với ô nhập tên đơn + nút Xong. */
+  #gomBtn:not(.active){width:100%;}
   #groupNameInput{flex:1;min-width:160px;}
   #gomStatusLine{
     font-size:12.5px;color:var(--blue);margin-bottom:2px;font-weight:600;
@@ -109,20 +114,24 @@
 
   .taskbar{
     position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
-    padding:12px 14px;display:none;align-items:center;gap:10px;z-index:30;
+    padding:10px 12px;display:none;align-items:center;gap:8px;z-index:30;
     max-width:var(--maxw);margin:0 auto;border-radius:12px 12px 0 0;
   }
   .taskbar.show{display:flex;}
-  .taskbar button{border:none;border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
-  .taskbar .countBadge{
-    flex:0 0 auto;background:rgba(255,255,255,.25);border-radius:999px;
-    min-width:28px;height:28px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:14px;
-  }
+  .taskbar button{border:none;border-radius:8px;padding:11px 12px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
+  /* Nút "Xem đã chọn": chỉ icon + số lượng, kích thước cố định theo nội dung
+     (không flex:1) — để nút hành động chính bên cạnh luôn có đủ chỗ, tránh
+     bị bóp chữ xuống nhiều dòng xấu khi màn hình hẹp (xem góp ý thiết kế). */
   .taskbar .viewBtn{
-    flex:1;background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
+    flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;
+    background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
   }
-  .taskbar #sendToIndexBtn{flex:0 0 auto;}
+  .taskbar .viewBtn .countBadge{
+    background:rgba(255,255,255,.25);border-radius:999px;
+    min-width:22px;height:22px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;
+  }
+  .taskbar #sendToIndexBtn{flex:1;min-width:0;}
 
   /* Modal xem danh sách đã chọn */
   .selgroup{margin-bottom:14px;}
@@ -214,8 +223,9 @@
 </main>
 
 <div class="taskbar" id="taskbar">
-  <span id="taskCount" class="countBadge">0</span>
-  <button class="viewBtn" id="viewSelectedBtn" type="button">📋 Xem đã chọn</button>
+  <button class="viewBtn" id="viewSelectedBtn" type="button" title="Xem đã chọn">
+    📋 <span class="countBadge" id="taskCount">0</span>
+  </button>
   <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
 </div>
 
