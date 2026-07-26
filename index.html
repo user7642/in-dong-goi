@@ -1011,9 +1011,10 @@ async function deleteTask(id){
 
 // ---- Phiếu giao (ship label PDF) — gắn theo order, không theo item ----
 
-// Tải file PDF lên Firebase Storage rồi ghi URL vào mọi item cùng orderId
-// (giống cách renameOrder() đồng bộ tên đơn). Dùng chung 1 path cố định theo
-// orderId nên lần tải lên sau tự ghi đè file cũ, không cần dọn rác thủ công.
+// Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
+// item cùng orderId (giống cách renameOrder() đồng bộ tên đơn). Dùng chung
+// 1 public_id cố định theo orderId nên lần tải lên sau tự ghi đè file cũ
+// (cần bật "Overwrite" cho upload preset "ship-labels" trên Cloudinary).
 async function uploadShipLabel(orderId, file){
   if(!file) return;
   if(file.type !== "application/pdf"){
@@ -1023,9 +1024,17 @@ async function uploadShipLabel(orderId, file){
   uploadingShipLabelIds.add(orderId);
   render();
   try{
-    const storageRef = ref(storage, `ship-labels/${orderId}.pdf`);
-    await uploadBytes(storageRef, file, { contentType: "application/pdf" });
-    const url = await getDownloadURL(storageRef);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("public_id", `ship-labels/${orderId}`);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data && data.error && data.error.message) || ("HTTP " + res.status));
+    const url = data.secure_url;
     const items = allTasks.filter(t => t.orderId === orderId);
     for(const it of items){
       await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: url, updatedAt: serverTimestamp() });
@@ -1041,16 +1050,22 @@ async function uploadShipLabel(orderId, file){
 async function removeShipLabel(orderId){
   if(!confirm("Xóa phiếu giao đã đính kèm cho đơn này?")) return;
   try{
-    try{
-      await deleteObject(ref(storage, `ship-labels/${orderId}.pdf`));
-    }catch(e){
-      // Bỏ qua nếu file đã không còn tồn tại trên Storage (vd đã bị xóa trước đó).
-    }
+    // Không xóa file trên Cloudinary ở đây: xóa cần chữ ký (API secret) nên
+    // không thể gọi an toàn từ trình duyệt. Chỉ gỡ URL khỏi Firestore; file
+    // cũ trên Cloudinary sẽ tự bị ghi đè ở lần tải lên kế tiếp cho orderId này.
     const items = allTasks.filter(t => t.orderId === orderId);
     for(const it of items){
       await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: deleteField(), updatedAt: serverTimestamp() });
     }
   }catch(e){ showError("Không xóa được phiếu giao: " + e.message); }
+}
+
+// Được gọi khi đơn hàng không còn item nào (mọi item cùng orderId đã bị xóa).
+// Vì lý do tương tự removeShipLabel(), không thể xóa file trên Cloudinary từ
+// trình duyệt mà không lộ API secret — file mồ côi (nếu có) sẽ nằm lại trên
+// Cloudinary nhưng vô hại vì không còn được tham chiếu ở đâu trong ứng dụng.
+async function deleteShipLabelFileIfExists(orderId){
+  // no-op: xem ghi chú ở trên.
 }
 
 // Tải file về máy trực tiếp (không mở tab mới): fetch nguyên byte gốc thành
