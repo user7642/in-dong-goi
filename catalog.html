@@ -69,13 +69,18 @@
 
   .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
   .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
-  .item .orderBtns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+  .item .dragHandle{
+    width:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:20px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;
+  }
+  .item .orderBtns{display:grid;grid-template-columns:repeat(2,28px);gap:4px;flex-shrink:0;align-content:center;}
   .item .orderBtn{
-    width:30px;height:30px;padding:0;font-size:13px;line-height:1;
+    width:28px;height:28px;padding:0;font-size:13px;line-height:1;
     background:var(--gray-bg);color:var(--text);
     display:flex;align-items:center;justify-content:center;border-radius:6px;
   }
   .item .orderBtn:disabled{opacity:.3;cursor:default;}
+  .item.dragging{opacity:.45;}
   .item .body{flex:1;min-width:0;}
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
@@ -316,6 +321,7 @@ function applyModeUI(){
   document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
   document.getElementById("manageSection").style.display = isManage ? "block" : "none";
   document.getElementById("sortModeRow").style.display = isManage ? "flex" : "none";
+  document.getElementById("searchBox").style.display = (isManage && sortMode) ? "none" : "block";
   document.getElementById("manageActionBar").style.display = (isManage && !sortMode) ? "flex" : "none";
   document.getElementById("selectAllRow").style.display = (isManage && !sortMode) ? "flex" : "none";
   const sortModeBtn = document.getElementById("sortModeBtn");
@@ -519,6 +525,9 @@ function escapeHtml(s){
 }
 
 function getFiltered(){
+  // Đang sắp xếp: luôn thao tác trên toàn bộ danh sách (không lọc theo từ khóa)
+  // để vị trí kéo/thả phản ánh đúng thứ tự thật, tránh nhảy lung tung khi có filter.
+  if(sortMode) return allProducts;
   const kw = document.getElementById("searchBox").value.trim().toLowerCase();
   return allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
 }
@@ -544,6 +553,123 @@ async function moveItem(productId, dir){
   }catch(e){
     showError("Không lưu được thứ tự mới: " + e.message);
   }
+}
+
+// Đưa 1 sản phẩm lên đầu / xuống cuối toàn bộ danh mục. Nhờ dùng bước nhảy
+// ORDER_STEP nên chỉ cần gán order nhỏ hơn min hiện có (lên đầu) hoặc lớn hơn
+// max hiện có (xuống cuối) — không phải renumber lại các sản phẩm khác.
+function getMinOrder(){
+  let min = Infinity;
+  for(const p of allProducts){
+    if(typeof p.order === "number" && p.order < min) min = p.order;
+  }
+  return min === Infinity ? 0 : min;
+}
+
+async function moveToTop(productId){
+  const p = allProducts.find(x => x.id === productId);
+  if(!p) return;
+  p.order = getMinOrder() - ORDER_STEP;
+  sortProductsInPlace();
+  renderList();
+  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
+  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
+}
+
+async function moveToBottom(productId){
+  const p = allProducts.find(x => x.id === productId);
+  if(!p) return;
+  p.order = getMaxOrder() + ORDER_STEP;
+  sortProductsInPlace();
+  renderList();
+  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
+  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
+}
+
+// ---- Kéo thả sắp xếp bằng tay cầm ⠿ (Pointer Events — chạy tốt trên cả
+// chuột lẫn cảm ứng điện thoại, không cần thư viện ngoài). Chỉ tay cầm mới
+// bắt sự kiện kéo (touch-action:none), phần còn lại của item vẫn cuộn bình
+// thường. Trong lúc kéo chỉ di chuyển các phần tử DOM cho mượt mắt; khi thả
+// tay mới đọc lại thứ tự DOM để ghi order thật xuống Firestore. ----
+function getDragAfterElement(container, y, draggingEl){
+  const els = [...container.querySelectorAll(".item")].filter(el => el !== draggingEl);
+  return els.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if(offset < 0 && offset > closest.offset){
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: -Infinity, element: null }).element;
+}
+
+function attachDragHandle(handle, itemEl){
+  if(!handle) return;
+  let dragging = false;
+  let scrollRAF = null;
+
+  function autoScrollTick(clientY){
+    const margin = 60;
+    let speed = 0;
+    if(clientY < margin) speed = -(margin - clientY) / 3;
+    else if(clientY > window.innerHeight - margin) speed = (clientY - (window.innerHeight - margin)) / 3;
+    if(speed !== 0) window.scrollBy(0, speed);
+    if(dragging) scrollRAF = requestAnimationFrame(() => autoScrollTick(clientY));
+  }
+
+  handle.addEventListener("pointerdown", e => {
+    if(e.button !== undefined && e.button !== 0) return; // chỉ chuột trái, cảm ứng thì e.button = 0
+    dragging = true;
+    itemEl.classList.add("dragging");
+    handle.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    scrollRAF = requestAnimationFrame(() => autoScrollTick(e.clientY));
+
+    const onMove = ev => {
+      if(!dragging) return;
+      const list = document.getElementById("list");
+      const afterEl = getDragAfterElement(list, ev.clientY, itemEl);
+      if(afterEl == null) list.appendChild(itemEl);
+      else list.insertBefore(itemEl, afterEl);
+      autoScrollTick(ev.clientY);
+    };
+
+    const onUp = async () => {
+      dragging = false;
+      if(scrollRAF) cancelAnimationFrame(scrollRAF);
+      itemEl.classList.remove("dragging");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+
+      // Đọc lại thứ tự thật trên DOM sau khi thả tay, renumber theo bước
+      // ORDER_STEP rồi ghi xuống Firestore — chỉ ghi những sản phẩm có order
+      // thực sự thay đổi để tránh ghi thừa.
+      const list = document.getElementById("list");
+      const newIds = [...list.querySelectorAll(".item")].map(el => el.dataset.id);
+      const changed = [];
+      newIds.forEach((id, i) => {
+        const p = allProducts.find(x => x.id === id);
+        if(!p) return;
+        const newOrder = (i + 1) * ORDER_STEP;
+        if(p.order !== newOrder){
+          p.order = newOrder;
+          changed.push(p);
+        }
+      });
+      sortProductsInPlace();
+      renderList();
+      try{
+        await Promise.all(changed.map(p => updateDoc(doc(db, "catalog", p.id), { order: p.order })));
+      }catch(e){
+        showError("Không lưu được thứ tự mới: " + e.message);
+      }
+    };
+
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  });
 }
 
 function renderTiersStaticHtml(p){
@@ -594,6 +720,7 @@ function renderList(){
   filtered.forEach((p, idx) => {
     const div = document.createElement("div");
     div.className = "item";
+    div.dataset.id = p.id;
     const isFirst = idx === 0;
     const isLast = idx === filtered.length - 1;
     const hasTiers = p.tiers && p.tiers.length >= 2;
@@ -629,9 +756,12 @@ function renderList(){
     }
     div.innerHTML = `
       ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
+      ${isSortMode ? `<div class="dragHandle" title="Kéo để đổi vị trí">⠿</div>` : ""}
       ${isSortMode ? `<div class="orderBtns">
           <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
+          <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
           <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
+          <button type="button" class="orderBtn bottomBtn" title="Đưa xuống cuối danh sách" ${isLast ? "disabled" : ""}>⤓</button>
         </div>` : ""}
       <div class="body">
         <div class="titlerow">
@@ -644,8 +774,13 @@ function renderList(){
     if(isSortMode){
       const upBtn = div.querySelector(".upBtn");
       const downBtn = div.querySelector(".downBtn");
+      const topBtn = div.querySelector(".topBtn");
+      const bottomBtn = div.querySelector(".bottomBtn");
       if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
       if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
+      if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
+      if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
+      attachDragHandle(div.querySelector(".dragHandle"), div);
     } else if(isManage){
       div.querySelector(".rowCheck").addEventListener("change", e => {
         if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
