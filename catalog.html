@@ -69,6 +69,13 @@
 
   .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
   .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
+  .item .orderBtns{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+  .item .orderBtn{
+    width:30px;height:30px;padding:0;font-size:13px;line-height:1;
+    background:var(--gray-bg);color:var(--text);
+    display:flex;align-items:center;justify-content:center;border-radius:6px;
+  }
+  .item .orderBtn:disabled{opacity:.3;cursor:default;}
   .item .body{flex:1;min-width:0;}
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
@@ -224,7 +231,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, query, orderBy, serverTimestamp
+  updateDoc, deleteDoc, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -358,14 +365,64 @@ gomDoneBtn.addEventListener("click", () => {
 
 groupNameInput.addEventListener("input", updateGomStatusLine);
 
-const q = query(catalogCol, orderBy("name", "asc"));
+// ---- Thứ tự hiển thị tùy chỉnh (field "order" trên mỗi sản phẩm) ----
+// Dùng bước nhảy 10 đơn vị (10, 20, 30...) thay vì 1, 2, 3... để sau này có
+// thể chèn 1 sản phẩm vào giữa 2 sản phẩm khác mà không phải renumber toàn bộ.
+const ORDER_STEP = 10;
+let orderMigrationDone = false;
+
+function sortProductsInPlace(){
+  allProducts.sort((a, b) => {
+    const oa = (typeof a.order === "number") ? a.order : Infinity;
+    const ob = (typeof b.order === "number") ? b.order : Infinity;
+    if(oa !== ob) return oa - ob;
+    return a.name.localeCompare(b.name, "vi");
+  });
+}
+
+function getMaxOrder(){
+  let max = 0;
+  for(const p of allProducts){
+    if(typeof p.order === "number" && p.order > max) max = p.order;
+  }
+  return max;
+}
+
+// Chạy đúng 1 lần: nếu TOÀN BỘ danh mục chưa có field "order" (dữ liệu cũ từ
+// trước khi có tính năng sắp xếp), gán order theo đúng thứ tự A-Z hiện tại
+// làm mốc ban đầu, để không làm xáo trộn danh sách người dùng đang quen mắt.
+// Nếu đã có ít nhất 1 sản phẩm có order (đã từng sắp xếp) thì bỏ qua, không
+// đụng vào bất kỳ sản phẩm nào.
+async function maybeMigrateOrder(){
+  if(orderMigrationDone) return;
+  if(allProducts.length === 0) return;
+  const noneHasOrder = allProducts.every(p => typeof p.order !== "number");
+  orderMigrationDone = true;
+  if(!noneHasOrder) return;
+  const sortedByName = [...allProducts].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  for(let i = 0; i < sortedByName.length; i++){
+    const p = sortedByName[i];
+    const ord = (i + 1) * ORDER_STEP;
+    p.order = ord;
+    try{ await updateDoc(doc(db, "catalog", p.id), { order: ord }); }
+    catch(e){ showError("Lỗi khởi tạo thứ tự sản phẩm: " + e.message); }
+  }
+}
+
+const q = query(catalogCol);
 onSnapshot(q, snap => {
   allProducts = snap.docs.map(d => {
     const data = d.data();
-    return { id: d.id, ...data, tiers: tiersFromFirestore(data.tiers) };
+    return {
+      id: d.id, ...data,
+      tiers: tiersFromFirestore(data.tiers),
+      order: (typeof data.order === "number" ? data.order : null)
+    };
   });
+  sortProductsInPlace();
   document.getElementById("totalCount").textContent = allProducts.length;
   renderList();
+  maybeMigrateOrder();
 }, err => {
   showError("Lỗi kết nối danh mục: " + err.message);
 });
@@ -445,6 +502,29 @@ function getFiltered(){
   return allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
 }
 
+// Đẩy 1 sản phẩm lên/xuống 1 bậc so với vị trí đang hiển thị (dir: -1 lên, +1 xuống).
+// Hoán đổi trực tiếp field "order" với sản phẩm liền kề — cập nhật UI ngay lập
+// tức (không chờ Firestore trả về) để thao tác nhanh, cảm giác mượt trên điện thoại.
+async function moveItem(productId, dir){
+  const filtered = getFiltered();
+  const idx = filtered.findIndex(p => p.id === productId);
+  const swapIdx = idx + dir;
+  if(idx === -1 || swapIdx < 0 || swapIdx >= filtered.length) return;
+  const a = filtered[idx];
+  const b = filtered[swapIdx];
+  const oa = a.order, ob = b.order;
+  a.order = ob;
+  b.order = oa;
+  sortProductsInPlace();
+  renderList();
+  try{
+    await updateDoc(doc(db, "catalog", a.id), { order: a.order });
+    await updateDoc(doc(db, "catalog", b.id), { order: b.order });
+  }catch(e){
+    showError("Không lưu được thứ tự mới: " + e.message);
+  }
+}
+
 function renderTiersStaticHtml(p){
   const outerTiers = p.tiers.slice(0, -1);
   const lastTier = p.tiers[p.tiers.length - 1];
@@ -489,9 +569,11 @@ function renderList(){
     updateTaskBar();
     return;
   }
-  filtered.forEach(p => {
+  filtered.forEach((p, idx) => {
     const div = document.createElement("div");
     div.className = "item";
+    const isFirst = idx === 0;
+    const isLast = idx === filtered.length - 1;
     const hasTiers = p.tiers && p.tiers.length >= 2;
     const hasFlat = p.variants && p.variants.length;
     let variantsHtml = "";
@@ -525,6 +607,10 @@ function renderList(){
     }
     div.innerHTML = `
       ${isManage ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
+      ${isManage ? `<div class="orderBtns">
+          <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
+          <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
+        </div>` : ""}
       <div class="body">
         <div class="titlerow">
           <div class="name">${escapeHtml(p.name)}</div>
@@ -540,6 +626,10 @@ function renderList(){
         updateSelectAllState(filtered);
       });
       div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+      const upBtn = div.querySelector(".upBtn");
+      const downBtn = div.querySelector(".downBtn");
+      if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
+      if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
     } else {
       div.querySelectorAll(".vchip").forEach(chip => {
         chip.addEventListener("click", e => {
@@ -743,6 +833,7 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
     return;
   }
   let created = 0, merged = 0, skipped = 0;
+  let nextOrder = getMaxOrder() + ORDER_STEP;
   try{
     for(const line of lines){
       const parsed = parseLine(line);
@@ -759,7 +850,9 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
         // dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên, không cần cập nhật gì thêm
         merged++;
       } else {
-        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers) });
+        // Sản phẩm mới mặc định xếp ở cuối danh sách hiện có (order lớn nhất + bước nhảy)
+        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers), order: nextOrder });
+        nextOrder += ORDER_STEP;
         created++;
       }
     }
