@@ -225,6 +225,7 @@
     border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
   }
   .ship-label-row .attach-btn{background:var(--blue-bg);color:var(--blue);}
+  .ship-label-row .view-btn{background:var(--gray-bg);color:var(--text);}
   .ship-label-row .download-btn{background:var(--green-bg);color:var(--green);}
   .ship-label-row .remove-btn{background:#fde8e8;color:var(--red);}
   .ship-label-row button[disabled]{opacity:.6;cursor:default;}
@@ -307,6 +308,11 @@
     border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;
     background:#fde8e8;color:var(--red);cursor:pointer;
   }
+  .download-all-wrap{padding:0 2px 10px;}
+  .download-all-btn{
+    width:100%;border:none;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;
+    background:var(--green-bg);color:var(--green);cursor:pointer;
+  }
   .batchbar .ship-btn{background:var(--blue);color:#fff;}
   .shipped-badge{
     display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;
@@ -356,6 +362,9 @@
   <div class="listToolbar" id="listToolbar">
     <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
     <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
+  </div>
+  <div class="download-all-wrap" id="downloadAllWrap" style="display:none;">
+    <button class="download-all-btn" id="downloadAllBtn">⬇️ Tải tất cả phiếu giao</button>
   </div>
   <div id="list"></div>
 </main>
@@ -420,6 +429,8 @@ const addbar = document.getElementById("addbar");
 const errArea = document.getElementById("errArea");
 const selectAllBox = document.getElementById("selectAllBox");
 const clearAllBtn = document.getElementById("clearAllBtn");
+const downloadAllWrap = document.getElementById("downloadAllWrap");
+const downloadAllBtn = document.getElementById("downloadAllBtn");
 
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
@@ -676,11 +687,22 @@ function render(){
       : currentTab === "dong_goi" ? "Chưa có sản phẩm nào chờ đóng gói."
       : "Chưa có sản phẩm nào hoàn tất.";
     list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    downloadAllWrap.style.display = "none";
     return;
   }
 
   const groups = groupShown(shown);
   groups.forEach(g => list.appendChild(renderOrderBox(g)));
+
+  // Nút "Tải tất cả phiếu giao" chỉ hiện khi trong danh sách đang xem (theo
+  // tab + từ khóa tìm kiếm hiện tại) có ít nhất 1 đơn đã đính kèm phiếu giao.
+  const groupsWithLabel = groups.filter(g => g.shipLabelUrl);
+  if(groupsWithLabel.length > 0){
+    downloadAllWrap.style.display = "block";
+    downloadAllBtn.textContent = `⬇️ Tải tất cả phiếu giao (${groupsWithLabel.length})`;
+  } else {
+    downloadAllWrap.style.display = "none";
+  }
 }
 
 function renderOrderBox(g){
@@ -788,6 +810,14 @@ function renderShipLabelRow(g){
   }
 
   if(g.shipLabelUrl){
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "view-btn";
+    viewBtn.textContent = "👁 Xem";
+    // target="_blank" qua window.open — chỉ mở tab mới hiển thị PDF (trình
+    // duyệt tự render), không tải file về máy như nút "Tải phiếu giao".
+    viewBtn.addEventListener("click", () => window.open(g.shipLabelUrl, "_blank", "noopener"));
+    rowEl.appendChild(viewBtn);
+
     const dlBtn = document.createElement("button");
     dlBtn.className = "download-btn";
     dlBtn.textContent = "⬇️ Tải phiếu giao";
@@ -1140,6 +1170,27 @@ async function downloadShipLabel(url, orderName){
     showError("Không tải được phiếu giao (có thể do cấu hình CORS trên Cloudinary): " + e.message);
   }
 }
+
+// Tải lần lượt (tuần tự, không đồng thời) mọi phiếu giao của các đơn ĐANG
+// HIỂN THỊ trong danh sách hiện tại (theo tab + tìm kiếm) — tránh trình
+// duyệt chặn khi kích hoạt quá nhiều tải xuống cùng lúc.
+async function downloadAllShipLabels(){
+  const groups = groupShown(getShown()).filter(g => g.shipLabelUrl);
+  if(groups.length === 0){
+    showError("Không có phiếu giao nào trong danh sách đang xem để tải.");
+    return;
+  }
+  if(!confirm(`Tải xuống ${groups.length} phiếu giao đang hiển thị?`)) return;
+  downloadAllBtn.disabled = true;
+  const originalText = downloadAllBtn.textContent;
+  for(let i = 0; i < groups.length; i++){
+    downloadAllBtn.textContent = `⏳ Đang tải (${i + 1}/${groups.length})...`;
+    await downloadShipLabel(groups[i].shipLabelUrl, groups[i].orderName);
+  }
+  downloadAllBtn.disabled = false;
+  downloadAllBtn.textContent = originalText;
+}
+downloadAllBtn.addEventListener("click", downloadAllShipLabels);
 
 async function renameOrder(orderId, newName){
   const n = (newName || "").trim() || newOrderName();
