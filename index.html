@@ -19,6 +19,7 @@
     --green-bg:#e8f7ec;
     --red:#dc2626;
     --gray-bg:#eceef0;
+    --maxw:680px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{
@@ -28,6 +29,10 @@
     color:var(--text);
     padding-bottom:90px;
   }
+  /* header, thanh addbar/searchbar sticky, main, footer-style bars đều dùng
+     chung 1 độ rộng tối đa (--maxw), canh giữa — để trên desktop các khối
+     thẳng hàng nhau thay vì header/thanh công cụ chạy full-width còn danh
+     sách bên dưới bị bó hẹp lại trông lệch. */
   header{
     background:var(--card);
     border-bottom:1px solid var(--border);
@@ -35,6 +40,8 @@
     position:sticky;
     top:0;
     z-index:20;
+    max-width:var(--maxw);
+    margin:0 auto;
   }
   h1{font-size:18px;margin:0 0 12px 0;font-weight:600;}
   .tabs{display:flex;gap:6px;}
@@ -70,6 +77,8 @@
     position:sticky;
     top:53px;
     z-index:19;
+    max-width:var(--maxw);
+    margin:0 auto;
   }
   .addbar input[type=text]{
     flex:1;
@@ -105,6 +114,8 @@
     position:sticky;
     top:106px;
     z-index:18;
+    max-width:var(--maxw);
+    margin:0 auto;
   }
   .searchbar input{
     width:100%;
@@ -127,7 +138,7 @@
     text-decoration:none;
   }
 
-  main{padding:12px 12px 0 12px;}
+  main{padding:12px 12px 0 12px;max-width:var(--maxw);margin:0 auto;}
   .empty{
     text-align:center;
     color:var(--muted);
@@ -246,6 +257,9 @@
     align-items:center;
     gap:10px;
     z-index:30;
+    max-width:var(--maxw);
+    margin:0 auto;
+    border-radius:12px 12px 0 0;
   }
   .batchbar.show{display:flex;}
   .batchbar span{flex:1;font-size:14px;}
@@ -283,6 +297,8 @@
     text-align:center;
     color:var(--muted);
     padding:8px 0 2px 0;
+    max-width:var(--maxw);
+    margin:0 auto;
   }
 </style>
 </head>
