@@ -41,32 +41,30 @@
     padding:8px 12px;font-size:13px;margin-bottom:10px;
   }
 
-  /* Gom sản phẩm bar */
+  /* Toolbar nổi trong phần header — dùng chung cho cả 2 tab, không cần tự
+     sticky riêng nữa vì đã nằm bên trong thẻ header (header đã sticky top:0). */
+  .header-toolbar{margin-top:10px;}
   #gomRow{margin-bottom:4px;}
   #groupNameInput{flex:1;min-width:160px;}
   #gomStatusLine{
-    font-size:12.5px;color:var(--blue);margin-bottom:10px;font-weight:600;
+    font-size:12.5px;color:var(--blue);margin-bottom:2px;font-weight:600;
   }
-  #gomBar.floating{
-    position:sticky;top:var(--header-h, 90px);z-index:14;background:var(--card);
-    border:1px solid var(--blue);border-radius:10px;
-    padding:10px 10px 2px;margin-bottom:10px;
-    box-shadow:0 4px 10px rgba(0,0,0,.08);
+  #gomBar.active{
+    background:var(--blue-bg);border:1px solid var(--blue);border-radius:10px;
+    padding:10px 10px 6px;
   }
-  #gomBar.floating #gomStatusLine{margin-bottom:8px;}
 
   /* Action bar (giống bảng sản phẩm sàn TMĐT) */
   .action-bar{
-    position:sticky;top:var(--header-h, 90px);z-index:12;
-    background:var(--card);border:1px solid var(--border);border-radius:10px;
-    padding:10px 12px;margin-bottom:10px;
+    background:var(--gray-bg);border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;
     display:flex;align-items:center;gap:10px;
   }
   .action-bar span{font-size:13px;color:var(--muted);flex:1;}
   .action-bar button{font-size:13px;padding:8px 14px;}
-  .action-bar .del-btn{background:var(--gray-bg);color:var(--muted);cursor:not-allowed;}
+  .action-bar .del-btn{background:var(--border);color:var(--muted);cursor:not-allowed;}
   .action-bar .del-btn.enabled{background:var(--red);color:#fff;cursor:pointer;}
-  .selectall{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;color:var(--muted);}
+  .selectall{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);}
   .selectall input{width:20px;height:20px;accent-color:var(--blue);}
 
   .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
@@ -142,6 +140,24 @@
     <div class="tab active" data-mode="task">➕ Thêm việc</div>
     <div class="tab" data-mode="manage">🗂 Quản lý danh mục</div>
   </div>
+
+  <div id="gomBar" class="header-toolbar">
+    <div class="row" id="gomRow">
+      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
+      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
+      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
+    </div>
+    <div id="gomStatusLine" style="display:none;"></div>
+  </div>
+
+  <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
+    <span id="selCount">Đã chọn 0 sản phẩm</span>
+    <button class="del-btn" id="topDelBtn">Xóa</button>
+  </div>
+  <div class="selectall header-toolbar" id="selectAllRow" style="display:none;">
+    <input type="checkbox" id="selectAllBox">
+    <span>Chọn tất cả</span>
+  </div>
 </header>
 
 <main>
@@ -167,25 +183,7 @@
     <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
 
-    <div class="action-bar" id="manageActionBar" style="display:none;">
-      <span id="selCount">Đã chọn 0 sản phẩm</span>
-      <button class="del-btn" id="topDelBtn">Xóa</button>
-    </div>
-    <div class="selectall" id="selectAllRow" style="display:none;">
-      <input type="checkbox" id="selectAllBox">
-      <span>Chọn tất cả</span>
-    </div>
-
     <div id="errArea"></div>
-
-    <div id="gomBar">
-      <div class="row" id="gomRow">
-        <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
-        <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
-        <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
-      </div>
-      <div id="gomStatusLine" style="display:none;"></div>
-    </div>
 
     <div id="list"></div>
   </section>
@@ -264,16 +262,6 @@ function showError(msg){
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
 }
 
-// Header là sticky nên các thanh nổi khác (gomBar, action-bar) phải bắt đầu
-// ngay dưới header — tính chiều cao thực tế thay vì hard-code để tránh bị che.
-function syncHeaderHeight(){
-  const h = document.querySelector("header").offsetHeight;
-  document.documentElement.style.setProperty("--header-h", h + "px");
-}
-window.addEventListener("resize", syncHeaderHeight);
-syncHeaderHeight();
-setTimeout(syncHeaderHeight, 300);
-
 function randCode(len){
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
@@ -331,7 +319,7 @@ function exitGomMode(){
   gomBtn.textContent = "📦 Gom sản phẩm";
   gomBtn.classList.remove("active");
   gomStatusLine.style.display = "none";
-  document.getElementById("gomBar").classList.remove("floating");
+  document.getElementById("gomBar").classList.remove("active");
 }
 
 gomBtn.addEventListener("click", () => {
@@ -343,7 +331,7 @@ gomBtn.addEventListener("click", () => {
     gomDoneBtn.style.display = "inline-block";
     gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
     gomBtn.classList.add("active");
-    document.getElementById("gomBar").classList.add("floating");
+    document.getElementById("gomBar").classList.add("active");
     updateGomStatusLine();
   } else {
     // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
