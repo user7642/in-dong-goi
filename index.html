@@ -506,12 +506,11 @@ function escapeHtml(s){
 // ---- Grouping helpers ----
 function orderPackInfo(orderId){
   const items = allTasks.filter(t => t.orderId === orderId);
-  const pending = items.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
+  const pending = items.filter(t => t.status === "cho_in").length;
   const readyToPack = items.filter(t => t.status === "cho_dong_goi").length;
-  const doneAlready = items.filter(t => t.status === "xong").length;
   return {
     total: items.length,
-    pending, readyToPack, doneAlready,
+    pending, readyToPack,
     eligible: pending === 0 && readyToPack > 0
   };
 }
@@ -533,9 +532,13 @@ function groupShown(shown){
 // ---- Render ----
 function getShown(){
   let shown;
-  if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in");
+  if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in");
   else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
-  else shown = allTasks.filter(t => t.status === "xong").slice(-50).reverse();
+  // Không còn cần giới hạn 50 mục ở client nữa: từ khi có expireAt + Firestore
+  // TTL (xem phần "Đã xong" trong hướng dẫn), tập dữ liệu status=xong đã tự
+  // giới hạn trong khoảng 7 ngày gần nhất, không phình vô hạn. Bỏ slice() để
+  // tìm kiếm (Lỗi A) có thể quét đúng toàn bộ 7 ngày thay vì chỉ 50 mục mới nhất.
+  else shown = allTasks.filter(t => t.status === "xong").slice().reverse();
 
   if(searchTerm){
     shown = shown.filter(t =>
@@ -554,7 +557,7 @@ function updateSelectAllBox(shown){
 }
 
 function render(){
-  const badgeIn = allTasks.filter(t => t.status === "cho_in" || t.status === "dang_in").length;
+  const badgeIn = allTasks.filter(t => t.status === "cho_in").length;
   const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
   const badgeXong = allTasks.filter(t => t.status === "xong").length;
   document.getElementById("badge-in").textContent = badgeIn;
@@ -804,7 +807,7 @@ function computeExpireAt(){
 }
 
 async function advanceStatus(t){
-  const next = t.status === "cho_in" || t.status === "dang_in" ? "cho_dong_goi" : "xong";
+  const next = t.status === "cho_in" ? "cho_dong_goi" : "xong";
   const patch = { status: next, updatedAt: serverTimestamp() };
   // Chỉ khi thật sự VÀO "xong" mới gắn hạn tự xoá (expireAt).
   if(next === "xong") patch.expireAt = computeExpireAt();
@@ -817,9 +820,15 @@ async function revertStatus(t){
   const prev = t.status === "cho_dong_goi" ? "cho_in" : t.status === "xong" ? "cho_dong_goi" : null;
   if(!prev) return;
   const patch = { status: prev, updatedAt: serverTimestamp() };
-  // Ra khỏi "xong" thì phải xoá expireAt — nếu không, item có thể bị TTL
-  // xoá nhầm dù đang là việc chờ xử lý thật (chưa quay lại "xong" lần nữa).
-  if(t.status === "xong") patch.expireAt = deleteField();
+  if(t.status === "xong"){
+    // Ra khỏi "xong" thì phải xoá expireAt — nếu không, item có thể bị TTL
+    // xoá nhầm dù đang là việc chờ xử lý thật (chưa quay lại "xong" lần nữa).
+    patch.expireAt = deleteField();
+    // Đồng thời reset "đã giao" — nếu không, khi item hoàn tất LẠI lần sau
+    // (thật sự), nhãn "🚚 Đã giao" cũ sẽ tự hiện sẵn dù chưa ai bấm, gây sai
+    // lệch dữ liệu đối soát.
+    patch.shipped = false;
+  }
   try{
     await updateDoc(doc(db, "tasks", t.id), patch);
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
