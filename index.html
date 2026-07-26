@@ -371,9 +371,6 @@ import {
   updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getStorage, ref, uploadBytes, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
@@ -384,9 +381,15 @@ const firebaseConfig = {
   appId: "1:532007763879:web:8d752aa4d86fd317ca0082"
 };
 
+// Phiếu giao (PDF) được lưu trên Cloudinary thay vì Firebase Storage — vì
+// Cloud Storage for Firebase hiện bắt buộc gói Blaze (cần khai thẻ). Cloudinary
+// có gói free không cần thẻ, dùng "unsigned upload preset" nên an toàn để gọi
+// thẳng từ trình duyệt (không lộ khóa bí mật nào trong code).
+const CLOUDINARY_CLOUD_NAME = "e8beonzt";
+const CLOUDINARY_UPLOAD_PRESET = "ship-labels";
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const tasksCol = collection(db, "tasks");
 
 let currentTab = "in";
@@ -473,12 +476,10 @@ clearAllBtn.addEventListener("click", async () => {
   const items = allTasks.filter(t => t.status === "xong");
   if(items.length === 0) return;
   if(!confirm(`Xóa toàn bộ ${items.length} sản phẩm đã xong? Không thể hoàn tác.`)) return;
-  const emptiedOrders = orderIdsBecomingEmpty(items.map(it => it.id));
   try{
     for(const it of items){
       await deleteDoc(doc(db, "tasks", it.id));
     }
-    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
     selected.clear();
     updateBatchBar();
   }catch(e){ showError("Không làm sạch được danh sách: " + e.message); }
@@ -529,58 +530,28 @@ onSnapshot(q, snap => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
 
-// ---- Dọn file phiếu giao PDF theo vòng đời document ----
+// ---- Dọn dẹp item "xong" đã quá hạn ----
+// Lưu ý: từ khi chuyển phiếu giao sang lưu ở Cloudinary, việc xóa file PDF
+// không còn thực hiện được an toàn từ trình duyệt nữa (Cloudinary yêu cầu ký
+// bằng API Secret để xóa, không thể nhúng secret đó vào code public trên
+// GitHub Pages). Nên khi 1 đơn bị xóa (thủ công hoặc do quá hạn), chỉ Firestore
+// doc bị xóa — file PDF cũ trên Cloudinary sẽ "mồ côi" (không tự dọn). Vì file
+// phiếu giao rất nhẹ và gói free Cloudinary có 25GB/tháng, việc này không đáng
+// ngại — đây là đánh đổi đã thống nhất để tránh phải khai thẻ cho Firebase Blaze.
 
-// Trả về danh sách orderId sẽ "hết sạch item" NẾU xóa các id trong deletedIds
-// khỏi allTasks hiện tại — dùng để biết đơn nào cần xóa luôn file PDF dùng
-// chung. Chỉ xóa file khi đây là item CUỐI CÙNG còn lại của đơn, tránh xóa
-// nhầm file khi đơn vẫn còn item khác đang tham chiếu tới cùng 1 phiếu giao.
-function orderIdsBecomingEmpty(deletedIds){
-  const idSet = new Set(deletedIds);
-  const remainingByOrder = new Map(); // orderId -> số item còn lại sau khi xóa
-  allTasks.forEach(t => {
-    const oid = t.orderId || t.id;
-    if(!remainingByOrder.has(oid)) remainingByOrder.set(oid, 0);
-    if(!idSet.has(t.id)) remainingByOrder.set(oid, remainingByOrder.get(oid) + 1);
-  });
-  const emptied = [];
-  deletedIds.forEach(id => {
-    const t = allTasks.find(x => x.id === id);
-    if(!t) return;
-    const oid = t.orderId || t.id;
-    if(remainingByOrder.get(oid) === 0 && !emptied.includes(oid)) emptied.push(oid);
-  });
-  return emptied;
-}
-
-async function deleteShipLabelFileIfExists(orderId){
-  try{
-    await deleteObject(ref(storage, `ship-labels/${orderId}.pdf`));
-  }catch(e){
-    // Bỏ qua: đơn này có thể chưa từng đính kèm phiếu giao (file không tồn tại) —
-    // không phải lỗi cần báo cho người dùng.
-  }
-}
-
-// Quét chủ động các item "xong" đã quá hạn expireAt và xóa NGAY (doc + file
-// PDF kèm theo), thay vì trông chờ hoàn toàn vào Firestore TTL — vì TTL chạy
-// nền phía server, không có cách nào tự gọi kèm việc xóa file Storage. TTL
-// server vẫn để nguyên, đóng vai trò lưới an toàn dự phòng (vd nhỡ lâu ngày
-// không ai mở app) — chạy trùng ở đây không sao vì deleteDoc/deleteObject
-// trên dữ liệu đã bị xóa chỉ lặng lẽ báo lỗi "không tồn tại" và được bỏ qua.
+// Quét chủ động các item "xong" đã quá hạn expireAt và xóa sớm hơn TTL server
+// của Firestore (TTL có thể trễ tới 72 giờ) — giúp tab "Đã xong" luôn gọn
+// trong đúng XONG_RETENTION_DAYS ngày gần nhất thay vì đợi Google tự dọn.
 async function purgeExpiredXong(){
   const now = Date.now();
   const expired = allTasks.filter(t =>
     t.status === "xong" && t.expireAt && typeof t.expireAt.toMillis === "function" && t.expireAt.toMillis() <= now
   );
   if(expired.length === 0) return;
-  const ids = expired.map(t => t.id);
-  const emptiedOrders = orderIdsBecomingEmpty(ids);
   try{
     for(const it of expired){
       await deleteDoc(doc(db, "tasks", it.id));
     }
-    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
   }catch(e){
     // Dọn dẹp nền — không làm phiền người dùng bằng lỗi nền không quan trọng.
   }
