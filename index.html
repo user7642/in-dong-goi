@@ -182,7 +182,7 @@
     text-align:center;
     word-break:break-word;
   }
-  .order-title.clickable{cursor:pointer;user-select:none;}
+  .order-header.clickable{cursor:pointer;user-select:none;}
   .expand-caret{
     display:inline-block;width:14px;color:var(--muted);font-weight:400;
   }
@@ -408,10 +408,10 @@ let editingTaskIds = new Set();
 let editingOrderIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
 let uploadingShipLabelIds = new Set();
-// Khu vực phiếu giao mặc định THU GỌN cho từng đơn — orderId có trong Set này
-// nghĩa là đang được mở rộng (bấm vào tên đơn để mở/đóng). Giúp danh sách gọn
-// hơn khi có nhiều đơn, thay vì luôn hiện sẵn hàng nút cho mọi đơn.
-let expandedShipLabelOrderIds = new Set();
+// Khu vực phiếu giao mặc định THU GỌN cho từng đơn — chỉ 1 đơn được mở rộng
+// tại 1 thời điểm (đóng đơn đang mở lại khi mở đơn khác, hoặc khi bấm ra
+// ngoài). Giúp danh sách gọn hơn khi có nhiều đơn.
+let expandedShipLabelOrderId = null;
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -456,6 +456,18 @@ function randCode(len){
 }
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function newOrderName(){ return "Đơn " + randCode(5); }
+
+// ---- Đóng khu vực phiếu giao đang mở khi bấm ra ngoài ----
+// Click vào chính dòng tiêu đề (.order-header) đã tự xử lý mở/đóng riêng ở
+// renderOrderBox(); click vào bên trong khu phiếu giao (.ship-label-row) cần
+// giữ nguyên để còn bấm được các nút (Tải/Thay file/Xóa). Mọi click khác
+// (kể cả vào sản phẩm bên dưới, đơn khác, thanh tìm kiếm...) đều đóng lại.
+document.addEventListener("click", (e) => {
+  if(expandedShipLabelOrderId === null) return;
+  if(e.target.closest(".order-header") || e.target.closest(".ship-label-row")) return;
+  expandedShipLabelOrderId = null;
+  render();
+});
 
 // ---- Tabs ----
 document.querySelectorAll(".tab").forEach(t => {
@@ -700,15 +712,10 @@ function renderOrderBox(g){
     setTimeout(() => input.focus(), 0);
   } else {
     const title = document.createElement("div");
-    title.className = "order-title clickable";
-    const isExpanded = expandedShipLabelOrderIds.has(g.orderId) || uploadingShipLabelIds.has(g.orderId);
+    title.className = "order-title";
+    const isExpanded = expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId);
     title.innerHTML = `<span class="expand-caret">${isExpanded ? "▾" : "▸"}</span>` + escapeHtml(g.orderName)
       + (g.shipLabelUrl ? ` <span class="ship-label-chip" title="Đã đính kèm phiếu giao">📎</span>` : "");
-    title.addEventListener("click", () => {
-      if(expandedShipLabelOrderIds.has(g.orderId)) expandedShipLabelOrderIds.delete(g.orderId);
-      else expandedShipLabelOrderIds.add(g.orderId);
-      render();
-    });
     const editBtn = document.createElement("button");
     editBtn.className = "edit-icon";
     editBtn.textContent = "✏️";
@@ -717,11 +724,16 @@ function renderOrderBox(g){
       editingOrderIds.add(g.orderId);
       render();
     });
+    header.classList.add("clickable");
+    header.addEventListener("click", () => {
+      expandedShipLabelOrderId = (expandedShipLabelOrderId === g.orderId) ? null : g.orderId;
+      render();
+    });
     header.appendChild(title);
     header.appendChild(editBtn);
   }
   box.appendChild(header);
-  if(expandedShipLabelOrderIds.has(g.orderId) || uploadingShipLabelIds.has(g.orderId)){
+  if(expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId)){
     box.appendChild(renderShipLabelRow(g));
   }
 
