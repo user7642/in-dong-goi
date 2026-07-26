@@ -103,6 +103,13 @@
   .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
   .muted{color:var(--muted);font-size:13px;}
 
+  .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
+  .linkEditBox{
+    margin-top:8px;padding:10px 10px 6px;border:1px solid var(--blue);
+    background:var(--blue-bg);border-radius:10px;
+  }
+  .linkEditBox input{margin-bottom:6px;}
+
   /* Nhiều tầng phân loại (VD: Chủ đề x Kích thước) */
   .groupRow{margin-bottom:10px;}
   .groupRow:last-child{margin-bottom:0;}
@@ -279,6 +286,8 @@ let selected = new Set();
 let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
 let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "ghim" (tô sáng) tại 1 thời điểm
 let editorSaveHandler = null;
+// Danh sách sản phẩm đang mở form "chèn link file in" ở tab Thêm việc.
+let editingLinkIds = new Set();
 
 // ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
 // 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
@@ -460,7 +469,8 @@ onSnapshot(q, snap => {
     return {
       id: d.id, ...data,
       tiers: tiersFromFirestore(data.tiers),
-      order: (typeof data.order === "number" ? data.order : null)
+      order: (typeof data.order === "number" ? data.order : null),
+      link: data.link || ""
     };
   });
   sortProductsInPlace();
@@ -470,6 +480,18 @@ onSnapshot(q, snap => {
 }, err => {
   showError("Lỗi kết nối danh mục: " + err.message);
 });
+
+// Kiểm tra 1 chuỗi có phải URL http(s) hợp lệ hay không. Không dùng cách
+// kiểm nôm na kiểu str.includes("http") vì cách đó vừa lỏng lẻo (chấp nhận
+// rác miễn có chữ "http" ở đâu đó) vừa không loại được các scheme nguy hiểm
+// khác (vd "javascript:..."). Dùng chính API URL của trình duyệt để parse
+// thật sự, rồi chỉ chấp nhận đúng 2 scheme http/https.
+function isValidHttpUrl(str){
+  let url;
+  try{ url = new URL(str); }
+  catch(_){ return false; }
+  return url.protocol === "http:" || url.protocol === "https:";
+}
 
 document.getElementById("searchBox").addEventListener("input", renderList);
 
@@ -703,9 +725,21 @@ function renderList(){
         </div>` : ""}
       <div class="body">
         <div class="titlerow">
-          <div class="name">${escapeHtml(p.name)}</div>
+          <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
           ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
+          ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
         </div>
+        ${(!isManage && editingLinkIds.has(p.id)) ? `
+          <div class="linkEditBox">
+            <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
+            <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
+            <div class="row row-nowrap" style="margin-top:6px;">
+              <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
+              <button type="button" class="btn-outline linkCancelBtn" style="flex:1;">Hủy</button>
+            </div>
+            <div class="status linkStatus"></div>
+          </div>
+        ` : ""}
         <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
       </div>
     `;
@@ -735,6 +769,60 @@ function renderList(){
         }
       });
     } else {
+      // ---- Nút ✏️ chèn/sửa link file in (chỉ ở tab Thêm việc) ----
+      const editLinkBtn = div.querySelector(".editLinkBtn");
+      if(editLinkBtn){
+        editLinkBtn.addEventListener("click", () => {
+          if(editingLinkIds.has(p.id)) editingLinkIds.delete(p.id);
+          else editingLinkIds.add(p.id);
+          renderList();
+        });
+      }
+      const linkSaveBtn = div.querySelector(".linkSaveBtn");
+      const linkCancelBtn = div.querySelector(".linkCancelBtn");
+      if(linkSaveBtn){
+        linkSaveBtn.addEventListener("click", async () => {
+          const statusEl = div.querySelector(".linkStatus");
+          const newName = div.querySelector(".linkEditName").value.trim();
+          const rawLink = div.querySelector(".linkEditUrl").value.trim();
+          if(!newName){
+            statusEl.textContent = "Tên sản phẩm không được để trống.";
+            statusEl.className = "status err";
+            return;
+          }
+          let linkToSave = "";
+          if(rawLink){
+            if(!isValidHttpUrl(rawLink)){
+              statusEl.textContent = "Link không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+              statusEl.className = "status err";
+              return;
+            }
+            linkToSave = rawLink;
+          }
+          if(newName.toLowerCase() !== p.name.toLowerCase()){
+            const dup = allProducts.find(x => x.id !== p.id && x.name.toLowerCase() === newName.toLowerCase());
+            if(dup){
+              statusEl.textContent = `Tên "${newName}" đã trùng với 1 sản phẩm khác trong danh mục.`;
+              statusEl.className = "status err";
+              return;
+            }
+          }
+          try{
+            await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
+            editingLinkIds.delete(p.id);
+            renderList();
+          }catch(e){
+            statusEl.textContent = "Lỗi khi lưu: " + e.message;
+            statusEl.className = "status err";
+          }
+        });
+      }
+      if(linkCancelBtn){
+        linkCancelBtn.addEventListener("click", () => {
+          editingLinkIds.delete(p.id);
+          renderList();
+        });
+      }
       div.querySelectorAll(".vchip").forEach(chip => {
         chip.addEventListener("click", e => {
           const key = chip.dataset.key;
@@ -754,7 +842,7 @@ function renderList(){
             }
           } else {
             if(!cur){
-              cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId() };
+              cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
               taskSelections.set(key, cur);
             }
             cur.qty += 1;
@@ -875,11 +963,13 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
 
   try{
     for(const e of entries){
+      const prod = allProducts.find(pr => pr.id === e.productId);
       await addDoc(tasksCol, {
         name: e.variant ? `${e.productName} — ${e.variant}` : e.productName,
         qty: e.qty,
         status: "cho_in",
         note: "",
+        link: (prod && prod.link) ? prod.link : "",
         orderId: e.orderId,
         orderName: orderNames.get(e.orderId),
         createdAt: serverTimestamp(),
