@@ -157,6 +157,10 @@
     <div id="gomStatusLine" style="display:none;"></div>
   </div>
 
+  <div class="row header-toolbar" id="sortModeRow" style="display:none;">
+    <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
+  </div>
+
   <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
     <span id="selCount">Đã chọn 0 sản phẩm</span>
     <button class="del-btn" id="topDelBtn">Xóa</button>
@@ -301,12 +305,22 @@ function updateGomStatusLine(){
   gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
 }
 
+// ---- Chế độ sắp xếp thủ công (chỉ trong tab quản lý) — bật lên mới hiện
+// nút ▲▼ trên từng item, vì đây là thao tác không thường xuyên (chủ yếu dùng
+// lúc mới nhập danh sách hoặc thỉnh thoảng dọn lại thứ tự sau này). ----
+let sortMode = false;
+
 function applyModeUI(){
   const isManage = mode === "manage";
+  if(!isManage) sortMode = false; // rời tab quản lý thì tự thoát chế độ sắp xếp
   document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
   document.getElementById("manageSection").style.display = isManage ? "block" : "none";
-  document.getElementById("manageActionBar").style.display = isManage ? "flex" : "none";
-  document.getElementById("selectAllRow").style.display = isManage ? "flex" : "none";
+  document.getElementById("sortModeRow").style.display = isManage ? "flex" : "none";
+  document.getElementById("manageActionBar").style.display = (isManage && !sortMode) ? "flex" : "none";
+  document.getElementById("selectAllRow").style.display = (isManage && !sortMode) ? "flex" : "none";
+  const sortModeBtn = document.getElementById("sortModeBtn");
+  sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
+  sortModeBtn.classList.toggle("active", sortMode);
   document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
   document.getElementById("gomBar").style.display = isManage ? "none" : "block";
   if(isManage){
@@ -316,6 +330,13 @@ function applyModeUI(){
   }
 }
 applyModeUI();
+
+document.getElementById("sortModeBtn").addEventListener("click", () => {
+  sortMode = !sortMode;
+  if(sortMode) selected.clear(); // không lẫn chế độ chọn/xóa với chế độ sắp xếp cùng lúc
+  applyModeUI();
+  renderList();
+});
 
 function exitGomMode(){
   gomMode = false;
@@ -561,6 +582,7 @@ function renderList(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
   const isManage = mode === "manage";
+  const isSortMode = isManage && sortMode;
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
@@ -606,30 +628,31 @@ function renderList(){
         </button>`;
     }
     div.innerHTML = `
-      ${isManage ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
-      ${isManage ? `<div class="orderBtns">
+      ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
+      ${isSortMode ? `<div class="orderBtns">
           <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
           <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
         </div>` : ""}
       <div class="body">
         <div class="titlerow">
           <div class="name">${escapeHtml(p.name)}</div>
-          ${isManage ? `<button class="editBtn">✏️ Sửa</button>` : ""}
+          ${(isManage && !isSortMode) ? `<button class="editBtn">✏️ Sửa</button>` : ""}
         </div>
         <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
       </div>
     `;
-    if(isManage){
+    if(isSortMode){
+      const upBtn = div.querySelector(".upBtn");
+      const downBtn = div.querySelector(".downBtn");
+      if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
+      if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
+    } else if(isManage){
       div.querySelector(".rowCheck").addEventListener("change", e => {
         if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
         updateActionBar();
         updateSelectAllState(filtered);
       });
       div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
-      const upBtn = div.querySelector(".upBtn");
-      const downBtn = div.querySelector(".downBtn");
-      if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
-      if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
     } else {
       div.querySelectorAll(".vchip").forEach(chip => {
         chip.addEventListener("click", e => {
