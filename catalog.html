@@ -80,6 +80,8 @@
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
   .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
+  .item .delBtn{background:var(--gray-bg);color:var(--red);font-size:13px;padding:6px 10px;flex-shrink:0;}
+  .item .rowActions{display:flex;gap:6px;flex-shrink:0;}
   .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
   .item .vchip.selected{background:var(--blue);color:#fff;}
   .item .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
@@ -191,8 +193,11 @@
   </section>
 
   <section>
-    <h2>Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
-    <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo từ khóa...">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
+      <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
+    </div>
+    <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo tên hoặc phân loại...">
 
     <div id="errArea"></div>
 
@@ -519,12 +524,20 @@ function escapeHtml(s){
   return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+function productMatchesKeyword(p, kw){
+  if(!kw) return true;
+  if(p.name.toLowerCase().includes(kw)) return true;
+  if(p.variants && p.variants.some(v => v.toLowerCase().includes(kw))) return true;
+  if(p.tiers && p.tiers.some(tier => tier.some(v => v.toLowerCase().includes(kw)))) return true;
+  return false;
+}
+
 function getFiltered(){
   // Đang sắp xếp: luôn thao tác trên toàn bộ danh sách (không lọc theo từ khóa)
-  // để vị trí kéo/thả phản ánh đúng thứ tự thật, tránh nhảy lung tung khi có filter.
+  // để nút ▲▼⤒⤓ phản ánh đúng thứ tự thật, tránh nhảy lung tung khi có filter.
   if(sortMode) return allProducts;
   const kw = document.getElementById("searchBox").value.trim().toLowerCase();
-  return allProducts.filter(p => !kw || p.name.toLowerCase().includes(kw));
+  return allProducts.filter(p => productMatchesKeyword(p, kw));
 }
 
 // Đẩy 1 sản phẩm lên/xuống 1 bậc so với vị trí đang hiển thị (dir: -1 lên, +1 xuống).
@@ -581,7 +594,6 @@ async function moveToBottom(productId){
   catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
 }
 
-// ---- Kéo thả sắp xếp bằng tay cầm ⠿ ----
 function renderTiersStaticHtml(p){
   const outerTiers = p.tiers.slice(0, -1);
   const lastTier = p.tiers[p.tiers.length - 1];
@@ -675,7 +687,7 @@ function renderList(){
       <div class="body">
         <div class="titlerow">
           <div class="name">${escapeHtml(p.name)}</div>
-          ${(isManage && !isSortMode) ? `<button class="editBtn">✏️ Sửa</button>` : ""}
+          ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
         </div>
         <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
       </div>
@@ -696,6 +708,15 @@ function renderList(){
         updateSelectAllState(filtered);
       });
       div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+      div.querySelector(".delBtn").addEventListener("click", async () => {
+        if(!confirm(`Xóa sản phẩm "${p.name}"?`)) return;
+        try{
+          await deleteDoc(doc(db, "catalog", p.id));
+          selected.delete(p.id);
+        }catch(e){
+          showError("Không xóa được sản phẩm: " + e.message);
+        }
+      });
     } else {
       div.querySelectorAll(".vchip").forEach(chip => {
         chip.addEventListener("click", e => {
@@ -898,31 +919,62 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
     statusEl.className = "status err";
     return;
   }
-  let created = 0, merged = 0, skipped = 0;
+  let created = 0, merged = 0, skipped = 0, mismatched = 0;
   let nextOrder = getMaxOrder() + ORDER_STEP;
+  // Bản sao làm việc trong bộ nhớ: allProducts chỉ được cập nhật qua onSnapshot
+  // (bất đồng bộ), nên nếu không theo dõi riêng, 2 dòng trùng tên sản phẩm MỚI
+  // trong cùng 1 lượt dán sẽ không thấy nhau -> bị tạo thành 2 sản phẩm trùng.
+  // workingList luôn phản ánh đúng trạng thái "sau khi xử lý xong các dòng
+  // trước đó", kể cả sản phẩm vừa mới tạo trong chính lượt dán này.
+  const workingList = allProducts.map(p => ({
+    id: p.id, name: p.name,
+    variants: p.variants ? [...p.variants] : [],
+    tiers: p.tiers ? p.tiers.map(arr => [...arr]) : null
+  }));
   try{
     for(const line of lines){
       const parsed = parseLine(line);
       if(!parsed){ skipped++; continue; }
-      const existing = allProducts.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
+      const existing = workingList.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
       if(existing){
-        if(parsed.tiers){
+        const existingHasTiers = existing.tiers && existing.tiers.length >= 2;
+        const existingHasFlat = existing.variants && existing.variants.length > 0;
+        const parsedIsTiered = !!parsed.tiers;
+        const parsedIsFlat = parsed.variants && parsed.variants.length > 0;
+
+        if(parsedIsTiered && existingHasFlat && !existingHasTiers){
+          // Sản phẩm đang ở dạng 1 tầng (phẳng) mà dòng mới lại đưa dạng 2 tầng
+          // -> không tự đổi cấu trúc ngầm, tránh mất/ẩn dữ liệu variants cũ.
+          mismatched++;
+        } else if(parsedIsFlat && existingHasTiers){
+          // Ngược lại: sản phẩm đã có 2 tầng mà dòng mới chỉ đưa danh sách phẳng.
+          mismatched++;
+        } else if(parsedIsTiered){
           const mergedTiers = mergeTiers(existing.tiers, parsed.tiers);
           await updateDoc(doc(db, "catalog", existing.id), { tiers: tiersToFirestore(mergedTiers) });
-        } else if(parsed.variants.length){
+          existing.tiers = mergedTiers;
+          merged++;
+        } else if(parsedIsFlat){
           const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
           await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
+          existing.variants = mergedVariants;
+          merged++;
+        } else {
+          // Dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên.
+          merged++;
         }
-        // dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên, không cần cập nhật gì thêm
-        merged++;
       } else {
         // Sản phẩm mới mặc định xếp ở cuối danh sách hiện có (order lớn nhất + bước nhảy)
-        await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers), order: nextOrder });
+        const ref = await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers), order: nextOrder });
         nextOrder += ORDER_STEP;
+        workingList.push({ id: ref.id, name: parsed.name, variants: [...parsed.variants], tiers: parsed.tiers ? parsed.tiers.map(arr => [...arr]) : null });
         created++;
       }
     }
-    statusEl.textContent = `Xong: ${created} sp mới, ${merged} sp gộp thêm phân loại, ${skipped} dòng bỏ qua (sai định dạng).`;
+    const parts = [`${created} sp mới`, `${merged} sp gộp thêm phân loại`];
+    if(mismatched > 0) parts.push(`${mismatched} dòng bỏ qua (khác cấu trúc phân loại với sản phẩm đã có, cần sửa tay qua nút ✏️ Sửa)`);
+    parts.push(`${skipped} dòng bỏ qua (sai định dạng)`);
+    statusEl.textContent = "Xong: " + parts.join(", ") + ".";
     statusEl.className = "status ok";
     document.getElementById("bulkInput").value = "";
     closeFullscreen();
@@ -930,6 +982,17 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
     statusEl.textContent = "Lỗi khi nhập danh sách: " + e.message;
     statusEl.className = "status err";
   }
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if(allProducts.length === 0){
+    alert("Danh mục đang trống, chưa có gì để xuất.");
+    return;
+  }
+  const text = allProducts.map(productToLine).join("\n");
+  // Chỉ để xem / sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây không ghi gì
+  // xuống Firestore, tránh nhầm lẫn với việc sửa từng sản phẩm.
+  openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true);
 });
 
 const bulkTextarea = document.getElementById("bulkInput");
@@ -958,6 +1021,11 @@ function openEditor(product){
     const parsed = parseLine(firstLine);
     if(!parsed){
       alert("Định dạng không hợp lệ, cần có ít nhất tên sản phẩm");
+      return false;
+    }
+    const dup = allProducts.find(p => p.id !== product.id && p.name.toLowerCase() === parsed.name.toLowerCase());
+    if(dup){
+      alert(`Tên "${parsed.name}" đã trùng với 1 sản phẩm khác đang có trong danh mục.\nĐổi tên khác, hoặc nếu muốn gộp 2 sản phẩm làm 1, hãy xóa sản phẩm này rồi dùng ô "Nhập / sửa danh sách" để gộp phân loại vào sản phẩm còn lại.`);
       return false;
     }
     try{
