@@ -586,11 +586,12 @@ async function moveToBottom(productId){
   catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
 }
 
-// ---- Kéo thả sắp xếp bằng tay cầm ⠿ (Pointer Events — chạy tốt trên cả
-// chuột lẫn cảm ứng điện thoại, không cần thư viện ngoài). Chỉ tay cầm mới
-// bắt sự kiện kéo (touch-action:none), phần còn lại của item vẫn cuộn bình
-// thường. Trong lúc kéo chỉ di chuyển các phần tử DOM cho mượt mắt; khi thả
-// tay mới đọc lại thứ tự DOM để ghi order thật xuống Firestore. ----
+// ---- Kéo thả sắp xếp bằng tay cầm ⠿ ----
+// Cố tình KHÔNG dùng Pointer Events / setPointerCapture: nhiều webview hay
+// gặp trên điện thoại (Zalo, Facebook, app Shopee/TikTok mở link ngoài...)
+// hỗ trợ Pointer Events không đầy đủ, khiến kéo thả im lặng không hoạt động.
+// Dùng touch + mouse events thuần, lắng nghe move/up trên window (không phụ
+// thuộc pointer capture) để chạy ổn định trên mọi trình duyệt/webview.
 function getDragAfterElement(container, y, draggingEl){
   const els = [...container.querySelectorAll(".item")].filter(el => el !== draggingEl);
   return els.reduce((closest, child) => {
@@ -607,69 +608,89 @@ function attachDragHandle(handle, itemEl){
   if(!handle) return;
   let dragging = false;
   let scrollRAF = null;
+  let lastY = 0;
 
-  function autoScrollTick(clientY){
-    const margin = 60;
-    let speed = 0;
-    if(clientY < margin) speed = -(margin - clientY) / 3;
-    else if(clientY > window.innerHeight - margin) speed = (clientY - (window.innerHeight - margin)) / 3;
-    if(speed !== 0) window.scrollBy(0, speed);
-    if(dragging) scrollRAF = requestAnimationFrame(() => autoScrollTick(clientY));
+  function yOf(e){
+    if(e.touches && e.touches.length) return e.touches[0].clientY;
+    if(e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientY;
+    return e.clientY;
   }
 
-  handle.addEventListener("pointerdown", e => {
-    if(e.button !== undefined && e.button !== 0) return; // chỉ chuột trái, cảm ứng thì e.button = 0
+  function autoScrollLoop(){
+    if(!dragging) return;
+    const margin = 60;
+    let speed = 0;
+    if(lastY < margin) speed = -(margin - lastY) / 3;
+    else if(lastY > window.innerHeight - margin) speed = (lastY - (window.innerHeight - margin)) / 3;
+    if(speed !== 0) window.scrollBy(0, speed);
+    scrollRAF = requestAnimationFrame(autoScrollLoop);
+  }
+
+  function onMove(e){
+    if(!dragging) return;
+    if(e.cancelable) e.preventDefault();
+    lastY = yOf(e);
+    const list = document.getElementById("list");
+    const afterEl = getDragAfterElement(list, lastY, itemEl);
+    if(afterEl == null) list.appendChild(itemEl);
+    else list.insertBefore(itemEl, afterEl);
+  }
+
+  function removeMoveListeners(){
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    window.removeEventListener("touchmove", onMove);
+    window.removeEventListener("touchend", onUp);
+    window.removeEventListener("touchcancel", onUp);
+  }
+
+  async function onUp(){
+    if(!dragging) return;
+    dragging = false;
+    if(scrollRAF) cancelAnimationFrame(scrollRAF);
+    itemEl.classList.remove("dragging");
+    removeMoveListeners();
+
+    // Đọc lại thứ tự thật trên DOM sau khi thả tay, renumber theo bước
+    // ORDER_STEP rồi ghi xuống Firestore — chỉ ghi những sản phẩm có order
+    // thực sự thay đổi để tránh ghi thừa.
+    const list = document.getElementById("list");
+    const newIds = [...list.querySelectorAll(".item")].map(el => el.dataset.id);
+    const changed = [];
+    newIds.forEach((id, i) => {
+      const p = allProducts.find(x => x.id === id);
+      if(!p) return;
+      const newOrder = (i + 1) * ORDER_STEP;
+      if(p.order !== newOrder){
+        p.order = newOrder;
+        changed.push(p);
+      }
+    });
+    sortProductsInPlace();
+    renderList();
+    try{
+      await Promise.all(changed.map(p => updateDoc(doc(db, "catalog", p.id), { order: p.order })));
+    }catch(e){
+      showError("Không lưu được thứ tự mới: " + e.message);
+    }
+  }
+
+  function onStart(e){
+    if(e.type === "mousedown" && e.button !== 0) return; // chỉ chuột trái
     dragging = true;
     itemEl.classList.add("dragging");
-    handle.setPointerCapture(e.pointerId);
-    e.preventDefault();
-    scrollRAF = requestAnimationFrame(() => autoScrollTick(e.clientY));
+    if(e.cancelable) e.preventDefault();
+    lastY = yOf(e);
+    scrollRAF = requestAnimationFrame(autoScrollLoop);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+    window.addEventListener("touchcancel", onUp);
+  }
 
-    const onMove = ev => {
-      if(!dragging) return;
-      const list = document.getElementById("list");
-      const afterEl = getDragAfterElement(list, ev.clientY, itemEl);
-      if(afterEl == null) list.appendChild(itemEl);
-      else list.insertBefore(itemEl, afterEl);
-      autoScrollTick(ev.clientY);
-    };
-
-    const onUp = async () => {
-      dragging = false;
-      if(scrollRAF) cancelAnimationFrame(scrollRAF);
-      itemEl.classList.remove("dragging");
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
-      handle.removeEventListener("pointercancel", onUp);
-
-      // Đọc lại thứ tự thật trên DOM sau khi thả tay, renumber theo bước
-      // ORDER_STEP rồi ghi xuống Firestore — chỉ ghi những sản phẩm có order
-      // thực sự thay đổi để tránh ghi thừa.
-      const list = document.getElementById("list");
-      const newIds = [...list.querySelectorAll(".item")].map(el => el.dataset.id);
-      const changed = [];
-      newIds.forEach((id, i) => {
-        const p = allProducts.find(x => x.id === id);
-        if(!p) return;
-        const newOrder = (i + 1) * ORDER_STEP;
-        if(p.order !== newOrder){
-          p.order = newOrder;
-          changed.push(p);
-        }
-      });
-      sortProductsInPlace();
-      renderList();
-      try{
-        await Promise.all(changed.map(p => updateDoc(doc(db, "catalog", p.id), { order: p.order })));
-      }catch(e){
-        showError("Không lưu được thứ tự mới: " + e.message);
-      }
-    };
-
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp);
-    handle.addEventListener("pointercancel", onUp);
-  });
+  handle.addEventListener("mousedown", onStart);
+  handle.addEventListener("touchstart", onStart, { passive: false });
 }
 
 function renderTiersStaticHtml(p){
