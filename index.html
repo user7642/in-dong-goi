@@ -182,6 +182,11 @@
     text-align:center;
     word-break:break-word;
   }
+  .order-title.clickable{cursor:pointer;user-select:none;}
+  .expand-caret{
+    display:inline-block;width:14px;color:var(--muted);font-weight:400;
+  }
+  .ship-label-chip{font-size:12px;margin-left:2px;}
   .order-header .edit-icon{
     position:absolute;
     right:8px;top:50%;transform:translateY(-50%);
@@ -403,6 +408,10 @@ let editingTaskIds = new Set();
 let editingOrderIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
 let uploadingShipLabelIds = new Set();
+// Khu vực phiếu giao mặc định THU GỌN cho từng đơn — orderId có trong Set này
+// nghĩa là đang được mở rộng (bấm vào tên đơn để mở/đóng). Giúp danh sách gọn
+// hơn khi có nhiều đơn, thay vì luôn hiện sẵn hàng nút cho mọi đơn.
+let expandedShipLabelOrderIds = new Set();
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -691,12 +700,20 @@ function renderOrderBox(g){
     setTimeout(() => input.focus(), 0);
   } else {
     const title = document.createElement("div");
-    title.className = "order-title";
-    title.textContent = g.orderName;
+    title.className = "order-title clickable";
+    const isExpanded = expandedShipLabelOrderIds.has(g.orderId) || uploadingShipLabelIds.has(g.orderId);
+    title.innerHTML = `<span class="expand-caret">${isExpanded ? "▾" : "▸"}</span>` + escapeHtml(g.orderName)
+      + (g.shipLabelUrl ? ` <span class="ship-label-chip" title="Đã đính kèm phiếu giao">📎</span>` : "");
+    title.addEventListener("click", () => {
+      if(expandedShipLabelOrderIds.has(g.orderId)) expandedShipLabelOrderIds.delete(g.orderId);
+      else expandedShipLabelOrderIds.add(g.orderId);
+      render();
+    });
     const editBtn = document.createElement("button");
     editBtn.className = "edit-icon";
     editBtn.textContent = "✏️";
-    editBtn.addEventListener("click", () => {
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
       editingOrderIds.add(g.orderId);
       render();
     });
@@ -704,7 +721,9 @@ function renderOrderBox(g){
     header.appendChild(editBtn);
   }
   box.appendChild(header);
-  box.appendChild(renderShipLabelRow(g));
+  if(expandedShipLabelOrderIds.has(g.orderId) || uploadingShipLabelIds.has(g.orderId)){
+    box.appendChild(renderShipLabelRow(g));
+  }
 
   if(currentTab === "dong_goi" && info){
     const line = document.createElement("div");
