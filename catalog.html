@@ -69,10 +69,6 @@
 
   .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
   .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
-  .item .dragHandle{
-    width:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-    font-size:20px;color:var(--muted);cursor:grab;touch-action:none;user-select:none;
-  }
   .item .orderBtns{display:grid;grid-template-columns:repeat(2,28px);gap:4px;flex-shrink:0;align-content:center;}
   .item .orderBtn{
     width:28px;height:28px;padding:0;font-size:13px;line-height:1;
@@ -80,7 +76,6 @@
     display:flex;align-items:center;justify-content:center;border-radius:6px;
   }
   .item .orderBtn:disabled{opacity:.3;cursor:default;}
-  .item.dragging{opacity:.45;}
   .item .body{flex:1;min-width:0;}
   .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
   .item .name{font-size:15px;font-weight:600;}
@@ -587,112 +582,6 @@ async function moveToBottom(productId){
 }
 
 // ---- Kéo thả sắp xếp bằng tay cầm ⠿ ----
-// Cố tình KHÔNG dùng Pointer Events / setPointerCapture: nhiều webview hay
-// gặp trên điện thoại (Zalo, Facebook, app Shopee/TikTok mở link ngoài...)
-// hỗ trợ Pointer Events không đầy đủ, khiến kéo thả im lặng không hoạt động.
-// Dùng touch + mouse events thuần, lắng nghe move/up trên window (không phụ
-// thuộc pointer capture) để chạy ổn định trên mọi trình duyệt/webview.
-function getDragAfterElement(container, y, draggingEl){
-  const els = [...container.querySelectorAll(".item")].filter(el => el !== draggingEl);
-  return els.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if(offset < 0 && offset > closest.offset){
-      return { offset, element: child };
-    }
-    return closest;
-  }, { offset: -Infinity, element: null }).element;
-}
-
-function attachDragHandle(handle, itemEl){
-  if(!handle) return;
-  let dragging = false;
-  let scrollRAF = null;
-  let lastY = 0;
-
-  function yOf(e){
-    if(e.touches && e.touches.length) return e.touches[0].clientY;
-    if(e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientY;
-    return e.clientY;
-  }
-
-  function autoScrollLoop(){
-    if(!dragging) return;
-    const margin = 60;
-    let speed = 0;
-    if(lastY < margin) speed = -(margin - lastY) / 3;
-    else if(lastY > window.innerHeight - margin) speed = (lastY - (window.innerHeight - margin)) / 3;
-    if(speed !== 0) window.scrollBy(0, speed);
-    scrollRAF = requestAnimationFrame(autoScrollLoop);
-  }
-
-  function onMove(e){
-    if(!dragging) return;
-    if(e.cancelable) e.preventDefault();
-    lastY = yOf(e);
-    const list = document.getElementById("list");
-    const afterEl = getDragAfterElement(list, lastY, itemEl);
-    if(afterEl == null) list.appendChild(itemEl);
-    else list.insertBefore(itemEl, afterEl);
-  }
-
-  function removeMoveListeners(){
-    window.removeEventListener("mousemove", onMove);
-    window.removeEventListener("mouseup", onUp);
-    window.removeEventListener("touchmove", onMove);
-    window.removeEventListener("touchend", onUp);
-    window.removeEventListener("touchcancel", onUp);
-  }
-
-  async function onUp(){
-    if(!dragging) return;
-    dragging = false;
-    if(scrollRAF) cancelAnimationFrame(scrollRAF);
-    itemEl.classList.remove("dragging");
-    removeMoveListeners();
-
-    // Đọc lại thứ tự thật trên DOM sau khi thả tay, renumber theo bước
-    // ORDER_STEP rồi ghi xuống Firestore — chỉ ghi những sản phẩm có order
-    // thực sự thay đổi để tránh ghi thừa.
-    const list = document.getElementById("list");
-    const newIds = [...list.querySelectorAll(".item")].map(el => el.dataset.id);
-    const changed = [];
-    newIds.forEach((id, i) => {
-      const p = allProducts.find(x => x.id === id);
-      if(!p) return;
-      const newOrder = (i + 1) * ORDER_STEP;
-      if(p.order !== newOrder){
-        p.order = newOrder;
-        changed.push(p);
-      }
-    });
-    sortProductsInPlace();
-    renderList();
-    try{
-      await Promise.all(changed.map(p => updateDoc(doc(db, "catalog", p.id), { order: p.order })));
-    }catch(e){
-      showError("Không lưu được thứ tự mới: " + e.message);
-    }
-  }
-
-  function onStart(e){
-    if(e.type === "mousedown" && e.button !== 0) return; // chỉ chuột trái
-    dragging = true;
-    itemEl.classList.add("dragging");
-    if(e.cancelable) e.preventDefault();
-    lastY = yOf(e);
-    scrollRAF = requestAnimationFrame(autoScrollLoop);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchmove", onMove, { passive: false });
-    window.addEventListener("touchend", onUp);
-    window.addEventListener("touchcancel", onUp);
-  }
-
-  handle.addEventListener("mousedown", onStart);
-  handle.addEventListener("touchstart", onStart, { passive: false });
-}
-
 function renderTiersStaticHtml(p){
   const outerTiers = p.tiers.slice(0, -1);
   const lastTier = p.tiers[p.tiers.length - 1];
@@ -777,7 +666,6 @@ function renderList(){
     }
     div.innerHTML = `
       ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
-      ${isSortMode ? `<div class="dragHandle" title="Kéo để đổi vị trí">⠿</div>` : ""}
       ${isSortMode ? `<div class="orderBtns">
           <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
           <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
@@ -801,7 +689,6 @@ function renderList(){
       if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
       if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
       if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
-      attachDragHandle(div.querySelector(".dragHandle"), div);
     } else if(isManage){
       div.querySelector(".rowCheck").addEventListener("change", e => {
         if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
