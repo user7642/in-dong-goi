@@ -3,17 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<!-- Trang chỉ thiết kế theo theme sáng — khai báo rõ để trình duyệt/điện
+     thoại không tự bật "chế độ tối" (auto dark mode) rồi tự đảo màu nền/chữ,
+     gây ra tình trạng viền ô lúc ẩn lúc hiện không nhất quán giữa các máy. -->
+<meta name="color-scheme" content="light">
 <title>Quản lý danh mục sản phẩm</title>
 <style>
   :root{
+    color-scheme:light;
     --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
     --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
     --amber:#b45309; --amber-bg:#fef3e0;
-    --maxw:680px;
+    --maxw:1150px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
   /* Header, main, footer và các thanh sticky/fixed đều dùng chung 1 độ rộng
+
      tối đa (--maxw), canh giữa — để trên desktop mọi khối đều thẳng hàng
      với nhau thay vì header chạy full-width còn nội dung bị bó hẹp lại. */
   header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;max-width:var(--maxw);margin:0 auto;}
@@ -118,13 +124,13 @@
   /* Mỗi ô lưới vẫn là 1 .item (giữ nguyên toàn bộ style tên SP + chip
      phân loại có sẵn) — chỉ đổi cách đặt trong layout. margin âm để các
      viền của ô liền kề chồng lên nhau thành 1 đường kẻ chung như bảng in,
-     tránh viền đôi giữa các ô. */
+     tránh viền đôi giữa các ô. Viền được tô đậm hơn --border mặc định
+     (vốn quá nhạt trên nền trắng) để luôn nhìn rõ đường lưới. */
   .gridWrap .item{
     display:flex;flex-direction:column;justify-content:flex-start;
-    margin:0 0 -1px -1px;border-radius:0;
+    margin:0 0 -1px -1px;border-radius:0;border-color:#c7cbd1;
     background:var(--card);position:relative;
   }
-  .gridWrap .item.active{border-color:var(--blue);background:var(--blue-bg);z-index:1;}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
   .linkEditBox{
@@ -930,16 +936,6 @@ function renderListView(){
 }
 
 // ---- Chế độ xem Lưới (chỉ ở tab Thêm việc) ----
-// Tổng số lượng đã chọn của 1 sản phẩm — dùng để tô viền/nền ô khi sản phẩm
-// đang có ít nhất 1 phân loại (hoặc cả sản phẩm đơn) được chọn.
-function productSelectedQty(p){
-  let totalQty = 0;
-  for(const val of taskSelections.values()){
-    if(val.productId === p.id) totalQty += val.qty;
-  }
-  return totalQty;
-}
-
 function renderGridView(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
@@ -952,7 +948,8 @@ function renderGridView(){
   // Mỗi ô hiển thị đầy đủ tên sản phẩm + toàn bộ chip phân loại — giống hệt
   // nội dung ở chế độ Danh sách — chỉ khác cách sắp xếp: nhiều cột (CSS
   // Grid auto-fill, tự đổi số cột theo chiều rộng khung), các ô cùng hàng
-  // tự co giãn bằng chiều cao ô cao nhất trong hàng đó.
+  // tự co giãn bằng chiều cao ô cao nhất trong hàng đó. Ô không tự tô sáng
+  // toàn khung khi sản phẩm được chọn — chỉ chip phân loại được chọn đổi màu.
   const wrap = document.createElement("div");
   wrap.className = "gridWrap";
   filtered.forEach((p, idx) => {
@@ -961,7 +958,6 @@ function renderGridView(){
       isFirst: idx === 0, isLast: idx === filtered.length - 1,
       filtered
     });
-    if(productSelectedQty(p) > 0) el.classList.add("active");
     wrap.appendChild(el);
   });
   list.appendChild(wrap);
