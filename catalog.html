@@ -311,7 +311,12 @@ function randCode(len){
   return s;
 }
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function newOrderName(){ return "Đơn " + randCode(5); }
+// Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
+// thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
+// mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
+// extractTrackingFromPdf ở index.html) — nên chỉ cần nhìn ký tự đầu là phân
+// biệt được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
+function newOrderName(){ return "#" + randCode(9); }
 
 // ---- Chuyển chế độ ----
 document.querySelectorAll(".tab").forEach(t => {
@@ -385,7 +390,17 @@ function exitGomMode(){
 gomBtn.addEventListener("click", () => {
   if(!gomMode){
     gomMode = true;
-    currentGroupId = newOrderId();
+    if(pinnedKey && taskSelections.has(pinnedKey)){
+      // Đang có sẵn 1 sp ghim (chọn kiểu đơn lẻ bình thường) — dùng LUÔN
+      // orderId hiện có của sp đó làm currentGroupId, không tạo id mới và
+      // không đổi identity của nó. Nếu không chọn thêm sp nào khác, nó vẫn
+      // đúng là đơn lẻ đó — chỉ khác là có thể gán thêm tên tùy biến. Nếu có
+      // chọn thêm sp khác trong lúc này, các sp đó sẽ nhập chung vào đơn này.
+      currentGroupId = taskSelections.get(pinnedKey).orderId;
+      pinnedKey = null;
+    } else {
+      currentGroupId = newOrderId();
+    }
     groupNameInput.style.display = "block";
     groupNameInput.value = "";
     gomDoneBtn.style.display = "inline-block";
@@ -393,6 +408,7 @@ gomBtn.addEventListener("click", () => {
     gomBtn.classList.add("active");
     document.getElementById("gomBar").classList.add("active");
     updateGomStatusLine();
+    renderList();
   } else {
     // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
     for(const val of taskSelections.values()){
@@ -410,7 +426,16 @@ gomDoneBtn.addEventListener("click", () => {
   // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ
   if(currentGroupId){
     const nm = groupNameInput.value.trim();
-    groupNames.set(currentGroupId, nm || null);
+    const itemsInGroup = Array.from(taskSelections.values()).filter(v => v.orderId === currentGroupId).length;
+    if(nm || itemsInGroup > 1){
+      // Có đặt tên, hoặc thực sự gộp từ 2 sp trở lên -> ghi nhận là đơn có tên/gộp.
+      groupNames.set(currentGroupId, nm || null);
+    } else {
+      // Chỉ đúng 1 sp và không đặt tên -> coi như chưa từng bấm gom, để nó
+      // vẫn hiển thị và hoạt động y hệt 1 sản phẩm lẻ bình thường (không bị
+      // gắn nhãn "Đơn gộp" một cách không cần thiết).
+      groupNames.delete(currentGroupId);
+    }
   }
   exitGomMode();
   renderList();
