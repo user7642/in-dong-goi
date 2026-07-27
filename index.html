@@ -156,62 +156,75 @@
     margin-bottom:10px;
   }
 
-  /* ---- Order box (grouping) ---- */
+  /* ---- Order box (grouping) — thẻ tóm tắt kiểu Shopee ---- */
   .order-box{
     border:1px solid var(--border);
     border-radius:12px;
     margin-bottom:12px;
     overflow:hidden;
     background:var(--card);
+    cursor:pointer;
   }
   .order-box.warn{border-color:var(--amber);}
   .order-box.ready{border-color:var(--green);}
-  .order-header{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:6px;
-    padding:10px 36px 10px 12px;
-    background:#fafbfc;
-    border-bottom:1px solid var(--border);
-    position:relative;
+
+  .order-summary-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;background:#fafbfc;border-bottom:1px solid var(--border);
+    font-size:12.5px;
   }
-  .order-title{
-    font-size:14px;
-    font-weight:700;
-    text-align:center;
-    word-break:break-word;
+  .order-time{color:var(--muted);}
+  .order-status-badge{font-weight:700;}
+  .order-status-badge.st-warn{color:var(--amber);}
+  .order-status-badge.st-info{color:var(--blue);}
+  .order-status-badge.st-ready{color:var(--green);}
+
+  .thumb-placeholder{
+    width:56px;height:56px;flex-shrink:0;border-radius:8px;
+    background:var(--gray-bg);display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:var(--muted);
   }
-  .order-header.clickable{cursor:pointer;user-select:none;}
-  .expand-caret{
-    display:inline-block;width:14px;color:var(--muted);font-weight:400;
+
+  .order-item-summary{
+    display:flex;gap:10px;align-items:flex-start;
+    padding:10px 12px;border-bottom:1px solid var(--border);
   }
+  .order-item-summary:last-of-type{border-bottom:none;}
+  .order-item-summary input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:4px;accent-color:var(--blue);}
+  .info-summary{flex:1;min-width:0;}
+  .name-summary{font-size:14px;font-weight:600;line-height:1.35;word-break:break-word;}
+  .meta-summary{font-size:12.5px;color:var(--muted);margin-top:3px;}
+
+  .order-summary-footer{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:8px 12px;border-bottom:1px solid var(--border);
+    font-size:12.5px;color:var(--muted);background:#fbfcfd;
+  }
+  .order-summary-footer b{color:var(--text);}
+
+  .order-code-row{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:8px 12px;border-bottom:1px solid var(--border);font-size:12.5px;
+  }
+  .order-code-row .code-label{color:var(--muted);}
+  .order-code-row .code-value{font-weight:600;display:flex;align-items:center;gap:6px;}
   .ship-label-chip{font-size:12px;margin-left:2px;}
-  .order-header .edit-icon{
-    position:absolute;
-    right:8px;top:50%;transform:translateY(-50%);
-    cursor:pointer;
-    font-size:14px;
-    color:var(--muted);
-    border:none;background:none;padding:6px;
+  .order-code-row .copy-btn{
+    border:none;background:none;color:var(--blue);font-size:12px;font-weight:700;
+    cursor:pointer;padding:2px 4px;
   }
-  .order-header input.order-title-input{
-    font-size:14px;font-weight:700;text-align:center;
-    border:1px solid var(--blue);border-radius:6px;padding:5px 8px;
-    flex:1;max-width:220px;
-  }
-  .order-header .save-icon{
-    border:none;background:var(--blue);color:#fff;border-radius:6px;
-    padding:6px 9px;font-size:13px;font-weight:600;cursor:pointer;
-  }
-  .order-status-line{font-size:11.5px;text-align:center;padding:6px 12px 0;color:var(--muted);}
+
+  .order-status-line{font-size:11.5px;text-align:center;padding:6px 12px;color:var(--muted);border-bottom:1px solid var(--border);}
   .order-status-line.warn{color:var(--amber);font-weight:600;}
   .order-status-line.ready{color:var(--green);font-weight:600;}
-  .pack-all-wrap{padding:8px 12px 10px;text-align:center;}
-  .pack-all-btn{
-    background:var(--green);color:#fff;border:none;border-radius:8px;
-    padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
+
+  .order-summary-actions{display:flex;gap:8px;padding:10px 12px;}
+  .order-summary-actions button{
+    flex:1;border:none;border-radius:8px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer;
   }
+  .order-summary-actions .ship-quick-btn{background:var(--gray-bg);color:var(--text);}
+  .order-summary-actions .order-primary-btn{background:var(--blue);color:#fff;}
+  .order-summary-actions .order-primary-btn.green{background:var(--green);}
 
   /* Phiếu giao (mã đơn vận) đính kèm PDF — dùng chung cho cả đơn hàng, không
      phải theo từng sản phẩm, nên đặt ngay dưới order-header. */
@@ -230,23 +243,67 @@
   .ship-label-row .remove-btn{background:#fde8e8;color:var(--red);}
   .ship-label-row button[disabled]{opacity:.6;cursor:default;}
 
-  .order-item{
-    display:flex;align-items:flex-start;gap:10px;
-    padding:12px;border-bottom:1px solid var(--border);
-  }
-  .order-item:last-child{border-bottom:none;}
-  .order-item input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
-  .order-item .info{flex:1;min-width:0;}
-  .order-item .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
-  .order-item .meta{font-size:13px;color:var(--muted);margin-top:2px;}
-  .order-item .row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
-  .order-item button.mini{
+  .detail-item-card .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
+  .detail-item-card .meta{font-size:13px;color:var(--muted);margin-top:2px;}
+  .detail-item-card .row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .detail-item-card button.mini{
     border:none;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:600;cursor:pointer;
     background:var(--gray-bg);color:var(--text);
   }
-  .order-item button.mini.primary{background:var(--blue-bg);color:var(--blue);}
-  .order-item button.mini.warnbtn{background:var(--amber-bg);color:var(--amber);}
-  .order-item button.mini.danger{background:#fde8e8;color:var(--red);}
+  .detail-item-card button.mini.primary{background:var(--blue-bg);color:var(--blue);}
+  .detail-item-card button.mini.warnbtn{background:var(--amber-bg);color:var(--amber);}
+  .detail-item-card button.mini.danger{background:#fde8e8;color:var(--red);}
+
+  /* ---- Trang chi tiết đơn hàng (mở toàn màn hình khi bấm vào thẻ tóm tắt) ---- */
+  .order-detail-overlay{
+    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:55;
+    display:none;flex-direction:column;padding:12px 12px 24px;overflow-y:auto;
+    max-width:var(--maxw);margin:0 auto;
+  }
+  .order-detail-overlay.show{display:flex;}
+  .detail-topbar{display:flex;align-items:center;padding:6px 2px 14px;}
+  .detail-back-btn{
+    border:none;background:none;font-size:16px;font-weight:700;color:var(--text);
+    cursor:pointer;padding:6px 2px;
+  }
+  .detail-code-row{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:10px 12px;margin-bottom:12px;font-size:13px;
+  }
+  .detail-code-row .code-label{color:var(--muted);flex-shrink:0;}
+  .detail-code-row .code-value{font-weight:700;word-break:break-all;}
+  .detail-code-row .copy-btn{
+    border:none;background:none;color:var(--blue);font-size:12.5px;font-weight:700;cursor:pointer;
+  }
+  .detail-code-row .edit-icon-btn{
+    border:none;background:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px;
+  }
+  .detail-code-row input.order-title-input{
+    font-size:13px;font-weight:700;border:1px solid var(--blue);border-radius:6px;
+    padding:6px 8px;flex:1;min-width:0;
+  }
+  .detail-code-row .save-icon{
+    border:none;background:var(--blue);color:#fff;border-radius:6px;
+    padding:6px 9px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0;
+  }
+
+  .detail-item-card{
+    display:flex;gap:10px;background:var(--card);border:1px solid var(--border);
+    border-radius:10px;padding:12px;margin-bottom:10px;
+  }
+  .detail-item-card .info{flex:1;min-width:0;}
+
+  .detail-ship-wrap{
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:4px 4px;margin-bottom:14px;overflow:hidden;
+  }
+  .detail-ship-wrap .ship-label-row{border-bottom:none;background:none;justify-content:flex-start;}
+
+  .delete-order-btn{
+    width:100%;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;
+    background:#fde8e8;color:var(--red);cursor:pointer;margin-top:auto;
+  }
 
   .note-preview{
     margin-top:5px;font-size:12.5px;color:var(--blue);background:var(--blue-bg);
@@ -420,6 +477,10 @@
   </div>
 </div>
 
+<!-- Trang chi tiết đơn hàng — mở toàn màn hình khi bấm vào thẻ tóm tắt trong
+     danh sách. Nội dung được dựng động trong renderOrderDetailOverlay(). -->
+<div class="order-detail-overlay" id="orderDetailOverlay"></div>
+
 <!-- jsQR: thư viện thuần JS đọc mã QR từ dữ liệu ảnh (canvas), dùng để đọc
      trực tiếp mã QR in trên phiếu giao thay vì dò chữ theo mẫu từng hãng. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -464,10 +525,10 @@ let taskEditorCurrentId = null; // đơn đang mở trong overlay "Sửa việc"
 let editingOrderIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
 let uploadingShipLabelIds = new Set();
-// Khu vực phiếu giao mặc định THU GỌN cho từng đơn — chỉ 1 đơn được mở rộng
-// tại 1 thời điểm (đóng đơn đang mở lại khi mở đơn khác, hoặc khi bấm ra
-// ngoài). Giúp danh sách gọn hơn khi có nhiều đơn.
-let expandedShipLabelOrderId = null;
+// orderId đang mở trang "Chi tiết đơn hàng" (toàn màn hình) — null = đang đóng.
+// Thẻ tóm tắt trong danh sách chỉ hiện thông tin cơ bản; mọi thao tác từng
+// sản phẩm (Sửa/Ghi chú/Xóa/Phiếu giao đầy đủ) chuyển hết vào đây.
+let openOrderDetailId = null;
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -544,18 +605,6 @@ function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toS
 // được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
 function newOrderName(){ return "#" + randCode(9); }
 
-// ---- Đóng khu vực phiếu giao đang mở khi bấm ra ngoài ----
-// Click vào chính dòng tiêu đề (.order-header) đã tự xử lý mở/đóng riêng ở
-// renderOrderBox(); click vào bên trong khu phiếu giao (.ship-label-row) cần
-// giữ nguyên để còn bấm được các nút (Tải/Thay file/Xóa). Mọi click khác
-// (kể cả vào sản phẩm bên dưới, đơn khác, thanh tìm kiếm...) đều đóng lại.
-document.addEventListener("click", (e) => {
-  if(expandedShipLabelOrderId === null) return;
-  if(e.target.closest(".order-header") || e.target.closest(".ship-label-row")) return;
-  expandedShipLabelOrderId = null;
-  render();
-});
-
 // ---- Tabs ----
 document.querySelectorAll(".tab").forEach(t => {
   t.addEventListener("click", () => {
@@ -563,6 +612,7 @@ document.querySelectorAll(".tab").forEach(t => {
     t.classList.add("active");
     currentTab = t.dataset.tab;
     selected.clear();
+    openOrderDetailId = null;
     addbar.style.display = currentTab === "in" ? "flex" : "none";
     clearAllBtn.style.display = currentTab === "xong" ? "inline-block" : "none";
     render();
@@ -668,6 +718,21 @@ async function purgeExpiredXong(){
 function escapeHtml(s){
   return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+
+// Định dạng thời gian tạo đơn kiểu "14:32, 26/07" — thay cho tên người mua
+// (dữ liệu không có) trên thẻ tóm tắt, giống vị trí đó ở giao diện Shopee.
+function formatDT(ts){
+  if(!ts || typeof ts.toDate !== "function") return "";
+  const d = ts.toDate();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  return `${hh}:${mm}, ${dd}/${mo}`;
+}
+
+const STATUS_LABEL = { in: "Chờ in", dong_goi: "Chờ đóng gói", xong: "Đã xong" };
+const STATUS_COLOR_CLASS = { in: "st-warn", dong_goi: "st-info", xong: "st-ready" };
 
 // ---- Grouping helpers ----
 function orderPackInfo(orderId){
@@ -779,11 +844,21 @@ function render(){
   } else {
     downloadAllWrap.style.display = "none";
   }
+
+  renderOrderDetailOverlay();
 }
 
+// Thẻ tóm tắt 1 đơn hàng trong danh sách — kiểu Shopee: chỉ thông tin cơ
+// bản + 2 nút nhanh (Phiếu giao / hành động chính). Bấm vào bất kỳ đâu trên
+// thẻ (trừ vùng đánh dấu .no-detail) sẽ mở trang "Chi tiết đơn hàng".
 function renderOrderBox(g){
   const box = document.createElement("div");
   box.className = "order-box";
+  box.addEventListener("click", (e) => {
+    if(e.target.closest(".no-detail")) return;
+    openOrderDetailId = g.orderId;
+    render();
+  });
 
   let info = null;
   if(currentTab === "dong_goi"){
@@ -791,49 +866,44 @@ function renderOrderBox(g){
     box.classList.add(info.eligible ? "ready" : "warn");
   }
 
+  // Dòng đầu: thời gian tạo đơn (thay cho tên người mua — không có dữ liệu
+  // thật) + trạng thái màu (thay cho "Chờ lấy hàng").
   const header = document.createElement("div");
-  header.className = "order-header";
-
-  if(editingOrderIds.has(g.orderId)){
-    const input = document.createElement("input");
-    input.type = "text";
-    input.className = "order-title-input";
-    input.value = g.orderName;
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "save-icon";
-    saveBtn.textContent = "Lưu";
-    const commit = attachClickAwayCommit(header, () => renameOrder(g.orderId, input.value));
-    saveBtn.addEventListener("click", commit);
-    input.addEventListener("keydown", e => { if(e.key === "Enter") commit(); });
-    header.appendChild(input);
-    header.appendChild(saveBtn);
-    setTimeout(() => input.focus(), 0);
-  } else {
-    const title = document.createElement("div");
-    title.className = "order-title";
-    const isExpanded = expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId);
-    title.innerHTML = `<span class="expand-caret">${isExpanded ? "▾" : "▸"}</span>` + escapeHtml(g.orderName)
-      + (g.shipLabelUrl ? ` <span class="ship-label-chip" title="Đã đính kèm phiếu giao">📎</span>` : "");
-    const editBtn = document.createElement("button");
-    editBtn.className = "edit-icon";
-    editBtn.textContent = "✏️";
-    editBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      editingOrderIds.add(g.orderId);
-      render();
-    });
-    header.classList.add("clickable");
-    header.addEventListener("click", () => {
-      expandedShipLabelOrderId = (expandedShipLabelOrderId === g.orderId) ? null : g.orderId;
-      render();
-    });
-    header.appendChild(title);
-    header.appendChild(editBtn);
-  }
+  header.className = "order-summary-header";
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "order-time";
+  timeSpan.textContent = formatDT(g.items[0] && g.items[0].createdAt);
+  const statusSpan = document.createElement("span");
+  statusSpan.className = "order-status-badge " + STATUS_COLOR_CLASS[currentTab];
+  statusSpan.textContent = STATUS_LABEL[currentTab];
+  header.appendChild(timeSpan);
+  header.appendChild(statusSpan);
   box.appendChild(header);
-  if(expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId)){
-    box.appendChild(renderShipLabelRow(g));
-  }
+
+  g.items.forEach(t => box.appendChild(renderItemSummary(t)));
+
+  const totalQty = g.items.reduce((s, t) => s + (t.qty || 1), 0);
+  const footer = document.createElement("div");
+  footer.className = "order-summary-footer";
+  footer.innerHTML = `<span>${g.items.length} sản phẩm</span><span>Tổng số lượng: <b>${totalQty}</b></span>`;
+  box.appendChild(footer);
+
+  const codeRow = document.createElement("div");
+  codeRow.className = "order-code-row";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "code-label";
+  labelSpan.textContent = "Mã đơn hàng";
+  const rightWrap = document.createElement("span");
+  rightWrap.className = "code-value";
+  rightWrap.innerHTML = escapeHtml(g.orderName) + (g.shipLabelUrl ? ` <span class="ship-label-chip" title="Đã đính kèm phiếu giao">📎</span>` : "");
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "copy-btn no-detail";
+  copyBtn.textContent = "Sao chép";
+  copyBtn.addEventListener("click", () => copyOrderCode(g.orderName, copyBtn));
+  rightWrap.appendChild(copyBtn);
+  codeRow.appendChild(labelSpan);
+  codeRow.appendChild(rightWrap);
+  box.appendChild(codeRow);
 
   if(currentTab === "dong_goi" && info){
     const line = document.createElement("div");
@@ -842,21 +912,105 @@ function renderOrderBox(g){
       ? "Đủ hàng — có thể đóng gói cả đơn"
       : `Đơn chưa đủ — còn ${info.pending} sản phẩm đang in`;
     box.appendChild(line);
-
-    if(info.eligible){
-      const wrap = document.createElement("div");
-      wrap.className = "pack-all-wrap";
-      const btn = document.createElement("button");
-      btn.className = "pack-all-btn";
-      btn.textContent = "📦 Đóng gói cả đơn";
-      btn.addEventListener("click", () => packWholeOrder(g.orderId));
-      wrap.appendChild(btn);
-      box.appendChild(wrap);
-    }
   }
 
-  g.items.forEach(t => box.appendChild(renderItem(t)));
+  const actionsRow = document.createElement("div");
+  actionsRow.className = "order-summary-actions no-detail";
+
+  const shipBtn = document.createElement("button");
+  shipBtn.className = "ship-quick-btn";
+  shipBtn.textContent = "📦 Phiếu giao";
+  shipBtn.addEventListener("click", () => {
+    if(g.shipLabelUrl) downloadShipLabel(g.shipLabelUrl, g.orderName);
+    else { openOrderDetailId = g.orderId; render(); }
+  });
+  actionsRow.appendChild(shipBtn);
+
+  if(currentTab === "in"){
+    const btn = document.createElement("button");
+    btn.className = "order-primary-btn";
+    btn.textContent = "✅ Đã in xong";
+    btn.addEventListener("click", () => advanceOrderItems(g.items));
+    actionsRow.appendChild(btn);
+  } else if(currentTab === "dong_goi" && info && info.eligible){
+    const btn = document.createElement("button");
+    btn.className = "order-primary-btn green";
+    btn.textContent = "📦 Đóng gói cả đơn";
+    btn.addEventListener("click", () => packWholeOrder(g.orderId));
+    actionsRow.appendChild(btn);
+  } else if(currentTab === "xong"){
+    const allShipped = g.items.every(t => t.shipped);
+    const btn = document.createElement("button");
+    btn.className = "order-primary-btn" + (allShipped ? "" : " green");
+    btn.textContent = allShipped ? "↩ Bỏ đã giao" : "🚚 Đã giao";
+    btn.addEventListener("click", () => g.items.forEach(t => markShipped(t.id, !allShipped)));
+    actionsRow.appendChild(btn);
+  }
+  box.appendChild(actionsRow);
+
   return box;
+}
+
+// Dòng 1 sản phẩm trong thẻ tóm tắt — chỉ ảnh/tiêu đề/SL + checkbox (dùng
+// cho chọn hàng loạt), KHÔNG có nút thao tác (những nút đó chuyển hết vào
+// trang chi tiết vì ít khi dùng tới).
+function renderItemSummary(t){
+  const row = document.createElement("div");
+  row.className = "order-item-summary";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "no-detail";
+  cb.checked = selected.has(t.id);
+  cb.addEventListener("click", e => e.stopPropagation());
+  cb.addEventListener("change", () => {
+    if(cb.checked) selected.add(t.id); else selected.delete(t.id);
+    updateBatchBar();
+  });
+  row.appendChild(cb);
+
+  // Khung ảnh thu nhỏ — hiện chưa có cơ chế gắn ảnh thật, để sẵn chỗ chờ
+  // tính năng chèn link ảnh sau này.
+  const thumb = document.createElement("div");
+  thumb.className = "thumb-placeholder";
+  thumb.textContent = "🖼";
+  row.appendChild(thumb);
+
+  const info = document.createElement("div");
+  info.className = "info-summary";
+  const nameDiv = document.createElement("div");
+  nameDiv.className = "name-summary";
+  nameDiv.textContent = t.name;
+  if(currentTab === "xong" && t.shipped){
+    const badge = document.createElement("span");
+    badge.className = "shipped-badge";
+    badge.textContent = "🚚 Đã giao";
+    nameDiv.appendChild(badge);
+  }
+  const metaDiv = document.createElement("div");
+  metaDiv.className = "meta-summary";
+  metaDiv.textContent = "SL: " + (t.qty || 1);
+  info.appendChild(nameDiv);
+  info.appendChild(metaDiv);
+  row.appendChild(info);
+
+  return row;
+}
+
+// Sao chép mã đơn hàng vào clipboard + phản hồi ngắn trên nút bấm.
+function copyOrderCode(code, btnEl){
+  if(!navigator.clipboard){ return; }
+  navigator.clipboard.writeText(code).then(() => {
+    const original = btnEl.textContent;
+    btnEl.textContent = "Đã chép ✓";
+    setTimeout(() => { btnEl.textContent = original; }, 1500);
+  }).catch(() => {});
+}
+
+// Đưa cả đơn (mọi sản phẩm đang hiện ở tab hiện tại) tiến 1 bước trạng thái —
+// dùng cho nút hành động chính trên thẻ tóm tắt ở tab "In".
+async function advanceOrderItems(items){
+  for(const t of items) await advanceStatus(t);
 }
 
 // Khu vực đính kèm/tải phiếu giao (PDF chứa mã đơn vận) — 1 file dùng chung
@@ -915,7 +1069,7 @@ function renderShipLabelRow(g){
   } else {
     const attachBtn = document.createElement("button");
     attachBtn.className = "attach-btn";
-    attachBtn.textContent = "📎 Đính kèm phiếu giao (PDF)";
+    attachBtn.textContent = "⬆️ Tải lên";
     attachBtn.addEventListener("click", () => fileInput.click());
     rowEl.appendChild(attachBtn);
   }
@@ -923,18 +1077,17 @@ function renderShipLabelRow(g){
   return rowEl;
 }
 
-function renderItem(t){
+// Thẻ 1 sản phẩm TRONG TRANG CHI TIẾT — đầy đủ nút thao tác (Sửa/Ghi chú/
+// Xóa/tiến-lùi trạng thái...), khác với renderItemSummary() ở thẻ tóm tắt
+// ngoài danh sách (chỉ hiện thông tin, không có nút gì).
+function renderItemDetail(t){
   const row = document.createElement("div");
-  row.className = "order-item";
+  row.className = "detail-item-card";
 
-  const cb = document.createElement("input");
-  cb.type = "checkbox";
-  cb.checked = selected.has(t.id);
-  cb.addEventListener("change", () => {
-    if(cb.checked) selected.add(t.id); else selected.delete(t.id);
-    updateBatchBar();
-  });
-  row.appendChild(cb);
+  const thumb = document.createElement("div");
+  thumb.className = "thumb-placeholder";
+  thumb.textContent = "🖼";
+  row.appendChild(thumb);
 
   const info = document.createElement("div");
   info.className = "info";
@@ -1050,6 +1203,109 @@ function renderItem(t){
 
   row.appendChild(info);
   return row;
+}
+
+// ---- Trang chi tiết đơn hàng (toàn màn hình) ----
+// Dựng lại nội dung mỗi lần render() chạy, dựa trên allTasks hiện tại (để
+// luôn khớp dữ liệu realtime) — chỉ hiện/ẩn (.show) khi openOrderDetailId
+// có giá trị khớp 1 đơn còn tồn tại.
+function renderOrderDetailOverlay(){
+  const el = document.getElementById("orderDetailOverlay");
+  const items = openOrderDetailId ? allTasks.filter(t => t.orderId === openOrderDetailId) : [];
+
+  if(!openOrderDetailId || items.length === 0){
+    // Đơn không còn tồn tại (đã bị xóa hết) hoặc đang đóng — tự đóng luôn.
+    if(openOrderDetailId && items.length === 0) openOrderDetailId = null;
+    el.classList.remove("show");
+    el.innerHTML = "";
+    return;
+  }
+
+  const g = {
+    orderId: openOrderDetailId,
+    orderName: items[0].orderName || items[0].name,
+    shipLabelUrl: (items.find(t => t.shipLabelUrl) || {}).shipLabelUrl || ""
+  };
+
+  el.innerHTML = "";
+  el.classList.add("show");
+
+  const topBar = document.createElement("div");
+  topBar.className = "detail-topbar";
+  const backBtn = document.createElement("button");
+  backBtn.className = "detail-back-btn";
+  backBtn.textContent = "← Chi tiết đơn hàng";
+  backBtn.addEventListener("click", () => { openOrderDetailId = null; render(); });
+  topBar.appendChild(backBtn);
+  el.appendChild(topBar);
+
+  // Mã đơn hàng + Sao chép + Sửa tên (việc đổi tên ít dùng nên chỉ đặt ở đây).
+  const codeRow = document.createElement("div");
+  codeRow.className = "detail-code-row";
+  if(editingOrderIds.has(g.orderId)){
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "order-title-input";
+    input.value = g.orderName;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "save-icon";
+    saveBtn.textContent = "Lưu";
+    const commit = attachClickAwayCommit(codeRow, () => renameOrder(g.orderId, input.value));
+    saveBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", e => { if(e.key === "Enter") commit(); });
+    codeRow.appendChild(input);
+    codeRow.appendChild(saveBtn);
+    setTimeout(() => input.focus(), 0);
+  } else {
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "code-label";
+    labelSpan.textContent = "Mã đơn hàng";
+    const valueSpan = document.createElement("span");
+    valueSpan.className = "code-value";
+    valueSpan.textContent = g.orderName;
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "copy-btn";
+    copyBtn.textContent = "Sao chép";
+    copyBtn.addEventListener("click", () => copyOrderCode(g.orderName, copyBtn));
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-icon-btn";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", () => { editingOrderIds.add(g.orderId); render(); });
+    codeRow.appendChild(labelSpan);
+    codeRow.appendChild(valueSpan);
+    codeRow.appendChild(copyBtn);
+    codeRow.appendChild(editBtn);
+  }
+  el.appendChild(codeRow);
+
+  // Từng sản phẩm, đầy đủ nút thao tác.
+  items.forEach(t => el.appendChild(renderItemDetail(t)));
+
+  // Khu vực phiếu giao — luôn hiện (không cần bấm mở rộng như trước).
+  const shipWrap = document.createElement("div");
+  shipWrap.className = "detail-ship-wrap";
+  shipWrap.appendChild(renderShipLabelRow(g));
+  el.appendChild(shipWrap);
+
+  // Xóa cả đơn.
+  const delOrderBtn = document.createElement("button");
+  delOrderBtn.className = "delete-order-btn";
+  delOrderBtn.textContent = "🗑 Xóa đơn hàng";
+  delOrderBtn.addEventListener("click", () => deleteOrder(g.orderId));
+  el.appendChild(delOrderBtn);
+}
+
+// Xóa toàn bộ sản phẩm thuộc 1 đơn cùng lúc (nút "Xóa đơn hàng" ở trang chi tiết).
+async function deleteOrder(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  if(items.length === 0) return;
+  if(!confirm(`Xóa toàn bộ đơn hàng này (${items.length} sản phẩm)? Không thể hoàn tác.`)) return;
+  try{
+    for(const it of items) await deleteDoc(doc(db, "tasks", it.id));
+    await deleteShipLabelFileIfExists(orderId);
+    openOrderDetailId = null;
+    render();
+  }catch(e){ showError("Không xóa được đơn hàng: " + e.message); }
 }
 
 // ---- Actions ----
