@@ -537,7 +537,12 @@ function randCode(len){
   return s;
 }
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function newOrderName(){ return "Đơn " + randCode(5); }
+// Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
+// thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
+// mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
+// extractTrackingFromPdf ở trên) — nên chỉ cần nhìn ký tự đầu là phân biệt
+// được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
+function newOrderName(){ return "#" + randCode(9); }
 
 // ---- Đóng khu vực phiếu giao đang mở khi bấm ra ngoài ----
 // Click vào chính dòng tiêu đề (.order-header) đã tự xử lý mở/đóng riêng ở
@@ -1263,7 +1268,7 @@ async function uploadShipLabel(orderId, file){
       const safeCode = trackingCode.replace(/[^A-Za-z0-9]/g, "");
       uploadFile = new File([file], `${safeCode}.pdf`, { type: file.type });
       const newTitle = trackingCode;
-      const isAutoName = /^Đơn [ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(currentName);
+      const isAutoName = /^#[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{9}$/.test(currentName);
       const shouldRename = isAutoName ||
         confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
       if(shouldRename) await renameOrder(orderId, newTitle);
