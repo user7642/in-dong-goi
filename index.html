@@ -1138,12 +1138,11 @@ function detectTracking(text){
 }
 
 async function extractTrackingFromPdf(file){
-  try{
-    const text = await extractPdfText(file);
-    return detectTracking(text);
-  }catch(e){
-    return null; // PDF lỗi/ảnh scan không đọc được text — coi như không nhận diện được
-  }
+  // Không "nuốt" lỗi ở đây nữa — để lỗi văng ra ngoài cho nơi gọi phân biệt
+  // được 2 trường hợp: "đọc PDF lỗi" (do thư viện/mạng) vs "đọc được nhưng
+  // không khớp mẫu nào" (PDF ảnh scan hoặc mẫu hãng lạ).
+  const text = await extractPdfText(file);
+  return detectTracking(text);
 }
 
 // Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
@@ -1169,7 +1168,13 @@ async function uploadShipLabel(orderId, file){
     const currentItem = allTasks.find(t => t.orderId === orderId);
     const currentName = (currentItem && currentItem.orderName) || "";
     let uploadFile = file;
-    const extraction = await extractTrackingFromPdf(file);
+    let extraction = null;
+    let readErrorMsg = null;
+    try{
+      extraction = await extractTrackingFromPdf(file);
+    }catch(e){
+      readErrorMsg = (e && e.message) ? e.message : String(e);
+    }
     if(extraction){
       const safeCode = extraction.code.replace(/[^A-Za-z0-9]/g, "");
       const slug = `${extraction.carrier}-${safeCode}`;
@@ -1180,7 +1185,13 @@ async function uploadShipLabel(orderId, file){
         confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
       if(shouldRename) await renameOrder(orderId, newTitle);
     } else {
-      showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
+      // TẠM THỜI hiện rõ lỗi thật (nếu có) để debug — sẽ gộp lại thành 1
+      // thông báo gọn hơn sau khi xác định được nguyên nhân cụ thể.
+      if(readErrorMsg){
+        showError("[DEBUG] Lỗi khi đọc PDF bằng pdf.js: " + readErrorMsg);
+      } else {
+        showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
+      }
       // Không giữ tên gốc lộn xộn từ điện thoại — đổi theo tên đơn hiện tại
       // (giống cách downloadShipLabel() đặt tên lúc tải xuống).
       const safeName = (currentName || "don-hang").replace(/[^a-zA-Z0-9-_]+/g, "_");
