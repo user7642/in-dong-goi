@@ -3,293 +3,435 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Quản lý danh mục sản phẩm</title>
+<title>Quản lý In & Đóng gói</title>
 <style>
   :root{
-    --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
-    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
-    --amber:#b45309; --amber-bg:#fef3e0;
+    --bg:#f5f6f7;
+    --card:#ffffff;
+    --border:#e2e4e7;
+    --text:#1a1d21;
+    --muted:#6b7280;
+    --blue:#2563eb;
+    --blue-bg:#eaf1ff;
+    --amber:#b45309;
+    --amber-bg:#fef3e0;
+    --green:#15803d;
+    --green-bg:#e8f7ec;
+    --red:#dc2626;
+    --gray-bg:#eceef0;
     --maxw:680px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
-  /* Header, main, footer và các thanh sticky/fixed đều dùng chung 1 độ rộng
-     tối đa (--maxw), canh giữa — để trên desktop mọi khối đều thẳng hàng
-     với nhau thay vì header chạy full-width còn nội dung bị bó hẹp lại. */
-  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;max-width:var(--maxw);margin:0 auto;}
-  h1{font-size:18px;margin:0;font-weight:600;text-align:center;}
-  a.back{font-size:13px;color:var(--blue);text-decoration:none;display:block;text-align:center;margin-bottom:6px;}
-  .tabs{display:flex;gap:6px;margin-top:12px;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:90px;
+  }
+  /* header, thanh addbar/searchbar sticky, main, footer-style bars đều dùng
+     chung 1 độ rộng tối đa (--maxw), canh giữa — để trên desktop các khối
+     thẳng hàng nhau thay vì header/thanh công cụ chạy full-width còn danh
+     sách bên dưới bị bó hẹp lại trông lệch. */
+  header{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:14px 16px 0 16px;
+    position:sticky;
+    top:0;
+    z-index:20;
+    max-width:var(--maxw);
+    margin:0 auto;
+  }
+  h1{font-size:18px;margin:0 0 12px 0;font-weight:600;}
+  .tabs{display:flex;gap:6px;}
   .tab{
-    flex:1;text-align:center;padding:10px 4px;font-size:14px;font-weight:600;
-    color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;user-select:none;
+    flex:1;
+    text-align:center;
+    padding:12px 4px;
+    font-size:15px;
+    font-weight:600;
+    color:var(--muted);
+    border-bottom:3px solid transparent;
+    cursor:pointer;
+    user-select:none;
   }
   .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
-  main{padding:14px;max-width:var(--maxw);margin:0 auto;}
-  section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
-  h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
-  input[type=text],textarea{
-    width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;
+  .count-badge{
+    display:inline-block;
+    background:var(--border);
+    color:var(--text);
+    border-radius:10px;
+    font-size:12px;
+    padding:1px 7px;
+    margin-left:5px;
   }
-  textarea{min-height:130px;resize:vertical;line-height:1.5;}
-  .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
-  .row-nowrap{flex-wrap:nowrap;}
-  button{border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;}
-  .btn-blue{background:var(--blue);color:#fff;}
-  .btn-green{background:var(--green);color:#fff;}
-  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
-  .btn-outline.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
-  .searchbox{margin-bottom:10px;}
+  .tab.active .count-badge{background:var(--blue);color:#fff;}
+
+  .addbar{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:10px 16px;
+    display:flex;
+    gap:8px;
+    position:sticky;
+    top:53px;
+    z-index:19;
+    max-width:var(--maxw);
+    margin:0 auto;
+  }
+  .addbar input[type=text]{
+    flex:1;
+    min-width:0;
+    font-size:16px;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+  .addbar input[type=number]{
+    width:64px;
+    font-size:16px;
+    padding:11px 6px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    text-align:center;
+  }
+  .addbar button{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:0 16px;
+    font-size:22px;
+    font-weight:600;
+    cursor:pointer;
+  }
+
+  .searchbar{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:8px 16px;
+    position:sticky;
+    top:106px;
+    z-index:18;
+    max-width:var(--maxw);
+    margin:0 auto;
+  }
+  .searchbar input{
+    width:100%;
+    font-size:15px;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+
+  .quicklink{padding:10px 12px 0 12px;}
+  .quicklink a{
+    display:block;
+    text-align:center;
+    background:var(--blue-bg);
+    color:var(--blue);
+    font-weight:600;
+    font-size:14px;
+    padding:11px 12px;
+    border-radius:8px;
+    text-decoration:none;
+  }
+
+  main{padding:12px 12px 0 12px;max-width:var(--maxw);margin:0 auto;}
+  .empty{
+    text-align:center;
+    color:var(--muted);
+    padding:60px 20px;
+    font-size:14px;
+  }
 
   .errbox{
-    background:#fde8e8;color:var(--red);border:1px solid #f5b8b8;border-radius:8px;
-    padding:8px 12px;font-size:13px;margin-bottom:10px;
+    background:#fde8e8;
+    color:var(--red);
+    border:1px solid #f5b8b8;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:13px;
+    margin-bottom:10px;
   }
 
-  /* Toolbar nổi trong phần header — dùng chung cho cả 2 tab, không cần tự
-     sticky riêng nữa vì đã nằm bên trong thẻ header (header đã sticky top:0). */
-  .header-toolbar{margin-top:10px;}
-  #gomRow{margin-bottom:4px;}
-  /* Khi chưa bấm "Gom sản phẩm", nút này đứng 1 mình trong hàng — cho nó
-     chiếm trọn chiều rộng thay vì co lại và lệch sang trái trông mất cân đối.
-     Khi đã kích hoạt (.active) thì trở lại kích thước tự nhiên để chia chỗ
-     với ô nhập tên đơn + nút Xong. */
-  #gomBtn:not(.active){width:100%;}
-  #groupNameInput{flex:1;min-width:160px;}
-  #gomStatusLine{
-    font-size:12.5px;color:var(--blue);margin-bottom:2px;font-weight:600;
+  /* ---- Order box (grouping) ---- */
+  .order-box{
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:12px;
+    overflow:hidden;
+    background:var(--card);
   }
-  #gomBar.active{
-    background:var(--blue-bg);border:1px solid var(--blue);border-radius:10px;
-    padding:10px 10px 6px;
+  .order-box.warn{border-color:var(--amber);}
+  .order-box.ready{border-color:var(--green);}
+  .order-header{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:10px 36px 10px 12px;
+    background:#fafbfc;
+    border-bottom:1px solid var(--border);
+    position:relative;
+  }
+  .order-title{
+    font-size:14px;
+    font-weight:700;
+    text-align:center;
+    word-break:break-word;
+  }
+  .order-header.clickable{cursor:pointer;user-select:none;}
+  .expand-caret{
+    display:inline-block;width:14px;color:var(--muted);font-weight:400;
+  }
+  .ship-label-chip{font-size:12px;margin-left:2px;}
+  .order-header .edit-icon{
+    position:absolute;
+    right:8px;top:50%;transform:translateY(-50%);
+    cursor:pointer;
+    font-size:14px;
+    color:var(--muted);
+    border:none;background:none;padding:6px;
+  }
+  .order-header input.order-title-input{
+    font-size:14px;font-weight:700;text-align:center;
+    border:1px solid var(--blue);border-radius:6px;padding:5px 8px;
+    flex:1;max-width:220px;
+  }
+  .order-header .save-icon{
+    border:none;background:var(--blue);color:#fff;border-radius:6px;
+    padding:6px 9px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .order-status-line{font-size:11.5px;text-align:center;padding:6px 12px 0;color:var(--muted);}
+  .order-status-line.warn{color:var(--amber);font-weight:600;}
+  .order-status-line.ready{color:var(--green);font-weight:600;}
+  .pack-all-wrap{padding:8px 12px 10px;text-align:center;}
+  .pack-all-btn{
+    background:var(--green);color:#fff;border:none;border-radius:8px;
+    padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;
   }
 
-  /* Action bar (giống bảng sản phẩm sàn TMĐT) */
-  .action-bar{
-    background:var(--gray-bg);border-radius:10px;
-    padding:10px 12px;margin-bottom:8px;
-    display:flex;align-items:center;gap:10px;
+  /* Phiếu giao (mã đơn vận) đính kèm PDF — dùng chung cho cả đơn hàng, không
+     phải theo từng sản phẩm, nên đặt ngay dưới order-header. */
+  .ship-label-row{
+    padding:9px 12px;
+    border-bottom:1px solid var(--border);
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:#fbfcfd;
   }
-  .action-bar span{font-size:13px;color:var(--muted);flex:1;}
-  .action-bar button{font-size:13px;padding:8px 14px;}
-  .action-bar .del-btn{background:var(--border);color:var(--muted);cursor:not-allowed;}
-  .action-bar .del-btn.enabled{background:var(--red);color:#fff;cursor:pointer;}
-  .selectall{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);}
-  .selectall input{width:20px;height:20px;accent-color:var(--blue);}
+  .ship-label-row button{
+    border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .ship-label-row .attach-btn{background:var(--blue-bg);color:var(--blue);}
+  .ship-label-row .view-btn{background:var(--gray-bg);color:var(--text);}
+  .ship-label-row .download-btn{background:var(--green-bg);color:var(--green);}
+  .ship-label-row .remove-btn{background:#fde8e8;color:var(--red);}
+  .ship-label-row button[disabled]{opacity:.6;cursor:default;}
 
-  .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
-  .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
-  .item .orderBtns{display:grid;grid-template-columns:repeat(2,28px);gap:4px;flex-shrink:0;align-content:center;}
-  .item .orderBtn{
-    width:28px;height:28px;padding:0;font-size:13px;line-height:1;
+  .order-item{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:12px;border-bottom:1px solid var(--border);
+  }
+  .order-item:last-child{border-bottom:none;}
+  .order-item input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
+  .order-item .info{flex:1;min-width:0;}
+  .order-item .name{font-size:16px;font-weight:600;line-height:1.3;word-break:break-word;}
+  .order-item .meta{font-size:13px;color:var(--muted);margin-top:2px;}
+  .order-item .row-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .order-item button.mini{
+    border:none;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:600;cursor:pointer;
     background:var(--gray-bg);color:var(--text);
-    display:flex;align-items:center;justify-content:center;border-radius:6px;
   }
-  .item .orderBtn:disabled{opacity:.3;cursor:default;}
-  .item .body{flex:1;min-width:0;}
-  .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
-  .item .name{font-size:15px;font-weight:600;}
-  .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
-  .item .delBtn{background:var(--gray-bg);color:var(--red);font-size:13px;padding:6px 10px;flex-shrink:0;}
-  .item .rowActions{display:flex;gap:6px;flex-shrink:0;}
-  .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
-  .item .vchip.selected{background:var(--blue);color:#fff;}
-  .item .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
-  .item .vchip .vlabel{cursor:pointer;padding:2px 4px;}
-  .item .vchip .qtytag{padding:2px 2px;}
-  .item .vchip .chipminus,.item .vchip .chipx{
-    margin-left:4px;font-weight:700;opacity:.85;cursor:pointer;padding:2px 6px;border-radius:8px;
-  }
-  .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
-  .muted{color:var(--muted);font-size:13px;}
+  .order-item button.mini.primary{background:var(--blue-bg);color:var(--blue);}
+  .order-item button.mini.warnbtn{background:var(--amber-bg);color:var(--amber);}
+  .order-item button.mini.danger{background:#fde8e8;color:var(--red);}
 
-  /* ---- Chế độ xem Mosaic — nhiều cột tự cân bằng theo chiều cao (kiểu
-     Cloudinary Mosaic / Pinterest), mỗi ô cao thấp khác nhau tùy số phân
-     loại thực tế, hiển thị đầy đủ chip ngay trong ô — không cần mở bảng
-     riêng nữa. Dùng CSS multi-column (column-fill:balance) để trình duyệt
-     tự chia và cân bằng chiều cao giữa các cột mà không cần đo bằng JS. ---- */
-  #viewModeRow button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
-  .gridWrap{
-    column-width:180px;column-gap:10px;column-fill:balance;
+  .note-preview{
+    margin-top:5px;font-size:12.5px;color:var(--blue);background:var(--blue-bg);
+    padding:6px 8px;border-radius:6px;word-break:break-word;cursor:pointer;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   }
-  /* Mỗi ô mosaic vẫn là 1 .item (giữ nguyên toàn bộ style tên SP + chip
-     phân loại có sẵn), chỉ đổi cách đặt trong layout: không kéo full-width
-     theo chiều ngang, không bị chia cột con nội bộ (checkbox/orderBtns –
-     vốn không xuất hiện ở tab Thêm việc) mà nằm gọn trong 1 cột mosaic. */
-  .gridWrap .item{
-    display:block;break-inside:avoid;page-break-inside:avoid;
-    margin:0 0 10px;background:var(--card);
-  }
-  .gridWrap .item.active{border-color:var(--blue);background:var(--blue-bg);}
 
-  .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
-  .linkEditBox{
-    margin-top:8px;padding:10px 10px 6px;border:1px solid var(--blue);
-    background:var(--blue-bg);border-radius:10px;
+  .note-box{margin-top:8px;}
+  .note-box textarea{
+    width:100%;font-size:13px;padding:8px 9px;border:1px solid var(--border);
+    border-radius:8px;min-height:54px;font-family:inherit;
   }
-  .linkEditBox input{margin-bottom:6px;}
-
-  /* Nhiều tầng phân loại (VD: Chủ đề x Kích thước) */
-  .groupRow{margin-bottom:10px;}
-  .groupRow:last-child{margin-bottom:0;}
-  .groupName{font-size:13px;color:var(--text);font-weight:700;margin-bottom:5px;}
-  .groupOpts{display:flex;flex-wrap:wrap;gap:6px;}
-  .status{font-size:13px;margin-top:8px;min-height:18px;}
-  .status.ok{color:var(--green);}
-  .status.err{color:var(--red);}
-
-  .taskbar{
-    position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
-    padding:10px 12px;display:none;align-items:center;gap:8px;z-index:30;
-    max-width:var(--maxw);margin:0 auto;border-radius:12px 12px 0 0;
+  .note-box .note-save{
+    margin-top:5px;font-size:12px;padding:6px 11px;border:none;border-radius:6px;
+    background:var(--blue);color:#fff;cursor:pointer;font-weight:600;
   }
-  .taskbar.show{display:flex;}
-  .taskbar button{border:none;border-radius:8px;padding:11px 12px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
-  /* Nút "Xem đã chọn": chỉ icon + số lượng, kích thước cố định theo nội dung
-     (không flex:1) — để nút hành động chính bên cạnh luôn có đủ chỗ, tránh
-     bị bóp chữ xuống nhiều dòng xấu khi màn hình hẹp (xem góp ý thiết kế). */
-  .taskbar .viewBtn{
-    flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;
-    background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
-  }
-  .taskbar .viewBtn .countBadge{
-    background:rgba(255,255,255,.25);border-radius:999px;
-    min-width:22px;height:22px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:13px;
-  }
-  .taskbar #sendToIndexBtn{flex:1;min-width:0;}
+  .note-dot{color:var(--blue);font-size:16px;line-height:0;margin-left:2px;}
 
-  /* Modal xem danh sách đã chọn */
-  .selgroup{margin-bottom:14px;}
-  .selgroup-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px;}
-  .selrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;}
-  .selrow:last-child{border-bottom:none;}
-  .selrow .selname{flex:1;}
-  .selrow .selremove{background:var(--gray-bg);color:var(--red);font-size:12px;padding:5px 9px;flex-shrink:0;}
-
-  .editor-overlay{
+  /* Overlay sửa việc (tên + số lượng) — kiểu giống editor-overlay trong
+     catalog.html: phủ toàn màn hình, dọc, chỗ nhập rộng rãi cho dễ bấm trên
+     điện thoại thay vì ô nhỏ nhét chung 1 hàng như trước. */
+  .task-editor-overlay{
     position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:50;
-    display:none;flex-direction:column;padding:14px;
+    display:none;flex-direction:column;padding:16px;
     max-width:var(--maxw);margin:0 auto;
   }
-  .editor-overlay.show{display:flex;}
-  .editor-overlay h3{font-size:16px;margin:0 0 8px 0;}
-  .editor-overlay p.muted{margin:0 0 10px 0;}
-  .editor-overlay textarea{flex:1;min-height:200px;font-size:15px;}
-  .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
-  .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
+  .task-editor-overlay.show{display:flex;}
+  .task-editor-overlay h3{font-size:16px;margin:0 0 16px 0;}
+  .task-editor-overlay .field-block{margin-bottom:16px;}
+  .task-editor-overlay .field-block.grow{flex:1;display:flex;flex-direction:column;margin-bottom:0;}
+  .task-editor-overlay label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+  .task-editor-overlay input[type=number]{
+    width:110px;font-size:17px;padding:13px 10px;border:1px solid var(--border);
+    border-radius:10px;text-align:center;
+  }
+  .task-editor-overlay textarea{
+    flex:1;min-height:160px;font-size:16px;padding:12px;border:1px solid var(--border);
+    border-radius:10px;resize:vertical;line-height:1.5;font-family:inherit;
+  }
+  .task-editor-overlay .editor-actions{display:flex;gap:8px;margin-top:14px;}
+  .task-editor-overlay .editor-actions button{
+    flex:1;padding:13px;font-size:15px;font-weight:600;border:none;border-radius:8px;cursor:pointer;
+  }
+  .task-editor-overlay .editor-actions .cancel-btn{background:var(--gray-bg);color:var(--text);}
+  .task-editor-overlay .editor-actions .save-btn{background:var(--blue);color:#fff;}
 
-  footer{text-align:center;padding:18px 14px 28px;max-width:var(--maxw);margin:0 auto;}
+  .batchbar{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    background:var(--text);
+    color:#fff;
+    padding:12px 14px;
+    display:none;
+    align-items:center;
+    gap:10px;
+    z-index:30;
+    max-width:var(--maxw);
+    margin:0 auto;
+    border-radius:12px 12px 0 0;
+  }
+  .batchbar.show{display:flex;}
+  .batchbar span{flex:1;font-size:14px;}
+  .batchbar button{
+    border:none;
+    border-radius:8px;
+    padding:11px 14px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .batchbar .done-btn{background:var(--green);color:#fff;}
+  .batchbar .del-btn{background:var(--red);color:#fff;}
+
+  .listToolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:4px 2px 10px;
+  }
+  .selectAllRow{
+    display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;
+  }
+  .selectAllRow input{width:20px;height:20px;accent-color:var(--blue);}
+  .clearAllBtn{
+    border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;
+    background:#fde8e8;color:var(--red);cursor:pointer;
+  }
+  .download-all-wrap{padding:0 2px 10px;}
+  .download-all-btn{
+    width:100%;border:none;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;
+    background:var(--green-bg);color:var(--green);cursor:pointer;
+  }
+  .batchbar .ship-btn{background:var(--blue);color:#fff;}
+  .shipped-badge{
+    display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;
+    color:var(--blue);background:var(--blue-bg);border-radius:8px;padding:2px 7px;
+  }
+  .task-linkchip{
+    display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;
+    color:var(--blue);background:var(--blue-bg);border-radius:8px;padding:2px 7px;
+    text-decoration:none;
+  }
+
+  .status-line{
+    font-size:11px;
+    text-align:center;
+    color:var(--muted);
+    padding:8px 0 2px 0;
+    max-width:var(--maxw);
+    margin:0 auto;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <a class="back" href="index.html">← Về trang chính</a>
-  <h1 id="pageTitle">Thêm danh sách công việc</h1>
+  <h1>Quản lý In &amp; Đóng gói</h1>
   <div class="tabs">
-    <div class="tab active" data-mode="task">➕ Thêm việc</div>
-    <div class="tab" data-mode="manage">🗂 Quản lý danh mục</div>
-  </div>
-
-  <div id="gomBar" class="header-toolbar">
-    <div class="row" id="gomRow">
-      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
-      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
-      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
-    </div>
-    <div id="gomStatusLine" style="display:none;"></div>
-  </div>
-
-  <div class="row header-toolbar" id="viewModeRow" style="display:none;">
-    <button class="btn-outline" id="listViewBtn" type="button">☰ Danh sách</button>
-    <button class="btn-outline" id="gridViewBtn" type="button">▦ Lưới</button>
-  </div>
-
-  <div class="row header-toolbar" id="sortModeRow" style="display:none;">
-    <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
-  </div>
-
-  <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
-    <span id="selCount">Đã chọn 0 sản phẩm</span>
-    <button class="del-btn" id="topDelBtn">Xóa</button>
-  </div>
-  <div class="selectall header-toolbar" id="selectAllRow" style="display:none;">
-    <input type="checkbox" id="selectAllBox">
-    <span>Chọn tất cả</span>
+    <div class="tab active" data-tab="in">In <span class="count-badge" id="badge-in">0</span></div>
+    <div class="tab" data-tab="dong_goi">Đóng gói <span class="count-badge" id="badge-dong_goi">0</span></div>
+    <div class="tab" data-tab="xong">Đã xong <span class="count-badge" id="badge-xong">0</span></div>
   </div>
 </header>
 
+<div class="addbar" id="addbar">
+  <input type="text" id="newName" placeholder="Tên sản phẩm...">
+  <input type="number" id="newQty" placeholder="SL" value="1" min="1">
+  <button id="addBtn">+</button>
+</div>
+
+<div class="searchbar">
+  <input type="text" id="searchTask" placeholder="🔍 Tìm việc theo tên hoặc tên đơn...">
+</div>
+
 <main>
-
-  <section id="manageSection" style="display:none;">
-    <h2>Nhập / sửa danh sách (dán vào đây)</h2>
-    <p class="muted" style="margin-top:0;">
-      Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
-      1) Không phân loại: <b>Tên sản phẩm</b><br>
-      2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
-      3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
-      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.
-    </p>
-    <textarea id="bulkInput" placeholder="Bút chì màu 12 màu&#10;Lược sử Việt Nam | A0, A1, A2, A3&#10;Bộ tranh kỹ năng an toàn | An toàn trong nhà, An toàn ngoài trời | A2 (60x42 cm), A3 (42x30 cm)"></textarea>
-    <div class="row row-nowrap" style="margin-top:8px;">
-      <button class="btn-blue" id="bulkBtn" style="flex:1;">Nhập danh sách</button>
-      <button class="btn-outline" id="expandBtn" type="button" style="flex:1;">⤢ Mở rộng</button>
-    </div>
-    <div class="status" id="bulkStatus"></div>
-  </section>
-
-  <section>
-    <div class="row" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
-      <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
-    </div>
-    <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo tên hoặc phân loại...">
-
-    <div id="errArea"></div>
-
-    <div id="list"></div>
-  </section>
-
+  <div class="quicklink"><a href="catalog.html">+ Thêm danh sách công việc</a></div>
+  <div class="download-all-wrap" id="downloadAllWrap" style="display:none;padding-top:8px;">
+    <button class="download-all-btn" id="downloadAllBtn">⬇️ Tải tất cả phiếu giao</button>
+  </div>
+  <div id="errArea"></div>
+  <div class="listToolbar" id="listToolbar">
+    <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
+    <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
+  </div>
+  <div id="list"></div>
+  <div class="quicklink" style="padding-top:8px;"><a href="huong-dan.html" style="background:var(--green-bg);color:var(--green);">📖 Hướng dẫn sử dụng</a></div>
 </main>
 
-<div class="taskbar" id="taskbar">
-  <button class="viewBtn" id="viewSelectedBtn" type="button" title="Xem đã chọn">
-    📋 <span class="countBadge" id="taskCount">0</span>
-  </button>
-  <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
+<div class="status-line" id="connStatus"></div>
+
+<div class="batchbar" id="batchbar">
+  <span id="batchCount">0 đã chọn</span>
+  <button class="done-btn" id="batchDone"></button>
+  <button class="ship-btn" id="batchShip" style="display:none;">🚚 Đã giao</button>
+  <button class="del-btn" id="batchDel">Xóa</button>
 </div>
 
-<div class="editor-overlay" id="editorOverlay">
-  <h3 id="editorTitle">Sửa sản phẩm</h3>
-  <p class="muted" id="editorDesc">Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)</p>
-  <textarea id="editorTextarea"></textarea>
+<!-- Overlay sửa tên việc + số lượng — mở toàn màn hình khi bấm ✏️ Sửa, thay
+     cho 2 ô nhỏ nhét chung 1 hàng như trước (khó bấm trên điện thoại). -->
+<div class="task-editor-overlay" id="taskEditorOverlay">
+  <h3>Sửa việc</h3>
+  <div class="field-block">
+    <label for="taskEditorQty">Số lượng</label>
+    <input type="number" id="taskEditorQty" min="1">
+  </div>
+  <div class="field-block grow">
+    <label for="taskEditorName">Tên việc</label>
+    <textarea id="taskEditorName"></textarea>
+  </div>
   <div class="editor-actions">
-    <button class="btn-outline" id="editorCancel">Hủy</button>
-    <button class="btn-green" id="editorSave">Lưu</button>
+    <button class="cancel-btn" id="taskEditorCancel">Hủy</button>
+    <button class="save-btn" id="taskEditorSave">Lưu</button>
   </div>
 </div>
 
-<div class="editor-overlay" id="selectedOverlay">
-  <h3>Sản phẩm đã chọn</h3>
-  <p class="muted" style="margin-top:0;">Chạm "Xóa" để bỏ chọn 1 phân loại. Đóng lại để tiếp tục chọn thêm.</p>
-  <div id="selectedListBody" style="flex:1;overflow:auto;"></div>
-  <div class="editor-actions">
-    <button class="btn-outline" id="selectedCloseBtn">Đóng</button>
-  </div>
-</div>
-
-<footer>
-  <a class="back" href="index.html">← Về trang chính</a>
-  <a class="back" href="huong-dan.html">📖 Xem hướng dẫn sử dụng</a>
-</footer>
-
+<!-- jsQR: thư viện thuần JS đọc mã QR từ dữ liệu ảnh (canvas), dùng để đọc
+     trực tiếp mã QR in trên phiếu giao thay vì dò chữ theo mẫu từng hãng. -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, query, serverTimestamp
+  updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
+  Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
@@ -300,40 +442,94 @@ const firebaseConfig = {
   appId: "1:532007763879:web:8d752aa4d86fd317ca0082"
 };
 
+// Phiếu giao (PDF) được lưu trên Cloudinary thay vì Firebase Storage — vì
+// Cloud Storage for Firebase hiện bắt buộc gói Blaze (cần khai thẻ). Cloudinary
+// có gói free không cần thẻ, dùng "unsigned upload preset" nên an toàn để gọi
+// thẳng từ trình duyệt (không lộ khóa bí mật nào trong code).
+const CLOUDINARY_CLOUD_NAME = "e8beonzt";
+const CLOUDINARY_UPLOAD_PRESET = "ship-labels";
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const catalogCol = collection(db, "catalog");
 const tasksCol = collection(db, "tasks");
 
-let allProducts = [];
+let currentTab = "in";
+let allTasks = [];
 let selected = new Set();
-let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
-let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "ghim" (tô sáng) tại 1 thời điểm
-let editorSaveHandler = null;
-// Danh sách sản phẩm đang mở form "chèn link file in" ở tab Thêm việc.
-let editingLinkIds = new Set();
+let searchTerm = "";
 
-// ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
-// 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
-let mode = "task";
+// UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
+let openNotes = new Set();
+let taskEditorCurrentId = null; // đơn đang mở trong overlay "Sửa việc" (null = đang đóng)
+let editingOrderIds = new Set();
+// orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
+let uploadingShipLabelIds = new Set();
+// Khu vực phiếu giao mặc định THU GỌN cho từng đơn — chỉ 1 đơn được mở rộng
+// tại 1 thời điểm (đóng đơn đang mở lại khi mở đơn khác, hoặc khi bấm ra
+// ngoài). Giúp danh sách gọn hơn khi có nhiều đơn.
+let expandedShipLabelOrderId = null;
 
-// ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, xếp dọc 1 cột full-width)
-// hoặc 'grid' (Mosaic — nhiều cột cao thấp tự cân bằng, vẫn hiển thị đầy đủ
-// chip phân loại ngay trong ô, không cần mở bảng riêng). Ghi nhớ lựa chọn
-// giữa các lần mở trang bằng localStorage. ----
-let viewMode = localStorage.getItem("catalogViewMode") || "list";
-
-// ---- Gom sản phẩm (grouping into one order) ----
-let gomMode = false;
-let currentGroupId = null;
-let groupNames = new Map(); // orderId đã "Xong" -> tên đơn (hoặc null = tự sinh mã)
-
+const list = document.getElementById("list");
+const connStatus = document.getElementById("connStatus");
+const batchbar = document.getElementById("batchbar");
+const addbar = document.getElementById("addbar");
 const errArea = document.getElementById("errArea");
+const selectAllBox = document.getElementById("selectAllBox");
+const clearAllBtn = document.getElementById("clearAllBtn");
+const downloadAllWrap = document.getElementById("downloadAllWrap");
+const downloadAllBtn = document.getElementById("downloadAllBtn");
+const taskEditorOverlay = document.getElementById("taskEditorOverlay");
+const taskEditorQty = document.getElementById("taskEditorQty");
+const taskEditorName = document.getElementById("taskEditorName");
+
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
 }
 
+// ---- Helper: commit an edit (save) either on explicit click or on click-away ----
+// Attaches a "focusout" listener to containerEl; if focus moves to something
+// outside containerEl, commitFn() runs automatically (click ra ngoài = lưu & đóng).
+// The returned function can be wired to a "Lưu" button so both paths share
+// the same one-shot commit (no double-submit).
+function attachClickAwayCommit(containerEl, commitFn){
+  let committed = false;
+  const commit = () => {
+    if(committed) return;
+    committed = true;
+    commitFn();
+  };
+  containerEl.addEventListener("focusout", () => {
+    setTimeout(() => {
+      if(!containerEl.isConnected) return; // already closed/removed (e.g. Hủy)
+      if(!containerEl.contains(document.activeElement)) commit();
+    }, 0);
+  });
+  return commit;
+}
+
+// ---- Overlay "Sửa việc" (tên + số lượng) — phủ toàn màn hình, chỗ nhập
+// rộng rãi cho dễ bấm trên điện thoại, giống kiểu editor-overlay bên
+// catalog.html thay vì nhét 2 ô nhỏ chung 1 hàng như trước. ----
+function openTaskEditor(t){
+  taskEditorCurrentId = t.id;
+  taskEditorQty.value = t.qty || 1;
+  taskEditorName.value = t.name;
+  taskEditorOverlay.classList.add("show");
+  setTimeout(() => taskEditorName.focus(), 0);
+}
+
+function closeTaskEditor(){
+  taskEditorCurrentId = null;
+  taskEditorOverlay.classList.remove("show");
+}
+
+document.getElementById("taskEditorCancel").addEventListener("click", closeTaskEditor);
+document.getElementById("taskEditorSave").addEventListener("click", () => {
+  if(taskEditorCurrentId) saveTaskEdit(taskEditorCurrentId, taskEditorName.value, taskEditorQty.value);
+});
+
+// ---- Helpers: id / name generation for orders ----
 function randCode(len){
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
@@ -344,960 +540,901 @@ function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toS
 // Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
 // thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
 // mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
-// extractTrackingFromPdf ở index.html) — nên chỉ cần nhìn ký tự đầu là phân
-// biệt được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
+// extractTrackingFromPdf ở trên) — nên chỉ cần nhìn ký tự đầu là phân biệt
+// được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
 function newOrderName(){ return "#" + randCode(9); }
 
-// ---- Chuyển chế độ ----
+// ---- Đóng khu vực phiếu giao đang mở khi bấm ra ngoài ----
+// Click vào chính dòng tiêu đề (.order-header) đã tự xử lý mở/đóng riêng ở
+// renderOrderBox(); click vào bên trong khu phiếu giao (.ship-label-row) cần
+// giữ nguyên để còn bấm được các nút (Tải/Thay file/Xóa). Mọi click khác
+// (kể cả vào sản phẩm bên dưới, đơn khác, thanh tìm kiếm...) đều đóng lại.
+document.addEventListener("click", (e) => {
+  if(expandedShipLabelOrderId === null) return;
+  if(e.target.closest(".order-header") || e.target.closest(".ship-label-row")) return;
+  expandedShipLabelOrderId = null;
+  render();
+});
+
+// ---- Tabs ----
 document.querySelectorAll(".tab").forEach(t => {
   t.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     t.classList.add("active");
-    mode = t.dataset.mode;
-    applyModeUI();
-    renderList();
+    currentTab = t.dataset.tab;
+    selected.clear();
+    addbar.style.display = currentTab === "in" ? "flex" : "none";
+    clearAllBtn.style.display = currentTab === "xong" ? "inline-block" : "none";
+    render();
   });
 });
+addbar.style.display = "flex";
 
-const gomBtn = document.getElementById("gomBtn");
-const groupNameInput = document.getElementById("groupNameInput");
-const gomStatusLine = document.getElementById("gomStatusLine");
-const gomDoneBtn = document.getElementById("gomDoneBtn");
-
-function updateGomStatusLine(){
-  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
-  const name = groupNameInput.value.trim();
-  gomStatusLine.style.display = "block";
-  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
-}
-
-// ---- Chế độ sắp xếp thủ công (chỉ trong tab quản lý) — bật lên mới hiện
-// nút ▲▼ trên từng item, vì đây là thao tác không thường xuyên (chủ yếu dùng
-// lúc mới nhập danh sách hoặc thỉnh thoảng dọn lại thứ tự sau này). ----
-let sortMode = false;
-
-function applyModeUI(){
-  const isManage = mode === "manage";
-  if(!isManage) sortMode = false; // rời tab quản lý thì tự thoát chế độ sắp xếp
-  document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
-  document.getElementById("manageSection").style.display = isManage ? "block" : "none";
-  document.getElementById("sortModeRow").style.display = isManage ? "flex" : "none";
-  document.getElementById("searchBox").style.display = (isManage && sortMode) ? "none" : "block";
-  document.getElementById("manageActionBar").style.display = (isManage && !sortMode) ? "flex" : "none";
-  document.getElementById("selectAllRow").style.display = (isManage && !sortMode) ? "flex" : "none";
-  const sortModeBtn = document.getElementById("sortModeBtn");
-  sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
-  sortModeBtn.classList.toggle("active", sortMode);
-  document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
-  document.getElementById("gomBar").style.display = isManage ? "none" : "block";
-  document.getElementById("viewModeRow").style.display = isManage ? "none" : "flex";
-  if(isManage){
-    document.getElementById("gomStatusLine").style.display = "none";
-  } else {
-    updateGomStatusLine();
-  }
-}
-applyModeUI();
-
-document.getElementById("sortModeBtn").addEventListener("click", () => {
-  sortMode = !sortMode;
-  if(sortMode) selected.clear(); // không lẫn chế độ chọn/xóa với chế độ sắp xếp cùng lúc
-  applyModeUI();
-  renderList();
+// ---- Chọn tất cả ----
+selectAllBox.addEventListener("change", () => {
+  const shown = getShown();
+  if(selectAllBox.checked) shown.forEach(t => selected.add(t.id));
+  else shown.forEach(t => selected.delete(t.id));
+  updateBatchBar();
+  render();
 });
 
-function exitGomMode(){
-  gomMode = false;
-  currentGroupId = null;
-  groupNameInput.value = "";
-  groupNameInput.style.display = "none";
-  gomDoneBtn.style.display = "none";
-  gomBtn.textContent = "📦 Gom sản phẩm";
-  gomBtn.classList.remove("active");
-  gomStatusLine.style.display = "none";
-  document.getElementById("gomBar").classList.remove("active");
-}
-
-gomBtn.addEventListener("click", () => {
-  if(!gomMode){
-    gomMode = true;
-    if(pinnedKey && taskSelections.has(pinnedKey)){
-      // Đang có sẵn 1 sp ghim (chọn kiểu đơn lẻ bình thường) — dùng LUÔN
-      // orderId hiện có của sp đó làm currentGroupId, không tạo id mới và
-      // không đổi identity của nó. Nếu không chọn thêm sp nào khác, nó vẫn
-      // đúng là đơn lẻ đó — chỉ khác là có thể gán thêm tên tùy biến. Nếu có
-      // chọn thêm sp khác trong lúc này, các sp đó sẽ nhập chung vào đơn này.
-      currentGroupId = taskSelections.get(pinnedKey).orderId;
-      pinnedKey = null;
-    } else {
-      currentGroupId = newOrderId();
+// ---- Làm sạch (xóa toàn bộ sản phẩm đã xong) ----
+clearAllBtn.addEventListener("click", async () => {
+  const items = allTasks.filter(t => t.status === "xong");
+  if(items.length === 0) return;
+  if(!confirm(`Xóa toàn bộ ${items.length} sản phẩm đã xong? Không thể hoàn tác.`)) return;
+  try{
+    for(const it of items){
+      await deleteDoc(doc(db, "tasks", it.id));
     }
-    groupNameInput.style.display = "block";
-    groupNameInput.value = "";
-    gomDoneBtn.style.display = "inline-block";
-    gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
-    gomBtn.classList.add("active");
-    document.getElementById("gomBar").classList.add("active");
-    updateGomStatusLine();
-    renderList();
-  } else {
-    // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
-    for(const val of taskSelections.values()){
-      if(val.orderId === currentGroupId){
-        val.orderId = newOrderId();
-      }
-    }
-    exitGomMode();
-    renderList();
-  }
+    selected.clear();
+    updateBatchBar();
+  }catch(e){ showError("Không làm sạch được danh sách: " + e.message); }
 });
 
-gomDoneBtn.addEventListener("click", () => {
-  // Xong: chốt các sp đã chọn trong nhóm này thành 1 đơn, thoát chế độ gom
-  // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ
-  if(currentGroupId){
-    const nm = groupNameInput.value.trim();
-    const itemsInGroup = Array.from(taskSelections.values()).filter(v => v.orderId === currentGroupId).length;
-    if(nm || itemsInGroup > 1){
-      // Có đặt tên, hoặc thực sự gộp từ 2 sp trở lên -> ghi nhận là đơn có tên/gộp.
-      groupNames.set(currentGroupId, nm || null);
-    } else {
-      // Chỉ đúng 1 sp và không đặt tên -> coi như chưa từng bấm gom, để nó
-      // vẫn hiển thị và hoạt động y hệt 1 sản phẩm lẻ bình thường (không bị
-      // gắn nhãn "Đơn gộp" một cách không cần thiết).
-      groupNames.delete(currentGroupId);
-    }
-  }
-  exitGomMode();
-  renderList();
+// ---- Search ----
+document.getElementById("searchTask").addEventListener("input", e => {
+  searchTerm = e.target.value.trim().toLowerCase();
+  render();
 });
 
-groupNameInput.addEventListener("input", updateGomStatusLine);
+// ---- Add task ----
+document.getElementById("addBtn").addEventListener("click", addTask);
+document.getElementById("newName").addEventListener("keydown", e => { if(e.key === "Enter") addTask(); });
 
-// ---- Thứ tự hiển thị tùy chỉnh (field "order" trên mỗi sản phẩm) ----
-// Dùng bước nhảy 10 đơn vị (10, 20, 30...) thay vì 1, 2, 3... để sau này có
-// thể chèn 1 sản phẩm vào giữa 2 sản phẩm khác mà không phải renumber toàn bộ.
-const ORDER_STEP = 10;
-let orderMigrationDone = false;
-
-function sortProductsInPlace(){
-  allProducts.sort((a, b) => {
-    const oa = (typeof a.order === "number") ? a.order : Infinity;
-    const ob = (typeof b.order === "number") ? b.order : Infinity;
-    if(oa !== ob) return oa - ob;
-    return a.name.localeCompare(b.name, "vi");
-  });
-}
-
-function getMaxOrder(){
-  let max = 0;
-  for(const p of allProducts){
-    if(typeof p.order === "number" && p.order > max) max = p.order;
-  }
-  return max;
-}
-
-// Chạy đúng 1 lần: nếu TOÀN BỘ danh mục chưa có field "order" (dữ liệu cũ từ
-// trước khi có tính năng sắp xếp), gán order theo đúng thứ tự A-Z hiện tại
-// làm mốc ban đầu, để không làm xáo trộn danh sách người dùng đang quen mắt.
-// Nếu đã có ít nhất 1 sản phẩm có order (đã từng sắp xếp) thì bỏ qua, không
-// đụng vào bất kỳ sản phẩm nào.
-async function maybeMigrateOrder(){
-  if(orderMigrationDone) return;
-  if(allProducts.length === 0) return;
-  const noneHasOrder = allProducts.every(p => typeof p.order !== "number");
-  orderMigrationDone = true;
-  if(!noneHasOrder) return;
-  const sortedByName = [...allProducts].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  for(let i = 0; i < sortedByName.length; i++){
-    const p = sortedByName[i];
-    const ord = (i + 1) * ORDER_STEP;
-    p.order = ord;
-    try{ await updateDoc(doc(db, "catalog", p.id), { order: ord }); }
-    catch(e){ showError("Lỗi khởi tạo thứ tự sản phẩm: " + e.message); }
+async function addTask(){
+  const nameEl = document.getElementById("newName");
+  const qtyEl = document.getElementById("newQty");
+  const name = nameEl.value.trim();
+  const qty = parseInt(qtyEl.value) || 1;
+  if(!name) return;
+  try{
+    await addDoc(tasksCol, {
+      name, qty,
+      status: "cho_in",
+      note: "",
+      orderId: newOrderId(),
+      orderName: newOrderName(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    nameEl.value = "";
+    qtyEl.value = "1";
+    nameEl.focus();
+  }catch(e){
+    showError("Không thêm được việc mới: " + e.message);
   }
 }
 
-const q = query(catalogCol);
+// ---- Realtime listener ----
+const q = query(tasksCol, orderBy("createdAt", "asc"));
 onSnapshot(q, snap => {
-  allProducts = snap.docs.map(d => {
-    const data = d.data();
-    return {
-      id: d.id, ...data,
-      tiers: tiersFromFirestore(data.tiers),
-      order: (typeof data.order === "number" ? data.order : null),
-      link: data.link || ""
-    };
-  });
-  sortProductsInPlace();
-  document.getElementById("totalCount").textContent = allProducts.length;
-  renderList();
-  maybeMigrateOrder();
+  allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  connStatus.textContent = "";
+  render();
+  purgeExpiredXong();
 }, err => {
-  showError("Lỗi kết nối danh mục: " + err.message);
+  connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
 
-// Kiểm tra 1 chuỗi có phải URL http(s) hợp lệ hay không. Không dùng cách
-// kiểm nôm na kiểu str.includes("http") vì cách đó vừa lỏng lẻo (chấp nhận
-// rác miễn có chữ "http" ở đâu đó) vừa không loại được các scheme nguy hiểm
-// khác (vd "javascript:..."). Dùng chính API URL của trình duyệt để parse
-// thật sự, rồi chỉ chấp nhận đúng 2 scheme http/https.
-function isValidHttpUrl(str){
-  let url;
-  try{ url = new URL(str); }
-  catch(_){ return false; }
-  return url.protocol === "http:" || url.protocol === "https:";
-}
+// ---- Dọn dẹp item "xong" đã quá hạn ----
+// Lưu ý: từ khi chuyển phiếu giao sang lưu ở Cloudinary, việc xóa file PDF
+// không còn thực hiện được an toàn từ trình duyệt nữa (Cloudinary yêu cầu ký
+// bằng API Secret để xóa, không thể nhúng secret đó vào code public trên
+// GitHub Pages). Nên khi 1 đơn bị xóa (thủ công hoặc do quá hạn), chỉ Firestore
+// doc bị xóa — file PDF cũ trên Cloudinary sẽ "mồ côi" (không tự dọn). Vì file
+// phiếu giao rất nhẹ và gói free Cloudinary có 25GB/tháng, việc này không đáng
+// ngại — đây là đánh đổi đã thống nhất để tránh phải khai thẻ cho Firebase Blaze.
 
-document.getElementById("searchBox").addEventListener("input", renderList);
-
-function parseLine(line){
-  const parts = line.split("|").map(s => s.trim());
-  const name = parts[0];
-  if(!name) return null;
-  const rest = parts.slice(1).filter(seg => seg.length > 0);
-
-  if(rest.length === 0){
-    // Không có phân loại — sản phẩm đơn
-    return { name, variants: [], tiers: null };
-  }
-  if(rest.length === 1){
-    // 1 tầng phân loại (kiểu cũ, phẳng)
-    const variants = rest[0].split(",").map(s => s.trim()).filter(Boolean);
-    return { name, variants, tiers: null };
-  }
-  // 2 tầng phân loại (hoặc hơn) — mỗi đoạn "|" là 1 tầng, chỉ ghi giá trị
-  const tiers = rest.map(seg => seg.split(",").map(s => s.trim()).filter(Boolean)).filter(arr => arr.length > 0);
-  if(tiers.length < 2) return null;
-  return { name, variants: [], tiers };
-}
-
-function cartesianProduct(arrays){
-  return arrays.reduce((acc, arr) => {
-    const result = [];
-    acc.forEach(prefix => arr.forEach(v => result.push([...prefix, v])));
-    return result;
-  }, [[]]);
-}
-
-// Firestore không cho phép lưu mảng lồng mảng trực tiếp (nested array).
-// Nội bộ code vẫn dùng tiers dạng [["a","b"],["c","d"]] cho tiện xử lý,
-// nhưng khi ghi lên Firestore phải bọc từng tầng trong 1 object.
-function tiersToFirestore(tiers){
-  if(!tiers) return null;
-  return tiers.map(arr => ({ values: arr }));
-}
-
-function tiersFromFirestore(tiers){
-  if(!tiers) return null;
-  return tiers.map(t => Array.isArray(t) ? t : (t.values || []));
-}
-
-function mergeTiers(existingTiers, newTiers){
-  const result = (existingTiers || []).map(arr => [...arr]);
-  newTiers.forEach((opts, i) => {
-    if(result[i]){
-      result[i] = Array.from(new Set([...result[i], ...opts]));
-    } else {
-      result[i] = [...opts];
+// Quét chủ động các item "xong" đã quá hạn expireAt và xóa sớm hơn TTL server
+// của Firestore (TTL có thể trễ tới 72 giờ) — giúp tab "Đã xong" luôn gọn
+// trong đúng XONG_RETENTION_DAYS ngày gần nhất thay vì đợi Google tự dọn.
+async function purgeExpiredXong(){
+  const now = Date.now();
+  const expired = allTasks.filter(t =>
+    t.status === "xong" && t.expireAt && typeof t.expireAt.toMillis === "function" && t.expireAt.toMillis() <= now
+  );
+  if(expired.length === 0) return;
+  try{
+    for(const it of expired){
+      await deleteDoc(doc(db, "tasks", it.id));
     }
-  });
-  return result;
-}
-
-function productToLine(p){
-  if(p.tiers && p.tiers.length >= 2){
-    return p.name + " | " + p.tiers.map(arr => arr.join(", ")).join(" | ");
+  }catch(e){
+    // Dọn dẹp nền — không làm phiền người dùng bằng lỗi nền không quan trọng.
   }
-  if(p.variants && p.variants.length){
-    return p.name + " | " + p.variants.join(", ");
-  }
-  return p.name;
 }
 
 function escapeHtml(s){
   return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
-function productMatchesKeyword(p, kw){
-  if(!kw) return true;
-  if(p.name.toLowerCase().includes(kw)) return true;
-  if(p.variants && p.variants.some(v => v.toLowerCase().includes(kw))) return true;
-  if(p.tiers && p.tiers.some(tier => tier.some(v => v.toLowerCase().includes(kw)))) return true;
-  return false;
+// ---- Grouping helpers ----
+function orderPackInfo(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  const pending = items.filter(t => t.status === "cho_in").length;
+  const readyToPack = items.filter(t => t.status === "cho_dong_goi").length;
+  return {
+    total: items.length,
+    pending, readyToPack,
+    eligible: pending === 0 && readyToPack > 0
+  };
 }
 
-function getFiltered(){
-  // Đang sắp xếp: luôn thao tác trên toàn bộ danh sách (không lọc theo từ khóa)
-  // để nút ▲▼⤒⤓ phản ánh đúng thứ tự thật, tránh nhảy lung tung khi có filter.
-  if(sortMode) return allProducts;
-  const kw = document.getElementById("searchBox").value.trim().toLowerCase();
-  return allProducts.filter(p => productMatchesKeyword(p, kw));
-}
-
-// Đẩy 1 sản phẩm lên/xuống 1 bậc so với vị trí đang hiển thị (dir: -1 lên, +1 xuống).
-// Hoán đổi trực tiếp field "order" với sản phẩm liền kề — cập nhật UI ngay lập
-// tức (không chờ Firestore trả về) để thao tác nhanh, cảm giác mượt trên điện thoại.
-async function moveItem(productId, dir){
-  const filtered = getFiltered();
-  const idx = filtered.findIndex(p => p.id === productId);
-  const swapIdx = idx + dir;
-  if(idx === -1 || swapIdx < 0 || swapIdx >= filtered.length) return;
-  const a = filtered[idx];
-  const b = filtered[swapIdx];
-  const oa = a.order, ob = b.order;
-  a.order = ob;
-  b.order = oa;
-  sortProductsInPlace();
-  renderList();
-  try{
-    await updateDoc(doc(db, "catalog", a.id), { order: a.order });
-    await updateDoc(doc(db, "catalog", b.id), { order: b.order });
-  }catch(e){
-    showError("Không lưu được thứ tự mới: " + e.message);
-  }
-}
-
-// Đưa 1 sản phẩm lên đầu / xuống cuối toàn bộ danh mục. Nhờ dùng bước nhảy
-// ORDER_STEP nên chỉ cần gán order nhỏ hơn min hiện có (lên đầu) hoặc lớn hơn
-// max hiện có (xuống cuối) — không phải renumber lại các sản phẩm khác.
-function getMinOrder(){
-  let min = Infinity;
-  for(const p of allProducts){
-    if(typeof p.order === "number" && p.order < min) min = p.order;
-  }
-  return min === Infinity ? 0 : min;
-}
-
-async function moveToTop(productId){
-  const p = allProducts.find(x => x.id === productId);
-  if(!p) return;
-  p.order = getMinOrder() - ORDER_STEP;
-  sortProductsInPlace();
-  renderList();
-  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
-  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
-}
-
-async function moveToBottom(productId){
-  const p = allProducts.find(x => x.id === productId);
-  if(!p) return;
-  p.order = getMaxOrder() + ORDER_STEP;
-  sortProductsInPlace();
-  renderList();
-  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
-  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
-}
-
-function renderTiersStaticHtml(p){
-  const outerTiers = p.tiers.slice(0, -1);
-  const lastTier = p.tiers[p.tiers.length - 1];
-  const combos = cartesianProduct(outerTiers);
-  return combos.map(combo => {
-    const label = combo.join(" - ");
-    const chips = lastTier.map(v => `<span class="vchip static">${escapeHtml(v)}</span>`).join("");
-    return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
-  }).join("");
-}
-
-function renderTiersSelectionHtml(p){
-  const outerTiers = p.tiers.slice(0, -1);
-  const lastTier = p.tiers[p.tiers.length - 1];
-  const combos = cartesianProduct(outerTiers);
-  return combos.map(combo => {
-    const label = combo.join(" - ");
-    const chips = lastTier.map(v => {
-      const variant = label + ": " + v;
-      const key = p.id + "__" + variant;
-      const active = isChipActive(key);
-      const cur = taskSelections.get(key);
-      const qty = cur ? cur.qty : 0;
-      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-        </button>`;
-    }).join("");
-    return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
-  }).join("");
-}
-
-function buildProductItemEl(p, opts){
-  const { isManage, isSortMode, isFirst, isLast, filtered } = opts;
-  const div = document.createElement("div");
-  div.className = "item";
-  div.dataset.id = p.id;
-  const hasTiers = p.tiers && p.tiers.length >= 2;
-  const hasFlat = p.variants && p.variants.length;
-  let variantsHtml = "";
-
-  if(hasTiers){
-    variantsHtml = isManage ? renderTiersStaticHtml(p) : renderTiersSelectionHtml(p);
-  } else if(hasFlat){
-    variantsHtml = p.variants.map(v => {
-      if(isManage){
-        return `<span class="vchip static">${escapeHtml(v)}</span>`;
-      }
-      const key = p.id + "__" + v;
-      const active = isChipActive(key);
-      const cur = taskSelections.get(key);
-      const qty = cur ? cur.qty : 0;
-      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-        </button>`;
-    }).join("");
-  } else if(!isManage){
-    // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
-    const key = p.id;
-    const active = isChipActive(key);
-    const cur = taskSelections.get(key);
-    const qty = cur ? cur.qty : 0;
-    variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-        <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
-        ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-      </button>`;
-  }
-  div.innerHTML = `
-    ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
-    ${isSortMode ? `<div class="orderBtns">
-        <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
-        <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
-        <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
-        <button type="button" class="orderBtn bottomBtn" title="Đưa xuống cuối danh sách" ${isLast ? "disabled" : ""}>⤓</button>
-      </div>` : ""}
-    <div class="body">
-      <div class="titlerow">
-        <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
-        ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
-        ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
-      </div>
-      ${(!isManage && editingLinkIds.has(p.id)) ? `
-        <div class="linkEditBox">
-          <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
-          <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
-          <div class="row row-nowrap" style="margin-top:6px;">
-            <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
-            <button type="button" class="btn-outline linkCancelBtn" style="flex:1;">Hủy</button>
-          </div>
-          <div class="status linkStatus"></div>
-        </div>
-      ` : ""}
-      <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
-    </div>
-  `;
-  if(isSortMode){
-    const upBtn = div.querySelector(".upBtn");
-    const downBtn = div.querySelector(".downBtn");
-    const topBtn = div.querySelector(".topBtn");
-    const bottomBtn = div.querySelector(".bottomBtn");
-    if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
-    if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
-    if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
-    if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
-  } else if(isManage){
-    div.querySelector(".rowCheck").addEventListener("change", e => {
-      if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
-      updateActionBar();
-      updateSelectAllState(filtered);
-    });
-    div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
-    div.querySelector(".delBtn").addEventListener("click", async () => {
-      if(!confirm(`Xóa sản phẩm "${p.name}"?`)) return;
-      try{
-        await deleteDoc(doc(db, "catalog", p.id));
-        selected.delete(p.id);
-      }catch(e){
-        showError("Không xóa được sản phẩm: " + e.message);
-      }
-    });
-  } else {
-    // ---- Nút ✏️ chèn/sửa link file in (chỉ ở tab Thêm việc) ----
-    const editLinkBtn = div.querySelector(".editLinkBtn");
-    if(editLinkBtn){
-      editLinkBtn.addEventListener("click", () => {
-        if(editingLinkIds.has(p.id)) editingLinkIds.delete(p.id);
-        else editingLinkIds.add(p.id);
-        renderList();
-      });
+function groupShown(shown){
+  const order = [];
+  const map = new Map();
+  shown.forEach(t => {
+    const oid = t.orderId || t.id;
+    if(!map.has(oid)){
+      map.set(oid, { orderId: oid, orderName: t.orderName || t.name, shipLabelUrl: "", items: [] });
+      order.push(oid);
     }
-    const linkSaveBtn = div.querySelector(".linkSaveBtn");
-    const linkCancelBtn = div.querySelector(".linkCancelBtn");
-    if(linkSaveBtn){
-      linkSaveBtn.addEventListener("click", async () => {
-        const statusEl = div.querySelector(".linkStatus");
-        const newName = div.querySelector(".linkEditName").value.trim();
-        const rawLink = div.querySelector(".linkEditUrl").value.trim();
-        if(!newName){
-          statusEl.textContent = "Tên sản phẩm không được để trống.";
-          statusEl.className = "status err";
-          return;
-        }
-        let linkToSave = "";
-        if(rawLink){
-          if(!isValidHttpUrl(rawLink)){
-            statusEl.textContent = "Link không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
-            statusEl.className = "status err";
-            return;
-          }
-          linkToSave = rawLink;
-        }
-        if(newName.toLowerCase() !== p.name.toLowerCase()){
-          const dup = allProducts.find(x => x.id !== p.id && x.name.toLowerCase() === newName.toLowerCase());
-          if(dup){
-            statusEl.textContent = `Tên "${newName}" đã trùng với 1 sản phẩm khác trong danh mục.`;
-            statusEl.className = "status err";
-            return;
-          }
-        }
-        try{
-          await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
-          editingLinkIds.delete(p.id);
-          renderList();
-        }catch(e){
-          statusEl.textContent = "Lỗi khi lưu: " + e.message;
-          statusEl.className = "status err";
-        }
-      });
-    }
-    if(linkCancelBtn){
-      linkCancelBtn.addEventListener("click", () => {
-        editingLinkIds.delete(p.id);
-        renderList();
-      });
-    }
-    div.querySelectorAll(".vchip").forEach(chip => {
-      chip.addEventListener("click", e => {
-        const key = chip.dataset.key;
-        const variant = key.slice(p.id.length + 2);
-        const act = e.target.dataset.act;
-        let cur = taskSelections.get(key);
-        if(act === "remove"){
-          taskSelections.delete(key);
-          if(pinnedKey === key) pinnedKey = null;
-        } else if(act === "minus"){
-          if(cur){
-            cur.qty -= 1;
-            if(cur.qty <= 0){
-              taskSelections.delete(key);
-              if(pinnedKey === key) pinnedKey = null;
-            }
-          }
-        } else {
-          if(!cur){
-            cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
-            taskSelections.set(key, cur);
-          }
-          cur.qty += 1;
-          if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
-        }
-        renderList();
-      });
-    });
-  }
-  return div;
+    const g = map.get(oid);
+    // shipLabelUrl được ghi lặp lên mọi item cùng orderId (giống orderName) —
+    // chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
+    if(!g.shipLabelUrl && t.shipLabelUrl) g.shipLabelUrl = t.shipLabelUrl;
+    g.items.push(t);
+  });
+  return order.map(oid => map.get(oid));
 }
 
-function renderListView(){
-  const list = document.getElementById("list");
-  const filtered = getFiltered();
-  const isManage = mode === "manage";
-  const isSortMode = isManage && sortMode;
+// Cho biết những orderId nào sẽ KHÔNG còn item nào sau khi xóa các id trong
+// deletedIds — dùng để biết đơn nào "trống hẳn" (từ đó dọn phiếu giao đính
+// kèm nếu cần). So sánh trên allTasks HIỆN TẠI (trước khi xóa thật sự), nên
+// phải gọi hàm này trước khi deleteDoc(), không phải sau.
+function orderIdsBecomingEmpty(deletedIds){
+  const deletedSet = new Set(deletedIds);
+  const affectedOrderIds = new Set(
+    allTasks
+      .filter(t => deletedSet.has(t.id))
+      .map(t => t.orderId || t.id)
+  );
+  const result = [];
+  affectedOrderIds.forEach(oid => {
+    const remaining = allTasks.some(t => t.orderId === oid && !deletedSet.has(t.id));
+    if(!remaining) result.push(oid);
+  });
+  return result;
+}
+
+// ---- Render ----
+function getShown(){
+  let shown;
+  if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in");
+  else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
+  // Không còn cần giới hạn 50 mục ở client nữa: từ khi có expireAt + Firestore
+  // TTL (xem phần "Đã xong" trong hướng dẫn), tập dữ liệu status=xong đã tự
+  // giới hạn trong khoảng 7 ngày gần nhất, không phình vô hạn. Bỏ slice() để
+  // tìm kiếm (Lỗi A) có thể quét đúng toàn bộ 7 ngày thay vì chỉ 50 mục mới nhất.
+  else shown = allTasks.filter(t => t.status === "xong").slice().reverse();
+
+  if(searchTerm){
+    shown = shown.filter(t =>
+      (t.name || "").toLowerCase().includes(searchTerm) ||
+      (t.orderName || "").toLowerCase().includes(searchTerm)
+    );
+  }
+  return shown;
+}
+
+function updateSelectAllBox(shown){
+  const n = shown.length;
+  const nSel = shown.filter(t => selected.has(t.id)).length;
+  selectAllBox.checked = n > 0 && nSel === n;
+  selectAllBox.indeterminate = nSel > 0 && nSel < n;
+}
+
+function render(){
+  const badgeIn = allTasks.filter(t => t.status === "cho_in").length;
+  const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
+  const badgeXong = allTasks.filter(t => t.status === "xong").length;
+  document.getElementById("badge-in").textContent = badgeIn;
+  document.getElementById("badge-dong_goi").textContent = badgeDG;
+  document.getElementById("badge-xong").textContent = badgeXong;
+
+  const shown = getShown();
+  updateSelectAllBox(shown);
+
   list.innerHTML = "";
-  if(filtered.length === 0){
-    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
-    updateActionBar();
-    updateSelectAllState(filtered);
-    updateTaskBar();
+  if(shown.length === 0){
+    const emptyMsg = searchTerm ? "Không tìm thấy việc nào khớp."
+      : currentTab === "in" ? "Chưa có việc nào. Thêm sản phẩm ở ô trên."
+      : currentTab === "dong_goi" ? "Chưa có sản phẩm nào chờ đóng gói."
+      : "Chưa có sản phẩm nào hoàn tất.";
+    list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
+    downloadAllWrap.style.display = "none";
     return;
   }
-  filtered.forEach((p, idx) => {
-    const div = buildProductItemEl(p, {
-      isManage, isSortMode,
-      isFirst: idx === 0,
-      isLast: idx === filtered.length - 1,
-      filtered
-    });
-    list.appendChild(div);
-  });
-  updateActionBar();
-  updateSelectAllState(filtered);
-  updateTaskBar();
-}
 
-// ---- Chế độ xem Mosaic (chỉ ở tab Thêm việc) ----
-// Tổng số lượng đã chọn của 1 sản phẩm — dùng để tô viền/nền ô khi sản phẩm
-// đang có ít nhất 1 phân loại (hoặc cả sản phẩm đơn) được chọn.
-function productSelectedQty(p){
-  let totalQty = 0;
-  for(const val of taskSelections.values()){
-    if(val.productId === p.id) totalQty += val.qty;
-  }
-  return totalQty;
-}
+  const groups = groupShown(shown);
+  groups.forEach(g => list.appendChild(renderOrderBox(g)));
 
-function renderGridView(){
-  const list = document.getElementById("list");
-  const filtered = getFiltered();
-  list.innerHTML = "";
-  if(filtered.length === 0){
-    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
-    updateTaskBar();
-    return;
-  }
-  // Mosaic: mỗi ô hiển thị đầy đủ tên sản phẩm + toàn bộ chip phân loại —
-  // giống hệt nội dung ở chế độ Danh sách — chỉ khác cách sắp xếp: nhiều
-  // cột cao thấp tự nhiên theo nội dung, tự cân bằng chiều cao giữa các
-  // cột (CSS multi-column), thay vì xếp dọc 1 cột full-width.
-  const wrap = document.createElement("div");
-  wrap.className = "gridWrap";
-  filtered.forEach((p, idx) => {
-    const el = buildProductItemEl(p, {
-      isManage: false, isSortMode: false,
-      isFirst: idx === 0, isLast: idx === filtered.length - 1,
-      filtered
-    });
-    if(productSelectedQty(p) > 0) el.classList.add("active");
-    wrap.appendChild(el);
-  });
-  list.appendChild(wrap);
-  updateTaskBar();
-}
-
-const listViewBtn = document.getElementById("listViewBtn");
-const gridViewBtn = document.getElementById("gridViewBtn");
-function updateViewModeButtons(){
-  listViewBtn.classList.toggle("active", viewMode === "list");
-  gridViewBtn.classList.toggle("active", viewMode === "grid");
-}
-listViewBtn.addEventListener("click", () => {
-  if(viewMode === "list") return;
-  viewMode = "list";
-  localStorage.setItem("catalogViewMode", "list");
-  updateViewModeButtons();
-  renderList();
-});
-gridViewBtn.addEventListener("click", () => {
-  if(viewMode === "grid") return;
-  viewMode = "grid";
-  localStorage.setItem("catalogViewMode", "grid");
-  updateViewModeButtons();
-  renderList();
-});
-updateViewModeButtons();
-
-function renderList(){
-  if(mode === "task" && viewMode === "grid"){
-    renderGridView();
+  // Nút "Tải tất cả phiếu giao" chỉ hiện khi trong danh sách đang xem (theo
+  // tab + từ khóa tìm kiếm hiện tại) có ít nhất 1 đơn đã đính kèm phiếu giao.
+  const groupsWithLabel = groups.filter(g => g.shipLabelUrl);
+  if(groupsWithLabel.length > 0){
+    downloadAllWrap.style.display = "block";
+    downloadAllBtn.textContent = `⬇️ Tải tất cả phiếu giao (${groupsWithLabel.length})`;
   } else {
-    renderListView();
+    downloadAllWrap.style.display = "none";
   }
 }
 
-// Xác định 1 phân loại có đang được tô sáng (ghim) trong danh sách hay không.
-// - Trong chế độ gom: mọi sp thuộc nhóm đang gom đều tô sáng (giữ nguyên như trước).
-// - Ngoài chế độ gom: chỉ phân loại vừa chọn gần nhất (đang ghim) mới tô sáng;
-//   các đơn lẻ đã chốt trước đó vẫn nằm trong giỏ hàng nhưng không còn tô sáng.
-function isChipActive(key){
-  const cur = taskSelections.get(key);
-  if(!cur) return false;
-  if(gomMode) return cur.orderId === currentGroupId;
-  return key === pinnedKey;
-}
+function renderOrderBox(g){
+  const box = document.createElement("div");
+  box.className = "order-box";
 
-// Nhấp ra ngoài 1 chip phân loại (nút/chỗ khác trên trang) cũng tự bỏ ghim,
-// giống như khi chọn 1 phân loại khác — chỉ áp dụng ngoài chế độ gom.
-document.addEventListener("click", e => {
-  if(gomMode || !pinnedKey) return;
-  if(e.target.closest(".vchip")) return; // để handler riêng của chip xử lý
-  pinnedKey = null;
-  renderList();
-});
+  let info = null;
+  if(currentTab === "dong_goi"){
+    info = orderPackInfo(g.orderId);
+    box.classList.add(info.eligible ? "ready" : "warn");
+  }
 
-function updateTaskBar(){
-  const bar = document.getElementById("taskbar");
-  const n = taskSelections.size;
-  document.getElementById("taskCount").textContent = n;
-  bar.classList.toggle("show", mode === "task" && n > 0);
-  if(n === 0) closeSelectedModal();
-}
+  const header = document.createElement("div");
+  header.className = "order-header";
 
-function getOrderLabel(orderId){
-  if(gomMode && orderId === currentGroupId){
-    const nm = groupNameInput.value.trim();
-    return (nm || "mã tự sinh") + " (đang gom)";
-  }
-  if(groupNames.has(orderId)){
-    return groupNames.get(orderId) || "Đơn gộp (mã tự sinh)";
-  }
-  return "Sản phẩm lẻ";
-}
-
-function renderSelectedModal(){
-  const body = document.getElementById("selectedListBody");
-  if(taskSelections.size === 0){
-    body.innerHTML = '<div class="muted">Chưa chọn sản phẩm nào.</div>';
-    return;
-  }
-  const groups = new Map();
-  for(const [key, val] of taskSelections.entries()){
-    if(!groups.has(val.orderId)) groups.set(val.orderId, []);
-    groups.get(val.orderId).push({ key, ...val });
-  }
-  let html = "";
-  for(const items of groups.values()){
-    const orderId = items[0].orderId;
-    html += `<div class="selgroup"><div class="selgroup-title">${escapeHtml(getOrderLabel(orderId))} — ${items.length} phân loại</div>`;
-    items.forEach(it => {
-      html += `<div class="selrow">
-        <span class="selname">${escapeHtml(it.productName)}${it.variant ? " — " + escapeHtml(it.variant) : ""} ×${it.qty}</span>
-        <button type="button" class="selremove" data-key="${escapeHtml(it.key)}">Xóa</button>
-      </div>`;
+  if(editingOrderIds.has(g.orderId)){
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "order-title-input";
+    input.value = g.orderName;
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "save-icon";
+    saveBtn.textContent = "Lưu";
+    const commit = attachClickAwayCommit(header, () => renameOrder(g.orderId, input.value));
+    saveBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", e => { if(e.key === "Enter") commit(); });
+    header.appendChild(input);
+    header.appendChild(saveBtn);
+    setTimeout(() => input.focus(), 0);
+  } else {
+    const title = document.createElement("div");
+    title.className = "order-title";
+    const isExpanded = expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId);
+    title.innerHTML = `<span class="expand-caret">${isExpanded ? "▾" : "▸"}</span>` + escapeHtml(g.orderName)
+      + (g.shipLabelUrl ? ` <span class="ship-label-chip" title="Đã đính kèm phiếu giao">📎</span>` : "");
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-icon";
+    editBtn.textContent = "✏️";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      editingOrderIds.add(g.orderId);
+      render();
     });
-    html += `</div>`;
-  }
-  body.innerHTML = html;
-  body.querySelectorAll(".selremove").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.dataset.key;
-      taskSelections.delete(key);
-      if(pinnedKey === key) pinnedKey = null;
-      renderSelectedModal();
-      renderList();
+    header.classList.add("clickable");
+    header.addEventListener("click", () => {
+      expandedShipLabelOrderId = (expandedShipLabelOrderId === g.orderId) ? null : g.orderId;
+      render();
     });
-  });
-}
+    header.appendChild(title);
+    header.appendChild(editBtn);
+  }
+  box.appendChild(header);
+  if(expandedShipLabelOrderId === g.orderId || uploadingShipLabelIds.has(g.orderId)){
+    box.appendChild(renderShipLabelRow(g));
+  }
 
-function closeSelectedModal(){
-  document.getElementById("selectedOverlay").classList.remove("show");
-}
+  if(currentTab === "dong_goi" && info){
+    const line = document.createElement("div");
+    line.className = "order-status-line " + (info.eligible ? "ready" : "warn");
+    line.textContent = info.eligible
+      ? "Đủ hàng — có thể đóng gói cả đơn"
+      : `Đơn chưa đủ — còn ${info.pending} sản phẩm đang in`;
+    box.appendChild(line);
 
-document.getElementById("viewSelectedBtn").addEventListener("click", () => {
-  renderSelectedModal();
-  document.getElementById("selectedOverlay").classList.add("show");
-});
-document.getElementById("selectedCloseBtn").addEventListener("click", closeSelectedModal);
-
-document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
-  if(taskSelections.size === 0) return;
-  const entries = Array.from(taskSelections.values());
-
-  // Xác định tên đơn cho từng orderId có trong lượt gửi này
-  const orderNames = new Map();
-  entries.forEach(e => {
-    if(!orderNames.has(e.orderId)){
-      let nm = null;
-      if(gomMode && e.orderId === currentGroupId){
-        nm = groupNameInput.value.trim() || null;
-      } else if(groupNames.has(e.orderId)){
-        nm = groupNames.get(e.orderId);
-      }
-      orderNames.set(e.orderId, nm || newOrderName());
+    if(info.eligible){
+      const wrap = document.createElement("div");
+      wrap.className = "pack-all-wrap";
+      const btn = document.createElement("button");
+      btn.className = "pack-all-btn";
+      btn.textContent = "📦 Đóng gói cả đơn";
+      btn.addEventListener("click", () => packWholeOrder(g.orderId));
+      wrap.appendChild(btn);
+      box.appendChild(wrap);
     }
-  });
+  }
 
-  try{
-    for(const e of entries){
-      const prod = allProducts.find(pr => pr.id === e.productId);
-      await addDoc(tasksCol, {
-        name: e.variant ? `${e.productName} — ${e.variant}` : e.productName,
-        qty: e.qty,
-        status: "cho_in",
-        note: "",
-        link: (prod && prod.link) ? prod.link : "",
-        orderId: e.orderId,
-        orderName: orderNames.get(e.orderId),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+  g.items.forEach(t => box.appendChild(renderItem(t)));
+  return box;
+}
+
+// Khu vực đính kèm/tải phiếu giao (PDF chứa mã đơn vận) — 1 file dùng chung
+// cho cả đơn hàng (order-level), khác với "🔗 File in" ở từng sản phẩm.
+function renderShipLabelRow(g){
+  const rowEl = document.createElement("div");
+  rowEl.className = "ship-label-row";
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/pdf";
+  fileInput.style.display = "none";
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files[0];
+    if(f) uploadShipLabel(g.orderId, f);
+    fileInput.value = "";
+  });
+  rowEl.appendChild(fileInput);
+
+  if(uploadingShipLabelIds.has(g.orderId)){
+    const busyBtn = document.createElement("button");
+    busyBtn.className = "attach-btn";
+    busyBtn.disabled = true;
+    busyBtn.textContent = "⏳ Đang tải lên...";
+    rowEl.appendChild(busyBtn);
+    return rowEl;
+  }
+
+  if(g.shipLabelUrl){
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "view-btn";
+    viewBtn.textContent = "👁 Xem";
+    // target="_blank" qua window.open — chỉ mở tab mới hiển thị PDF (trình
+    // duyệt tự render), không tải file về máy như nút "Tải phiếu giao".
+    viewBtn.addEventListener("click", () => window.open(g.shipLabelUrl, "_blank", "noopener"));
+    rowEl.appendChild(viewBtn);
+
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "download-btn";
+    dlBtn.textContent = "⬇️ Tải phiếu giao";
+    dlBtn.addEventListener("click", () => downloadShipLabel(g.shipLabelUrl, g.orderName));
+    rowEl.appendChild(dlBtn);
+
+    const replaceBtn = document.createElement("button");
+    replaceBtn.className = "attach-btn";
+    replaceBtn.textContent = "🔄 Thay file";
+    replaceBtn.addEventListener("click", () => fileInput.click());
+    rowEl.appendChild(replaceBtn);
+
+    const rmBtn = document.createElement("button");
+    rmBtn.className = "remove-btn";
+    rmBtn.textContent = "🗑";
+    rmBtn.title = "Xóa phiếu giao";
+    rmBtn.addEventListener("click", () => removeShipLabel(g.orderId));
+    rowEl.appendChild(rmBtn);
+  } else {
+    const attachBtn = document.createElement("button");
+    attachBtn.className = "attach-btn";
+    attachBtn.textContent = "📎 Đính kèm phiếu giao (PDF)";
+    attachBtn.addEventListener("click", () => fileInput.click());
+    rowEl.appendChild(attachBtn);
+  }
+
+  return rowEl;
+}
+
+function renderItem(t){
+  const row = document.createElement("div");
+  row.className = "order-item";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = selected.has(t.id);
+  cb.addEventListener("change", () => {
+    if(cb.checked) selected.add(t.id); else selected.delete(t.id);
+    updateBatchBar();
+  });
+  row.appendChild(cb);
+
+  const info = document.createElement("div");
+  info.className = "info";
+
+  {
+    const nameDiv = document.createElement("div");
+    nameDiv.className = "name";
+    nameDiv.textContent = t.name;
+    if(t.link){
+      const linkA = document.createElement("a");
+      linkA.className = "task-linkchip";
+      linkA.href = t.link;
+      linkA.target = "_blank";
+      linkA.rel = "noopener";
+      linkA.textContent = "🔗 File in";
+      nameDiv.appendChild(linkA);
+    }
+    if(currentTab === "xong" && t.shipped){
+      const badge = document.createElement("span");
+      badge.className = "shipped-badge";
+      badge.textContent = "🚚 Đã giao";
+      nameDiv.appendChild(badge);
+    }
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "meta";
+    metaDiv.textContent = "SL: " + (t.qty || 1);
+    info.appendChild(nameDiv);
+    info.appendChild(metaDiv);
+
+    // Xem trước ghi chú ngay trên danh sách (không cần bấm Sửa mới thấy).
+    // Dùng dạng xem trước thay vì tooltip vì tooltip cần hover, không dùng
+    // được trên điện thoại (chạm) — xem trước luôn hiện + bấm vào để sửa
+    // là cách hoạt động tốt trên di động hơn.
+    if(t.note && !openNotes.has(t.id)){
+      const preview = document.createElement("div");
+      preview.className = "note-preview";
+      preview.textContent = "📝 " + t.note;
+      preview.addEventListener("click", () => { openNotes.add(t.id); render(); });
+      info.appendChild(preview);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "row-actions";
+
+    if(currentTab !== "xong"){
+      const advBtn = document.createElement("button");
+      advBtn.className = "mini primary";
+      advBtn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+      advBtn.addEventListener("click", () => advanceStatus(t));
+      actions.appendChild(advBtn);
+    }
+
+    if(currentTab === "dong_goi" || currentTab === "xong"){
+      const revBtn = document.createElement("button");
+      revBtn.className = "mini warnbtn";
+      revBtn.textContent = "↩ Lùi lại";
+      revBtn.addEventListener("click", () => revertStatus(t));
+      actions.appendChild(revBtn);
+    }
+
+    if(currentTab === "xong"){
+      const shipBtn = document.createElement("button");
+      shipBtn.className = "mini" + (t.shipped ? "" : " primary");
+      shipBtn.textContent = t.shipped ? "↩ Bỏ đã giao" : "🚚 Đã giao";
+      shipBtn.addEventListener("click", () => toggleShipped(t));
+      actions.appendChild(shipBtn);
+    }
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "mini";
+    editBtn.textContent = "✏️ Sửa";
+    editBtn.addEventListener("click", () => openTaskEditor(t));
+    actions.appendChild(editBtn);
+
+    const noteBtn = document.createElement("button");
+    noteBtn.className = "mini";
+    noteBtn.innerHTML = "📝 Ghi chú" + (t.note ? "<span class='note-dot'>•</span>" : "");
+    noteBtn.addEventListener("click", () => {
+      if(openNotes.has(t.id)) openNotes.delete(t.id); else openNotes.add(t.id);
+      render();
+    });
+    actions.appendChild(noteBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "mini danger";
+    delBtn.textContent = "🗑 Xóa";
+    delBtn.addEventListener("click", () => deleteTask(t.id));
+    actions.appendChild(delBtn);
+
+    info.appendChild(actions);
+
+    if(openNotes.has(t.id)){
+      const noteBox = document.createElement("div");
+      noteBox.className = "note-box";
+      const ta = document.createElement("textarea");
+      ta.placeholder = "Ghi chú cho việc này...";
+      ta.value = t.note || "";
+      const saveNoteBtn = document.createElement("button");
+      saveNoteBtn.className = "note-save";
+      saveNoteBtn.textContent = "Lưu ghi chú";
+      const commit = attachClickAwayCommit(noteBox, async () => {
+        await saveNote(t.id, ta.value);
+        openNotes.delete(t.id);
+        render();
       });
+      saveNoteBtn.addEventListener("click", commit);
+      noteBox.appendChild(ta);
+      noteBox.appendChild(saveNoteBtn);
+      info.appendChild(noteBox);
+      setTimeout(() => ta.focus(), 0);
     }
-    taskSelections.clear();
-    groupNames.clear();
-    pinnedKey = null;
-    exitGomMode();
-    renderList();
-    alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
-  }catch(err){
-    showError("Không gửi được sang danh sách hôm nay: " + err.message);
   }
-});
 
-function updateSelectAllState(filtered){
-  const box = document.getElementById("selectAllBox");
-  const idsShown = filtered.map(p => p.id);
-  box.checked = idsShown.length > 0 && idsShown.every(id => selected.has(id));
+  row.appendChild(info);
+  return row;
 }
 
-document.getElementById("selectAllBox").addEventListener("change", e => {
-  const filtered = getFiltered();
-  if(e.target.checked) filtered.forEach(p => selected.add(p.id));
-  else filtered.forEach(p => selected.delete(p.id));
-  renderList();
-});
+// ---- Actions ----
 
-function updateActionBar(){
-  const n = selected.size;
-  document.getElementById("selCount").textContent = `Đã chọn ${n} sản phẩm`;
-  document.getElementById("topDelBtn").classList.toggle("enabled", n > 0);
+// Số ngày lưu trữ tối đa cho các item ở tab "Đã xong" trước khi Firestore TTL
+// tự xoá (xem huong-dan.html / README về cách bật TTL policy trên field expireAt).
+// Chỉnh số này nếu muốn thay đổi thời gian giữ lịch sử đối soát.
+const XONG_RETENTION_DAYS = 7;
+
+function computeExpireAt(){
+  const ms = Date.now() + XONG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  return Timestamp.fromMillis(ms);
 }
 
-document.getElementById("topDelBtn").addEventListener("click", async () => {
-  if(selected.size === 0) return;
-  if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
+async function advanceStatus(t){
+  const next = t.status === "cho_in" ? "cho_dong_goi" : "xong";
+  const patch = { status: next, updatedAt: serverTimestamp() };
+  // Chỉ khi thật sự VÀO "xong" mới gắn hạn tự xoá (expireAt).
+  if(next === "xong") patch.expireAt = computeExpireAt();
   try{
-    for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
-    selected.clear();
-  }catch(e){
-    showError("Không xóa được sản phẩm đã chọn: " + e.message);
-  }
-});
+    await updateDoc(doc(db, "tasks", t.id), patch);
+  }catch(e){ showError("Không cập nhật được trạng thái: " + e.message); }
+}
 
-document.getElementById("bulkBtn").addEventListener("click", async () => {
-  const raw = document.getElementById("bulkInput").value;
-  const statusEl = document.getElementById("bulkStatus");
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  if(lines.length === 0){
-    statusEl.textContent = "Chưa có nội dung để nhập.";
-    statusEl.className = "status err";
-    return;
+async function revertStatus(t){
+  const prev = t.status === "cho_dong_goi" ? "cho_in" : t.status === "xong" ? "cho_dong_goi" : null;
+  if(!prev) return;
+  const patch = { status: prev, updatedAt: serverTimestamp() };
+  if(t.status === "xong"){
+    // Ra khỏi "xong" thì phải xoá expireAt — nếu không, item có thể bị TTL
+    // xoá nhầm dù đang là việc chờ xử lý thật (chưa quay lại "xong" lần nữa).
+    patch.expireAt = deleteField();
+    // Đồng thời reset "đã giao" — nếu không, khi item hoàn tất LẠI lần sau
+    // (thật sự), nhãn "🚚 Đã giao" cũ sẽ tự hiện sẵn dù chưa ai bấm, gây sai
+    // lệch dữ liệu đối soát.
+    patch.shipped = false;
   }
-  let created = 0, merged = 0, skipped = 0, mismatched = 0;
-  let nextOrder = getMaxOrder() + ORDER_STEP;
-  // Bản sao làm việc trong bộ nhớ: allProducts chỉ được cập nhật qua onSnapshot
-  // (bất đồng bộ), nên nếu không theo dõi riêng, 2 dòng trùng tên sản phẩm MỚI
-  // trong cùng 1 lượt dán sẽ không thấy nhau -> bị tạo thành 2 sản phẩm trùng.
-  // workingList luôn phản ánh đúng trạng thái "sau khi xử lý xong các dòng
-  // trước đó", kể cả sản phẩm vừa mới tạo trong chính lượt dán này.
-  const workingList = allProducts.map(p => ({
-    id: p.id, name: p.name,
-    variants: p.variants ? [...p.variants] : [],
-    tiers: p.tiers ? p.tiers.map(arr => [...arr]) : null
-  }));
   try{
-    for(const line of lines){
-      const parsed = parseLine(line);
-      if(!parsed){ skipped++; continue; }
-      const existing = workingList.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
-      if(existing){
-        const existingHasTiers = existing.tiers && existing.tiers.length >= 2;
-        const existingHasFlat = existing.variants && existing.variants.length > 0;
-        const parsedIsTiered = !!parsed.tiers;
-        const parsedIsFlat = parsed.variants && parsed.variants.length > 0;
+    await updateDoc(doc(db, "tasks", t.id), patch);
+  }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
+}
 
-        if(parsedIsTiered && existingHasFlat && !existingHasTiers){
-          // Sản phẩm đang ở dạng 1 tầng (phẳng) mà dòng mới lại đưa dạng 2 tầng
-          // -> không tự đổi cấu trúc ngầm, tránh mất/ẩn dữ liệu variants cũ.
-          mismatched++;
-        } else if(parsedIsFlat && existingHasTiers){
-          // Ngược lại: sản phẩm đã có 2 tầng mà dòng mới chỉ đưa danh sách phẳng.
-          mismatched++;
-        } else if(parsedIsTiered){
-          const mergedTiers = mergeTiers(existing.tiers, parsed.tiers);
-          await updateDoc(doc(db, "catalog", existing.id), { tiers: tiersToFirestore(mergedTiers) });
-          existing.tiers = mergedTiers;
-          merged++;
-        } else if(parsedIsFlat){
-          const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
-          await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
-          existing.variants = mergedVariants;
-          merged++;
-        } else {
-          // Dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên.
-          merged++;
-        }
-      } else {
-        // Sản phẩm mới mặc định xếp ở cuối danh sách hiện có (order lớn nhất + bước nhảy)
-        const ref = await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers), order: nextOrder });
-        nextOrder += ORDER_STEP;
-        workingList.push({ id: ref.id, name: parsed.name, variants: [...parsed.variants], tiers: parsed.tiers ? parsed.tiers.map(arr => [...arr]) : null });
-        created++;
+async function toggleShipped(t){
+  try{
+    await updateDoc(doc(db, "tasks", t.id), { shipped: !t.shipped, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
+}
+
+async function markShipped(id, value){
+  try{
+    await updateDoc(doc(db, "tasks", id), { shipped: value, updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
+}
+
+async function packWholeOrder(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId && t.status === "cho_dong_goi");
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp(), expireAt: computeExpireAt() });
+    }
+  }catch(e){ showError("Không đóng gói được cả đơn: " + e.message); }
+}
+
+async function saveTaskEdit(id, name, qty){
+  const n = (name || "").trim();
+  const q = parseInt(qty) || 1;
+  if(!n){ showError("Tên sản phẩm không được để trống."); return; }
+  try{
+    await updateDoc(doc(db, "tasks", id), { name: n, qty: q, updatedAt: serverTimestamp() });
+    closeTaskEditor();
+    render();
+  }catch(e){ showError("Không lưu được thay đổi: " + e.message); }
+}
+
+async function saveNote(id, note){
+  try{
+    await updateDoc(doc(db, "tasks", id), { note: note || "", updatedAt: serverTimestamp() });
+  }catch(e){ showError("Không lưu được ghi chú: " + e.message); }
+}
+
+async function deleteTask(id){
+  if(!confirm("Xóa việc này?")) return;
+  const emptiedOrders = orderIdsBecomingEmpty([id]);
+  try{
+    await deleteDoc(doc(db, "tasks", id));
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
+  }catch(e){ showError("Không xóa được: " + e.message); }
+}
+
+// ---- Phiếu giao (ship label PDF) — gắn theo order, không theo item ----
+
+// ---- Trích mã vận đơn từ PDF phiếu giao ----
+// Có 2 cách, dùng kết hợp:
+//  1) Đọc MÃ QR in trên phiếu (render trang PDF ra canvas rồi giải mã bằng
+//     jsQR) — ĐÂY LÀ CÁCH CHÍNH. Mã QR trên các phiếu đã kiểm tra (J&T, SPX,
+//     GHN) đều encode ĐÚNG mã vận đơn dạng chữ thuần, không kèm nhãn hay chữ
+//     rác gì khác — nên không cần biết trước mẫu của từng hãng, không sợ hãng
+//     đổi cách trình bày, và vẫn đọc được kể cả khi PDF là ảnh scan (miễn ảnh
+//     đủ nét để thấy mã QR), vì làm việc trên ảnh render chứ không phụ thuộc
+//     lớp text của PDF.
+//  2) Đọc LỚP TEXT bằng pdf.js (cách cũ) — chỉ dùng làm DỰ PHÒNG khi trang
+//     không có mã QR nào đọc được. Không còn dùng để suy ra tên hãng nữa —
+//     kết quả trả về CHỈ LÀ chuỗi mã vận đơn (string), không kèm carrier.
+async function renderPdfPageToCanvas(page, scale){
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d");
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas;
+}
+
+async function extractQrFromPdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  // Thử nhiều độ phân giải (scale) tăng dần: ảnh nét hơn thì đọc mã QR nhỏ dễ
+  // hơn, nhưng cũng chậm hơn — nên chỉ tăng scale khi lần thử trước thất bại.
+  const scales = [2, 3, 4];
+  for(let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    for(const scale of scales){
+      const canvas = await renderPdfPageToCanvas(page, scale);
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const qr = window.jsQR(imageData.data, imageData.width, imageData.height);
+      if(qr && qr.data && qr.data.trim()){
+        return qr.data.trim();
       }
     }
-    const parts = [`${created} sp mới`, `${merged} sp gộp thêm phân loại`];
-    if(mismatched > 0) parts.push(`${mismatched} dòng bỏ qua (khác cấu trúc phân loại với sản phẩm đã có, cần sửa tay qua nút ✏️ Sửa)`);
-    parts.push(`${skipped} dòng bỏ qua (sai định dạng)`);
-    statusEl.textContent = "Xong: " + parts.join(", ") + ".";
-    statusEl.className = "status ok";
-    document.getElementById("bulkInput").value = "";
-    closeFullscreen();
-  }catch(e){
-    statusEl.textContent = "Lỗi khi nhập danh sách: " + e.message;
-    statusEl.className = "status err";
   }
-});
+  return null;
+}
 
-// Giữ nguyên nội dung này khớp với đoạn <p class="muted"> tĩnh nằm dưới
-// ô #bulkInput ở trên — nếu sửa 1 chỗ thì nhớ sửa luôn chỗ kia.
-const BULK_FORMAT_HELP = `Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
-      1) Không phân loại: <b>Tên sản phẩm</b><br>
-      2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
-      3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
-      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.`;
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  for(let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += " " + content.items.map(it => it.str).join(" ");
+  }
+  return text;
+}
 
-document.getElementById("exportBtn").addEventListener("click", () => {
-  if(allProducts.length === 0){
-    alert("Danh mục đang trống, chưa có gì để xuất.");
+// Dự phòng khi không đọc được mã QR nào — dò trong lớp text. Trả về CHUỖI mã
+// vận đơn hoặc null (không còn phân biệt hãng).
+function detectTrackingFromText(text){
+  // --- J&T Express: phiếu không ghi rõ nhãn "Mã vận đơn:" — mã vận đơn
+  // chính là dãy số của mã vạch, lặp lại nhiều lần dọc theo lề phiếu. Phải
+  // loại trừ "Order ID" (đó là mã đơn hàng của sàn TikTok Shop/Shopee, KHÔNG
+  // phải mã vận đơn) rồi chọn dãy số xuất hiện nhiều lần nhất còn lại.
+  if(/J\s*&\s*T/i.test(text)){
+    const cleaned = text.replace(/Order\s*ID\s*:?\s*\d+/gi, "");
+    const nums = cleaned.match(/\d{9,15}/g) || [];
+    const freq = new Map();
+    nums.forEach(n => freq.set(n, (freq.get(n) || 0) + 1));
+    let best = null, bestCount = 0;
+    for(const [n, c] of freq){ if(c > bestCount){ best = n; bestCount = c; } }
+    return best || null;
+  }
+  // --- Các nhãn "họ Shopee" (SPX Express, hoặc đối tác Giao Hàng Nhanh) đều
+  // ghi rõ nhãn "Mã vận đơn:" ngay trước mã.
+  const m = text.match(/Mã vận đơn:?\s*([A-Za-z0-9]{5,})/i);
+  return m ? m[1] : null;
+}
+
+async function extractTrackingFromPdf(file){
+  // Không "nuốt" lỗi ở đây nữa — để lỗi văng ra ngoài cho nơi gọi phân biệt
+  // được 2 trường hợp: "đọc PDF lỗi" (do thư viện/mạng) vs "đọc được nhưng
+  // không khớp mẫu nào" (PDF ảnh scan hoặc mẫu hãng lạ).
+
+  // Đọc song song cả 2 cách; ưu tiên QR, chỉ dùng text khi QR không ra gì.
+  const [qrCode, text] = await Promise.all([
+    extractQrFromPdf(file).catch(() => null),
+    extractPdfText(file)
+  ]);
+
+  if(qrCode) return qrCode;
+
+  return detectTrackingFromText(text);
+}
+
+// Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
+// item cùng orderId (giống cách renameOrder() đồng bộ tên đơn). Dùng chung
+// 1 public_id cố định theo orderId nên lần tải lên sau tự ghi đè file cũ
+// (cần bật "Overwrite" cho upload preset "ship-labels" trên Cloudinary).
+async function uploadShipLabel(orderId, file){
+  if(!file) return;
+  if(file.type !== "application/pdf"){
+    showError("Chỉ chấp nhận file PDF cho phiếu giao.");
     return;
   }
-  const text = allProducts.map(productToLine).join("\n");
-  // Chỉ để xem / sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây không ghi gì
-  // xuống Firestore, tránh nhầm lẫn với việc sửa từng sản phẩm.
-  openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true,
-    `Đây là toàn bộ danh mục hiện có, mỗi dòng 1 sản phẩm theo đúng định dạng nhập liệu.<br>
-     Chỉ để xem và sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây sẽ không ghi gì xuống hệ thống.`);
-});
-
-const bulkTextarea = document.getElementById("bulkInput");
-document.getElementById("expandBtn").addEventListener("click", () => {
-  openEditorRaw("Nhập / sửa danh sách", bulkTextarea.value, async (text) => {
-    bulkTextarea.value = text;
-    return true;
-  }, BULK_FORMAT_HELP);
-});
-
-function closeFullscreen(){
-  document.getElementById("editorOverlay").classList.remove("show");
-}
-
-function openEditorRaw(title, initialText, onSave, descriptionHtml){
-  document.getElementById("editorTitle").textContent = title;
-  document.getElementById("editorDesc").innerHTML = descriptionHtml;
-  document.getElementById("editorTextarea").value = initialText;
-  document.getElementById("editorOverlay").classList.add("show");
-  editorSaveHandler = onSave;
-}
-
-function openEditor(product){
-  const line = productToLine(product);
-  openEditorRaw("Sửa: " + product.name, line, async (text) => {
-    const firstLine = text.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
-    const parsed = parseLine(firstLine);
-    if(!parsed){
-      alert("Định dạng không hợp lệ, cần có ít nhất tên sản phẩm");
-      return false;
-    }
-    const dup = allProducts.find(p => p.id !== product.id && p.name.toLowerCase() === parsed.name.toLowerCase());
-    if(dup){
-      alert(`Tên "${parsed.name}" đã trùng với 1 sản phẩm khác đang có trong danh mục.\nĐổi tên khác, hoặc nếu muốn gộp 2 sản phẩm làm 1, hãy xóa sản phẩm này rồi dùng ô "Nhập / sửa danh sách" để gộp phân loại vào sản phẩm còn lại.`);
-      return false;
-    }
+  uploadingShipLabelIds.add(orderId);
+  render();
+  try{
+    // URL (public_id) LUÔN cố định theo orderId nội bộ — không đổi dù đọc
+    // được mã vận đơn hay không, để link luôn "vô danh" với người ngoài và
+    // luôn ghi đè đúng 1 file (không phát sinh file mồ côi khi mã vận đơn
+    // đổi giữa các lần tải lên). Chỉ TÊN FILE GỐC (display name trên
+    // Cloudinary) mới đổi theo mã vận đơn khi đọc được, để tiện tìm kiếm
+    // trong Media Library — tách biệt hoàn toàn khỏi URL thật.
+    const publicId = `ship-labels/${orderId}`;
+    const currentItem = allTasks.find(t => t.orderId === orderId);
+    const currentName = (currentItem && currentItem.orderName) || "";
+    let uploadFile = file;
+    let trackingCode = null;
+    let readErrorMsg = null;
     try{
-      await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers) });
-      return true;
+      trackingCode = await extractTrackingFromPdf(file);
     }catch(e){
-      showError("Không lưu được sản phẩm: " + e.message);
-      return false;
+      readErrorMsg = (e && e.message) ? e.message : String(e);
     }
-  }, 'Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)');
+    if(trackingCode){
+      const safeCode = trackingCode.replace(/[^A-Za-z0-9]/g, "");
+      uploadFile = new File([file], `${safeCode}.pdf`, { type: file.type });
+      const newTitle = trackingCode;
+      const isAutoName = /^#[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{9}$/.test(currentName);
+      const shouldRename = isAutoName ||
+        confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
+      if(shouldRename) await renameOrder(orderId, newTitle);
+    } else {
+      if(readErrorMsg){
+        showError("Không đọc được file PDF này để tự nhận diện mã vận đơn — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
+      } else {
+        showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
+      }
+      // Không giữ tên gốc lộn xộn từ điện thoại — đổi theo tên đơn hiện tại
+      // (giống cách downloadShipLabel() đặt tên lúc tải xuống).
+      const safeName = (currentName || "don-hang").replace(/[^a-zA-Z0-9-_]+/g, "_");
+      uploadFile = new File([file], `phieu-giao-${safeName}.pdf`, { type: file.type });
+    }
+    const formData = new FormData();
+    formData.append("file", uploadFile);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("public_id", publicId);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data && data.error && data.error.message) || ("HTTP " + res.status));
+    const url = data.secure_url;
+    const items = allTasks.filter(t => t.orderId === orderId);
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: url, updatedAt: serverTimestamp() });
+    }
+  }catch(e){
+    showError("Không tải lên được phiếu giao: " + e.message);
+  }finally{
+    uploadingShipLabelIds.delete(orderId);
+    render();
+  }
 }
 
-document.getElementById("editorCancel").addEventListener("click", closeFullscreen);
-document.getElementById("editorSave").addEventListener("click", async () => {
-  const text = document.getElementById("editorTextarea").value;
-  if(editorSaveHandler){
-    const result = await editorSaveHandler(text);
-    if(result === false) return;
+async function removeShipLabel(orderId){
+  if(!confirm("Xóa phiếu giao đã đính kèm cho đơn này?")) return;
+  try{
+    // Không xóa file trên Cloudinary ở đây: xóa cần chữ ký (API secret) nên
+    // không thể gọi an toàn từ trình duyệt. Chỉ gỡ URL khỏi Firestore; file
+    // cũ trên Cloudinary sẽ tự bị ghi đè ở lần tải lên kế tiếp cho orderId này.
+    const items = allTasks.filter(t => t.orderId === orderId);
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { shipLabelUrl: deleteField(), updatedAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Không xóa được phiếu giao: " + e.message); }
+}
+
+// Được gọi khi đơn hàng không còn item nào (mọi item cùng orderId đã bị xóa).
+// Vì lý do tương tự removeShipLabel(), không thể xóa file trên Cloudinary từ
+// trình duyệt mà không lộ API secret — file mồ côi (nếu có) sẽ nằm lại trên
+// Cloudinary nhưng vô hại vì không còn được tham chiếu ở đâu trong ứng dụng.
+async function deleteShipLabelFileIfExists(orderId){
+  // no-op: xem ghi chú ở trên.
+}
+
+// Tải file về máy trực tiếp (không mở tab mới): fetch nguyên byte gốc thành
+// blob rồi tự trigger tải — cách này bắt buộc phải dùng vì URL nằm khác domain
+// (Cloudinary), thẻ <a download> trỏ thẳng URL cross-domain sẽ bị trình
+// duyệt mở tab xem thay vì tải về.
+async function downloadShipLabel(url, orderName){
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const safeName = (orderName || "don-hang").replace(/[^a-zA-Z0-9-_]+/g, "_");
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `phieu-giao-${safeName}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  }catch(e){
+    showError("Không tải được phiếu giao (có thể do cấu hình CORS trên Cloudinary): " + e.message);
   }
-  closeFullscreen();
+}
+
+// Tải lần lượt (tuần tự, không đồng thời) mọi phiếu giao của các đơn ĐANG
+// HIỂN THỊ trong danh sách hiện tại (theo tab + tìm kiếm) — tránh trình
+// duyệt chặn khi kích hoạt quá nhiều tải xuống cùng lúc.
+async function downloadAllShipLabels(){
+  const groups = groupShown(getShown()).filter(g => g.shipLabelUrl);
+  if(groups.length === 0){
+    showError("Không có phiếu giao nào trong danh sách đang xem để tải.");
+    return;
+  }
+  if(!confirm(`Tải xuống ${groups.length} phiếu giao đang hiển thị?`)) return;
+  downloadAllBtn.disabled = true;
+  const originalText = downloadAllBtn.textContent;
+  for(let i = 0; i < groups.length; i++){
+    downloadAllBtn.textContent = `⏳ Đang tải (${i + 1}/${groups.length})...`;
+    await downloadShipLabel(groups[i].shipLabelUrl, groups[i].orderName);
+  }
+  downloadAllBtn.disabled = false;
+  downloadAllBtn.textContent = originalText;
+}
+downloadAllBtn.addEventListener("click", downloadAllShipLabels);
+
+async function renameOrder(orderId, newName){
+  const n = (newName || "").trim() || newOrderName();
+  const items = allTasks.filter(t => t.orderId === orderId);
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { orderName: n, updatedAt: serverTimestamp() });
+    }
+    editingOrderIds.delete(orderId);
+    render();
+  }catch(e){ showError("Không đổi được tên đơn: " + e.message); }
+}
+
+// ---- Batch actions ----
+function updateBatchBar(){
+  const n = selected.size;
+  document.getElementById("batchCount").textContent = n + " đã chọn";
+  const doneBtn = document.getElementById("batchDone");
+  const shipBtn = document.getElementById("batchShip");
+  if(currentTab === "xong"){
+    doneBtn.style.display = "none";
+    shipBtn.style.display = "inline-block";
+  } else {
+    doneBtn.style.display = "inline-block";
+    doneBtn.textContent = currentTab === "in" ? "Đã in xong" : "Đã đóng gói";
+    shipBtn.style.display = "none";
+  }
+  batchbar.classList.toggle("show", n > 0);
+}
+
+document.getElementById("batchShip").addEventListener("click", async () => {
+  const ids = Array.from(selected);
+  try{
+    for(const id of ids){
+      await markShipped(id, true);
+    }
+  }catch(e){ showError("Lỗi khi đánh dấu đã giao theo lô: " + e.message); }
+  selected.clear();
+  updateBatchBar();
+});
+
+document.getElementById("batchDone").addEventListener("click", async () => {
+  const ids = Array.from(selected);
+  try{
+    for(const id of ids){
+      const t = allTasks.find(x => x.id === id);
+      if(t) await advanceStatus(t);
+    }
+  }catch(e){ showError("Lỗi khi xử lý theo lô: " + e.message); }
+  selected.clear();
+  updateBatchBar();
+});
+
+document.getElementById("batchDel").addEventListener("click", async () => {
+  if(!confirm("Xóa " + selected.size + " mục đã chọn?")) return;
+  const ids = Array.from(selected);
+  const emptiedOrders = orderIdsBecomingEmpty(ids);
+  try{
+    for(const id of ids){
+      await deleteDoc(doc(db, "tasks", id));
+    }
+    for(const oid of emptiedOrders) await deleteShipLabelFileIfExists(oid);
+  }catch(e){ showError("Không xóa được các mục đã chọn: " + e.message); }
+  selected.clear();
+  updateBatchBar();
 });
 </script>
 </body>
