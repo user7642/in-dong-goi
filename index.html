@@ -385,6 +385,8 @@ import {
   updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
@@ -1091,6 +1093,59 @@ async function deleteTask(id){
 
 // ---- Phiếu giao (ship label PDF) — gắn theo order, không theo item ----
 
+// ---- Trích mã vận đơn từ PDF phiếu giao (đọc lớp text bằng pdf.js, KHÔNG
+// dùng OCR — chỉ hoạt động với PDF có lớp chữ thật, không phải ảnh scan) ----
+// Mỗi hãng vận chuyển in phiếu theo mẫu khác nhau nên cần quy tắc riêng.
+// Trả về { carrier, code } nếu nhận diện được, hoặc null nếu không (mẫu lạ
+// hoặc PDF là ảnh scan không có lớp chữ).
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  for(let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += " " + content.items.map(it => it.str).join(" ");
+  }
+  return text;
+}
+
+function detectTracking(text){
+  // --- J&T Express: phiếu không ghi rõ nhãn "Mã vận đơn:" — mã vận đơn
+  // chính là dãy số của mã vạch, lặp lại nhiều lần dọc theo lề phiếu. Phải
+  // loại trừ "Order ID" (đó là mã đơn hàng của sàn TikTok Shop/Shopee, KHÔNG
+  // phải mã vận đơn) rồi chọn dãy số xuất hiện nhiều lần nhất còn lại.
+  if(/J\s*&\s*T/i.test(text)){
+    const cleaned = text.replace(/Order\s*ID\s*:?\s*\d+/gi, "");
+    const nums = cleaned.match(/\d{9,15}/g) || [];
+    const freq = new Map();
+    nums.forEach(n => freq.set(n, (freq.get(n) || 0) + 1));
+    let best = null, bestCount = 0;
+    for(const [n, c] of freq){ if(c > bestCount){ best = n; bestCount = c; } }
+    return best ? { carrier: "JNT", code: best } : null;
+  }
+  // --- Các nhãn "họ Shopee" (SPX Express, hoặc đối tác Giao Hàng Nhanh) đều
+  // ghi rõ nhãn "Mã vận đơn:" ngay trước mã, nên dùng chung 1 quy tắc, chỉ
+  // khác nhau ở tên hãng hiển thị (dựa vào logo/từ khóa xuất hiện trong text).
+  const m = text.match(/Mã vận đơn:?\s*([A-Za-z0-9]{5,})/i);
+  if(m){
+    let carrier = "SHOPEE";
+    if(/giao\s*h[àa]ng\s*nhanh/i.test(text)) carrier = "GHN";
+    else if(/spx/i.test(text)) carrier = "SPX";
+    return { carrier, code: m[1] };
+  }
+  return null;
+}
+
+async function extractTrackingFromPdf(file){
+  try{
+    const text = await extractPdfText(file);
+    return detectTracking(text);
+  }catch(e){
+    return null; // PDF lỗi/ảnh scan không đọc được text — coi như không nhận diện được
+  }
+}
+
 // Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
 // item cùng orderId (giống cách renameOrder() đồng bộ tên đơn). Dùng chung
 // 1 public_id cố định theo orderId nên lần tải lên sau tự ghi đè file cũ
@@ -1104,10 +1159,37 @@ async function uploadShipLabel(orderId, file){
   uploadingShipLabelIds.add(orderId);
   render();
   try{
+    // URL (public_id) LUÔN cố định theo orderId nội bộ — không đổi dù đọc
+    // được mã vận đơn hay không, để link luôn "vô danh" với người ngoài và
+    // luôn ghi đè đúng 1 file (không phát sinh file mồ côi khi mã vận đơn
+    // đổi giữa các lần tải lên). Chỉ TÊN FILE GỐC (display name trên
+    // Cloudinary) mới đổi theo mã vận đơn khi đọc được, để tiện tìm kiếm
+    // trong Media Library — tách biệt hoàn toàn khỏi URL thật.
+    const publicId = `ship-labels/${orderId}`;
+    const currentItem = allTasks.find(t => t.orderId === orderId);
+    const currentName = (currentItem && currentItem.orderName) || "";
+    let uploadFile = file;
+    const extraction = await extractTrackingFromPdf(file);
+    if(extraction){
+      const safeCode = extraction.code.replace(/[^A-Za-z0-9]/g, "");
+      const slug = `${extraction.carrier}-${safeCode}`;
+      uploadFile = new File([file], `${slug}.pdf`, { type: file.type });
+      const newTitle = `${extraction.carrier}:${extraction.code}`;
+      const isAutoName = /^Đơn [ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(currentName);
+      const shouldRename = isAutoName ||
+        confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
+      if(shouldRename) await renameOrder(orderId, newTitle);
+    } else {
+      showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
+      // Không giữ tên gốc lộn xộn từ điện thoại — đổi theo tên đơn hiện tại
+      // (giống cách downloadShipLabel() đặt tên lúc tải xuống).
+      const safeName = (currentName || "don-hang").replace(/[^a-zA-Z0-9-_]+/g, "_");
+      uploadFile = new File([file], `phieu-giao-${safeName}.pdf`, { type: file.type });
+    }
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", uploadFile);
     formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    formData.append("public_id", `ship-labels/${orderId}`);
+    formData.append("public_id", publicId);
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`, {
       method: "POST",
       body: formData
