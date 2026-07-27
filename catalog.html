@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Quản lý danh mục sản phẩm</title>
+<style>
+  :root{
+    --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
+    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
+    --amber:#b45309; --amber-bg:#fef3e0;
+    --maxw:680px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  /* Header, main, footer và các thanh sticky/fixed đều dùng chung 1 độ rộng
+     tối đa (--maxw), canh giữa — để trên desktop mọi khối đều thẳng hàng
+     với nhau thay vì header chạy full-width còn nội dung bị bó hẹp lại. */
+  header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:15;max-width:var(--maxw);margin:0 auto;}
+  h1{font-size:18px;margin:0;font-weight:600;text-align:center;}
+  a.back{font-size:13px;color:var(--blue);text-decoration:none;display:block;text-align:center;margin-bottom:6px;}
+  .tabs{display:flex;gap:6px;margin-top:12px;}
+  .tab{
+    flex:1;text-align:center;padding:10px 4px;font-size:14px;font-weight:600;
+    color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;user-select:none;
+  }
+  .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+  main{padding:14px;max-width:var(--maxw);margin:0 auto;}
+  section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;}
+  h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
+  input[type=text],textarea{
+    width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;
+  }
+  textarea{min-height:130px;resize:vertical;line-height:1.5;}
+  .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
+  .row-nowrap{flex-wrap:nowrap;}
+  button{border:none;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;}
+  .btn-blue{background:var(--blue);color:#fff;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);}
+  .btn-outline.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+  .searchbox{margin-bottom:10px;}
+
+  .errbox{
+    background:#fde8e8;color:var(--red);border:1px solid #f5b8b8;border-radius:8px;
+    padding:8px 12px;font-size:13px;margin-bottom:10px;
+  }
+
+  /* Toolbar nổi trong phần header — dùng chung cho cả 2 tab, không cần tự
+     sticky riêng nữa vì đã nằm bên trong thẻ header (header đã sticky top:0). */
+  .header-toolbar{margin-top:10px;}
+  #gomRow{margin-bottom:4px;}
+  /* Khi chưa bấm "Gom sản phẩm", nút này đứng 1 mình trong hàng — cho nó
+     chiếm trọn chiều rộng thay vì co lại và lệch sang trái trông mất cân đối.
+     Khi đã kích hoạt (.active) thì trở lại kích thước tự nhiên để chia chỗ
+     với ô nhập tên đơn + nút Xong. */
+  #gomBtn:not(.active){width:100%;}
+  #groupNameInput{flex:1;min-width:160px;}
+  #gomStatusLine{
+    font-size:12.5px;color:var(--blue);margin-bottom:2px;font-weight:600;
+  }
+  #gomBar.active{
+    background:var(--blue-bg);border:1px solid var(--blue);border-radius:10px;
+    padding:10px 10px 6px;
+  }
+
+  /* Action bar (giống bảng sản phẩm sàn TMĐT) */
+  .action-bar{
+    background:var(--gray-bg);border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .action-bar span{font-size:13px;color:var(--muted);flex:1;}
+  .action-bar button{font-size:13px;padding:8px 14px;}
+  .action-bar .del-btn{background:var(--border);color:var(--muted);cursor:not-allowed;}
+  .action-bar .del-btn.enabled{background:var(--red);color:#fff;cursor:pointer;}
+  .selectall{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);}
+  .selectall input{width:20px;height:20px;accent-color:var(--blue);}
+
+  .item{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;gap:10px;}
+  .item input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:var(--blue);}
+  .item .orderBtns{display:grid;grid-template-columns:repeat(2,28px);gap:4px;flex-shrink:0;align-content:center;}
+  .item .orderBtn{
+    width:28px;height:28px;padding:0;font-size:13px;line-height:1;
+    background:var(--gray-bg);color:var(--text);
+    display:flex;align-items:center;justify-content:center;border-radius:6px;
+  }
+  .item .orderBtn:disabled{opacity:.3;cursor:default;}
+  .item .body{flex:1;min-width:0;}
+  .item .titlerow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;}
+  .item .name{font-size:15px;font-weight:600;}
+  .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
+  .item .delBtn{background:var(--gray-bg);color:var(--red);font-size:13px;padding:6px 10px;flex-shrink:0;}
+  .item .rowActions{display:flex;gap:6px;flex-shrink:0;}
+  .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
+  .item .vchip.selected{background:var(--blue);color:#fff;}
+  .item .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
+  .item .vchip .vlabel{cursor:pointer;padding:2px 4px;}
+  .item .vchip .qtytag{padding:2px 2px;}
+  .item .vchip .chipminus,.item .vchip .chipx{
+    margin-left:4px;font-weight:700;opacity:.85;cursor:pointer;padding:2px 6px;border-radius:8px;
+  }
+  .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
+  .muted{color:var(--muted);font-size:13px;}
+
+  /* ---- Chế độ xem dạng lưới (grid) — các ô cố định 1 chiều cao như nhau,
+     không phình to theo số phân loại; chi tiết phân loại xem ở bảng chọn
+     nhanh riêng khi chạm vào ô. ---- */
+  #viewModeRow button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+  .gridWrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .gcard{
+    position:relative;border:1.5px solid var(--border);border-radius:10px;padding:10px;
+    height:104px;display:flex;flex-direction:column;justify-content:space-between;
+    cursor:pointer;background:var(--card);
+  }
+  .gcard.active{border-color:var(--blue);background:var(--blue-bg);}
+  .gcard .gtop{display:flex;align-items:flex-start;gap:8px;}
+  .gcard .gavatar{
+    width:26px;height:26px;flex-shrink:0;border-radius:7px;background:var(--blue-bg);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  }
+  .gcard.active .gavatar{background:var(--blue);color:#fff;}
+  .gcard .gname{
+    font-size:13px;font-weight:600;line-height:1.3;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  }
+  .gcard .gstatus{font-size:11.5px;color:var(--muted);}
+  .gcard.active .gstatus{color:var(--blue);}
+  .gcard .gqtyRow{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--blue);}
+  .gcard .gqtyRow .gminus{background:#fff;color:var(--text);border-radius:6px;padding:1px 9px;font-weight:700;}
+
+  .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
+  .linkEditBox{
+    margin-top:8px;padding:10px 10px 6px;border:1px solid var(--blue);
+    background:var(--blue-bg);border-radius:10px;
+  }
+  .linkEditBox input{margin-bottom:6px;}
+
+  /* Nhiều tầng phân loại (VD: Chủ đề x Kích thước) */
+  .groupRow{margin-bottom:10px;}
+  .groupRow:last-child{margin-bottom:0;}
+  .groupName{font-size:13px;color:var(--text);font-weight:700;margin-bottom:5px;}
+  .groupOpts{display:flex;flex-wrap:wrap;gap:6px;}
+  .status{font-size:13px;margin-top:8px;min-height:18px;}
+  .status.ok{color:var(--green);}
+  .status.err{color:var(--red);}
+
+  .taskbar{
+    position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
+    padding:10px 12px;display:none;align-items:center;gap:8px;z-index:30;
+    max-width:var(--maxw);margin:0 auto;border-radius:12px 12px 0 0;
+  }
+  .taskbar.show{display:flex;}
+  .taskbar button{border:none;border-radius:8px;padding:11px 12px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
+  /* Nút "Xem đã chọn": chỉ icon + số lượng, kích thước cố định theo nội dung
+     (không flex:1) — để nút hành động chính bên cạnh luôn có đủ chỗ, tránh
+     bị bóp chữ xuống nhiều dòng xấu khi màn hình hẹp (xem góp ý thiết kế). */
+  .taskbar .viewBtn{
+    flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;
+    background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
+  }
+  .taskbar .viewBtn .countBadge{
+    background:rgba(255,255,255,.25);border-radius:999px;
+    min-width:22px;height:22px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;
+  }
+  .taskbar #sendToIndexBtn{flex:1;min-width:0;}
+
+  /* Modal xem danh sách đã chọn */
+  .selgroup{margin-bottom:14px;}
+  .selgroup-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px;}
+  .selrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;}
+  .selrow:last-child{border-bottom:none;}
+  .selrow .selname{flex:1;}
+  .selrow .selremove{background:var(--gray-bg);color:var(--red);font-size:12px;padding:5px 9px;flex-shrink:0;}
+
+  .editor-overlay{
+    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:50;
+    display:none;flex-direction:column;padding:14px;
+    max-width:var(--maxw);margin:0 auto;
+  }
+  .editor-overlay.show{display:flex;}
+  .editor-overlay h3{font-size:16px;margin:0 0 8px 0;}
+  .editor-overlay p.muted{margin:0 0 10px 0;}
+  .editor-overlay textarea{flex:1;min-height:200px;font-size:15px;}
+  .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
+  .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
+
+  footer{text-align:center;padding:18px 14px 28px;max-width:var(--maxw);margin:0 auto;}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="index.html">← Về trang chính</a>
+  <h1 id="pageTitle">Thêm danh sách công việc</h1>
+  <div class="tabs">
+    <div class="tab active" data-mode="task">➕ Thêm việc</div>
+    <div class="tab" data-mode="manage">🗂 Quản lý danh mục</div>
+  </div>
+
+  <div id="gomBar" class="header-toolbar">
+    <div class="row" id="gomRow">
+      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
+      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
+      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
+    </div>
+    <div id="gomStatusLine" style="display:none;"></div>
+  </div>
+
+  <div class="row header-toolbar" id="viewModeRow" style="display:none;">
+    <button class="btn-outline" id="listViewBtn" type="button">☰ Danh sách</button>
+    <button class="btn-outline" id="gridViewBtn" type="button">▦ Lưới</button>
+  </div>
+
+  <div class="row header-toolbar" id="sortModeRow" style="display:none;">
+    <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
+  </div>
+
+  <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
+    <span id="selCount">Đã chọn 0 sản phẩm</span>
+    <button class="del-btn" id="topDelBtn">Xóa</button>
+  </div>
+  <div class="selectall header-toolbar" id="selectAllRow" style="display:none;">
+    <input type="checkbox" id="selectAllBox">
+    <span>Chọn tất cả</span>
+  </div>
+</header>
+
+<main>
+
+  <section id="manageSection" style="display:none;">
+    <h2>Nhập / sửa danh sách (dán vào đây)</h2>
+    <p class="muted" style="margin-top:0;">
+      Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
+      1) Không phân loại: <b>Tên sản phẩm</b><br>
+      2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
+      3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
+      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.
+    </p>
+    <textarea id="bulkInput" placeholder="Bút chì màu 12 màu&#10;Lược sử Việt Nam | A0, A1, A2, A3&#10;Bộ tranh kỹ năng an toàn | An toàn trong nhà, An toàn ngoài trời | A2 (60x42 cm), A3 (42x30 cm)"></textarea>
+    <div class="row row-nowrap" style="margin-top:8px;">
+      <button class="btn-blue" id="bulkBtn" style="flex:1;">Nhập danh sách</button>
+      <button class="btn-outline" id="expandBtn" type="button" style="flex:1;">⤢ Mở rộng</button>
+    </div>
+    <div class="status" id="bulkStatus"></div>
+  </section>
+
+  <section>
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
+      <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
+    </div>
+    <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo tên hoặc phân loại...">
+
+    <div id="errArea"></div>
+
+    <div id="list"></div>
+  </section>
+
+</main>
+
+<div class="taskbar" id="taskbar">
+  <button class="viewBtn" id="viewSelectedBtn" type="button" title="Xem đã chọn">
+    📋 <span class="countBadge" id="taskCount">0</span>
+  </button>
+  <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
+</div>
+
+<div class="editor-overlay" id="editorOverlay">
+  <h3 id="editorTitle">Sửa sản phẩm</h3>
+  <p class="muted" id="editorDesc">Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)</p>
+  <textarea id="editorTextarea"></textarea>
+  <div class="editor-actions">
+    <button class="btn-outline" id="editorCancel">Hủy</button>
+    <button class="btn-green" id="editorSave">Lưu</button>
+  </div>
+</div>
+
+<div class="editor-overlay" id="selectedOverlay">
+  <h3>Sản phẩm đã chọn</h3>
+  <p class="muted" style="margin-top:0;">Chạm "Xóa" để bỏ chọn 1 phân loại. Đóng lại để tiếp tục chọn thêm.</p>
+  <div id="selectedListBody" style="flex:1;overflow:auto;"></div>
+  <div class="editor-actions">
+    <button class="btn-outline" id="selectedCloseBtn">Đóng</button>
+  </div>
+</div>
+
+<div class="editor-overlay" id="gridDetailOverlay">
+  <h3>Chọn phân loại</h3>
+  <div id="gridDetailBody" style="flex:1;overflow:auto;"></div>
+  <div class="editor-actions">
+    <button class="btn-outline" id="gridDetailCloseBtn">Đóng</button>
+  </div>
+</div>
+
+<footer>
+  <a class="back" href="index.html">← Về trang chính</a>
+  <a class="back" href="huong-dan.html">📖 Xem hướng dẫn sử dụng</a>
+</footer>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, onSnapshot, doc,
+  updateDoc, deleteDoc, query, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7KyouXCw0dgRJK8pUiHkay8sUjqhGM3g",
+  authDomain: "in-dong-goi.firebaseapp.com",
+  projectId: "in-dong-goi",
+  storageBucket: "in-dong-goi.firebasestorage.app",
+  messagingSenderId: "532007763879",
+  appId: "1:532007763879:web:8d752aa4d86fd317ca0082"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const catalogCol = collection(db, "catalog");
+const tasksCol = collection(db, "tasks");
+
+let allProducts = [];
+let selected = new Set();
+let taskSelections = new Map(); // key: productId__variant -> {productName, variant, qty, orderId}
+let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "ghim" (tô sáng) tại 1 thời điểm
+let editorSaveHandler = null;
+// Danh sách sản phẩm đang mở form "chèn link file in" ở tab Thêm việc.
+let editingLinkIds = new Set();
+
+// ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
+// 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
+let mode = "task";
+
+// ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, như hiện tại) hoặc
+// 'grid' (dạng lưới, các ô đều nhau, xem chi tiết phân loại qua bảng chọn
+// nhanh riêng). Ghi nhớ lựa chọn giữa các lần mở trang bằng localStorage. ----
+let viewMode = localStorage.getItem("catalogViewMode") || "list";
+// Sản phẩm đang mở bảng chọn nhanh (chỉ dùng ở chế độ lưới)
+let gridDetailProductId = null;
+
+// ---- Gom sản phẩm (grouping into one order) ----
+let gomMode = false;
+let currentGroupId = null;
+let groupNames = new Map(); // orderId đã "Xong" -> tên đơn (hoặc null = tự sinh mã)
+
+const errArea = document.getElementById("errArea");
+function showError(msg){
+  errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
+  setTimeout(() => { errArea.innerHTML = ""; }, 6000);
+}
+
+function randCode(len){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+// Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
+// thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
+// mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
+// extractTrackingFromPdf ở index.html) — nên chỉ cần nhìn ký tự đầu là phân
+// biệt được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
+function newOrderName(){ return "#" + randCode(9); }
+
+// ---- Chuyển chế độ ----
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    mode = t.dataset.mode;
+    if(mode === "manage") closeGridDetail();
+    applyModeUI();
+    renderList();
+  });
+});
+
+const gomBtn = document.getElementById("gomBtn");
+const groupNameInput = document.getElementById("groupNameInput");
+const gomStatusLine = document.getElementById("gomStatusLine");
+const gomDoneBtn = document.getElementById("gomDoneBtn");
+
+function updateGomStatusLine(){
+  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
+  const name = groupNameInput.value.trim();
+  gomStatusLine.style.display = "block";
+  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
+}
+
+// ---- Chế độ sắp xếp thủ công (chỉ trong tab quản lý) — bật lên mới hiện
+// nút ▲▼ trên từng item, vì đây là thao tác không thường xuyên (chủ yếu dùng
+// lúc mới nhập danh sách hoặc thỉnh thoảng dọn lại thứ tự sau này). ----
+let sortMode = false;
+
+function applyModeUI(){
+  const isManage = mode === "manage";
+  if(!isManage) sortMode = false; // rời tab quản lý thì tự thoát chế độ sắp xếp
+  document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
+  document.getElementById("manageSection").style.display = isManage ? "block" : "none";
+  document.getElementById("sortModeRow").style.display = isManage ? "flex" : "none";
+  document.getElementById("searchBox").style.display = (isManage && sortMode) ? "none" : "block";
+  document.getElementById("manageActionBar").style.display = (isManage && !sortMode) ? "flex" : "none";
+  document.getElementById("selectAllRow").style.display = (isManage && !sortMode) ? "flex" : "none";
+  const sortModeBtn = document.getElementById("sortModeBtn");
+  sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
+  sortModeBtn.classList.toggle("active", sortMode);
+  document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
+  document.getElementById("gomBar").style.display = isManage ? "none" : "block";
+  document.getElementById("viewModeRow").style.display = isManage ? "none" : "flex";
+  if(isManage){
+    document.getElementById("gomStatusLine").style.display = "none";
+  } else {
+    updateGomStatusLine();
+  }
+}
+applyModeUI();
+
+document.getElementById("sortModeBtn").addEventListener("click", () => {
+  sortMode = !sortMode;
+  if(sortMode) selected.clear(); // không lẫn chế độ chọn/xóa với chế độ sắp xếp cùng lúc
+  applyModeUI();
+  renderList();
+});
+
+function exitGomMode(){
+  gomMode = false;
+  currentGroupId = null;
+  groupNameInput.value = "";
+  groupNameInput.style.display = "none";
+  gomDoneBtn.style.display = "none";
+  gomBtn.textContent = "📦 Gom sản phẩm";
+  gomBtn.classList.remove("active");
+  gomStatusLine.style.display = "none";
+  document.getElementById("gomBar").classList.remove("active");
+}
+
+gomBtn.addEventListener("click", () => {
+  if(!gomMode){
+    gomMode = true;
+    if(pinnedKey && taskSelections.has(pinnedKey)){
+      // Đang có sẵn 1 sp ghim (chọn kiểu đơn lẻ bình thường) — dùng LUÔN
+      // orderId hiện có của sp đó làm currentGroupId, không tạo id mới và
+      // không đổi identity của nó. Nếu không chọn thêm sp nào khác, nó vẫn
+      // đúng là đơn lẻ đó — chỉ khác là có thể gán thêm tên tùy biến. Nếu có
+      // chọn thêm sp khác trong lúc này, các sp đó sẽ nhập chung vào đơn này.
+      currentGroupId = taskSelections.get(pinnedKey).orderId;
+      pinnedKey = null;
+    } else {
+      currentGroupId = newOrderId();
+    }
+    groupNameInput.style.display = "block";
+    groupNameInput.value = "";
+    gomDoneBtn.style.display = "inline-block";
+    gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
+    gomBtn.classList.add("active");
+    document.getElementById("gomBar").classList.add("active");
+    updateGomStatusLine();
+    renderList();
+  } else {
+    // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
+    for(const val of taskSelections.values()){
+      if(val.orderId === currentGroupId){
+        val.orderId = newOrderId();
+      }
+    }
+    exitGomMode();
+    renderList();
+  }
+});
+
+gomDoneBtn.addEventListener("click", () => {
+  // Xong: chốt các sp đã chọn trong nhóm này thành 1 đơn, thoát chế độ gom
+  // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ
+  if(currentGroupId){
+    const nm = groupNameInput.value.trim();
+    const itemsInGroup = Array.from(taskSelections.values()).filter(v => v.orderId === currentGroupId).length;
+    if(nm || itemsInGroup > 1){
+      // Có đặt tên, hoặc thực sự gộp từ 2 sp trở lên -> ghi nhận là đơn có tên/gộp.
+      groupNames.set(currentGroupId, nm || null);
+    } else {
+      // Chỉ đúng 1 sp và không đặt tên -> coi như chưa từng bấm gom, để nó
+      // vẫn hiển thị và hoạt động y hệt 1 sản phẩm lẻ bình thường (không bị
+      // gắn nhãn "Đơn gộp" một cách không cần thiết).
+      groupNames.delete(currentGroupId);
+    }
+  }
+  exitGomMode();
+  renderList();
+});
+
+groupNameInput.addEventListener("input", updateGomStatusLine);
+
+// ---- Thứ tự hiển thị tùy chỉnh (field "order" trên mỗi sản phẩm) ----
+// Dùng bước nhảy 10 đơn vị (10, 20, 30...) thay vì 1, 2, 3... để sau này có
+// thể chèn 1 sản phẩm vào giữa 2 sản phẩm khác mà không phải renumber toàn bộ.
+const ORDER_STEP = 10;
+let orderMigrationDone = false;
+
+function sortProductsInPlace(){
+  allProducts.sort((a, b) => {
+    const oa = (typeof a.order === "number") ? a.order : Infinity;
+    const ob = (typeof b.order === "number") ? b.order : Infinity;
+    if(oa !== ob) return oa - ob;
+    return a.name.localeCompare(b.name, "vi");
+  });
+}
+
+function getMaxOrder(){
+  let max = 0;
+  for(const p of allProducts){
+    if(typeof p.order === "number" && p.order > max) max = p.order;
+  }
+  return max;
+}
+
+// Chạy đúng 1 lần: nếu TOÀN BỘ danh mục chưa có field "order" (dữ liệu cũ từ
+// trước khi có tính năng sắp xếp), gán order theo đúng thứ tự A-Z hiện tại
+// làm mốc ban đầu, để không làm xáo trộn danh sách người dùng đang quen mắt.
+// Nếu đã có ít nhất 1 sản phẩm có order (đã từng sắp xếp) thì bỏ qua, không
+// đụng vào bất kỳ sản phẩm nào.
+async function maybeMigrateOrder(){
+  if(orderMigrationDone) return;
+  if(allProducts.length === 0) return;
+  const noneHasOrder = allProducts.every(p => typeof p.order !== "number");
+  orderMigrationDone = true;
+  if(!noneHasOrder) return;
+  const sortedByName = [...allProducts].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  for(let i = 0; i < sortedByName.length; i++){
+    const p = sortedByName[i];
+    const ord = (i + 1) * ORDER_STEP;
+    p.order = ord;
+    try{ await updateDoc(doc(db, "catalog", p.id), { order: ord }); }
+    catch(e){ showError("Lỗi khởi tạo thứ tự sản phẩm: " + e.message); }
+  }
+}
+
+const q = query(catalogCol);
+onSnapshot(q, snap => {
+  allProducts = snap.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id, ...data,
+      tiers: tiersFromFirestore(data.tiers),
+      order: (typeof data.order === "number" ? data.order : null),
+      link: data.link || ""
+    };
+  });
+  sortProductsInPlace();
+  document.getElementById("totalCount").textContent = allProducts.length;
+  renderList();
+  maybeMigrateOrder();
+}, err => {
+  showError("Lỗi kết nối danh mục: " + err.message);
+});
+
+// Kiểm tra 1 chuỗi có phải URL http(s) hợp lệ hay không. Không dùng cách
+// kiểm nôm na kiểu str.includes("http") vì cách đó vừa lỏng lẻo (chấp nhận
+// rác miễn có chữ "http" ở đâu đó) vừa không loại được các scheme nguy hiểm
+// khác (vd "javascript:..."). Dùng chính API URL của trình duyệt để parse
+// thật sự, rồi chỉ chấp nhận đúng 2 scheme http/https.
+function isValidHttpUrl(str){
+  let url;
+  try{ url = new URL(str); }
+  catch(_){ return false; }
+  return url.protocol === "http:" || url.protocol === "https:";
+}
+
+document.getElementById("searchBox").addEventListener("input", renderList);
+
+function parseLine(line){
+  const parts = line.split("|").map(s => s.trim());
+  const name = parts[0];
+  if(!name) return null;
+  const rest = parts.slice(1).filter(seg => seg.length > 0);
+
+  if(rest.length === 0){
+    // Không có phân loại — sản phẩm đơn
+    return { name, variants: [], tiers: null };
+  }
+  if(rest.length === 1){
+    // 1 tầng phân loại (kiểu cũ, phẳng)
+    const variants = rest[0].split(",").map(s => s.trim()).filter(Boolean);
+    return { name, variants, tiers: null };
+  }
+  // 2 tầng phân loại (hoặc hơn) — mỗi đoạn "|" là 1 tầng, chỉ ghi giá trị
+  const tiers = rest.map(seg => seg.split(",").map(s => s.trim()).filter(Boolean)).filter(arr => arr.length > 0);
+  if(tiers.length < 2) return null;
+  return { name, variants: [], tiers };
+}
+
+function cartesianProduct(arrays){
+  return arrays.reduce((acc, arr) => {
+    const result = [];
+    acc.forEach(prefix => arr.forEach(v => result.push([...prefix, v])));
+    return result;
+  }, [[]]);
+}
+
+// Firestore không cho phép lưu mảng lồng mảng trực tiếp (nested array).
+// Nội bộ code vẫn dùng tiers dạng [["a","b"],["c","d"]] cho tiện xử lý,
+// nhưng khi ghi lên Firestore phải bọc từng tầng trong 1 object.
+function tiersToFirestore(tiers){
+  if(!tiers) return null;
+  return tiers.map(arr => ({ values: arr }));
+}
+
+function tiersFromFirestore(tiers){
+  if(!tiers) return null;
+  return tiers.map(t => Array.isArray(t) ? t : (t.values || []));
+}
+
+function mergeTiers(existingTiers, newTiers){
+  const result = (existingTiers || []).map(arr => [...arr]);
+  newTiers.forEach((opts, i) => {
+    if(result[i]){
+      result[i] = Array.from(new Set([...result[i], ...opts]));
+    } else {
+      result[i] = [...opts];
+    }
+  });
+  return result;
+}
+
+function productToLine(p){
+  if(p.tiers && p.tiers.length >= 2){
+    return p.name + " | " + p.tiers.map(arr => arr.join(", ")).join(" | ");
+  }
+  if(p.variants && p.variants.length){
+    return p.name + " | " + p.variants.join(", ");
+  }
+  return p.name;
+}
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function productMatchesKeyword(p, kw){
+  if(!kw) return true;
+  if(p.name.toLowerCase().includes(kw)) return true;
+  if(p.variants && p.variants.some(v => v.toLowerCase().includes(kw))) return true;
+  if(p.tiers && p.tiers.some(tier => tier.some(v => v.toLowerCase().includes(kw)))) return true;
+  return false;
+}
+
+function getFiltered(){
+  // Đang sắp xếp: luôn thao tác trên toàn bộ danh sách (không lọc theo từ khóa)
+  // để nút ▲▼⤒⤓ phản ánh đúng thứ tự thật, tránh nhảy lung tung khi có filter.
+  if(sortMode) return allProducts;
+  const kw = document.getElementById("searchBox").value.trim().toLowerCase();
+  return allProducts.filter(p => productMatchesKeyword(p, kw));
+}
+
+// Đẩy 1 sản phẩm lên/xuống 1 bậc so với vị trí đang hiển thị (dir: -1 lên, +1 xuống).
+// Hoán đổi trực tiếp field "order" với sản phẩm liền kề — cập nhật UI ngay lập
+// tức (không chờ Firestore trả về) để thao tác nhanh, cảm giác mượt trên điện thoại.
+async function moveItem(productId, dir){
+  const filtered = getFiltered();
+  const idx = filtered.findIndex(p => p.id === productId);
+  const swapIdx = idx + dir;
+  if(idx === -1 || swapIdx < 0 || swapIdx >= filtered.length) return;
+  const a = filtered[idx];
+  const b = filtered[swapIdx];
+  const oa = a.order, ob = b.order;
+  a.order = ob;
+  b.order = oa;
+  sortProductsInPlace();
+  renderList();
+  try{
+    await updateDoc(doc(db, "catalog", a.id), { order: a.order });
+    await updateDoc(doc(db, "catalog", b.id), { order: b.order });
+  }catch(e){
+    showError("Không lưu được thứ tự mới: " + e.message);
+  }
+}
+
+// Đưa 1 sản phẩm lên đầu / xuống cuối toàn bộ danh mục. Nhờ dùng bước nhảy
+// ORDER_STEP nên chỉ cần gán order nhỏ hơn min hiện có (lên đầu) hoặc lớn hơn
+// max hiện có (xuống cuối) — không phải renumber lại các sản phẩm khác.
+function getMinOrder(){
+  let min = Infinity;
+  for(const p of allProducts){
+    if(typeof p.order === "number" && p.order < min) min = p.order;
+  }
+  return min === Infinity ? 0 : min;
+}
+
+async function moveToTop(productId){
+  const p = allProducts.find(x => x.id === productId);
+  if(!p) return;
+  p.order = getMinOrder() - ORDER_STEP;
+  sortProductsInPlace();
+  renderList();
+  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
+  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
+}
+
+async function moveToBottom(productId){
+  const p = allProducts.find(x => x.id === productId);
+  if(!p) return;
+  p.order = getMaxOrder() + ORDER_STEP;
+  sortProductsInPlace();
+  renderList();
+  try{ await updateDoc(doc(db, "catalog", p.id), { order: p.order }); }
+  catch(e){ showError("Không lưu được thứ tự mới: " + e.message); }
+}
+
+function renderTiersStaticHtml(p){
+  const outerTiers = p.tiers.slice(0, -1);
+  const lastTier = p.tiers[p.tiers.length - 1];
+  const combos = cartesianProduct(outerTiers);
+  return combos.map(combo => {
+    const label = combo.join(" - ");
+    const chips = lastTier.map(v => `<span class="vchip static">${escapeHtml(v)}</span>`).join("");
+    return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
+  }).join("");
+}
+
+function renderTiersSelectionHtml(p){
+  const outerTiers = p.tiers.slice(0, -1);
+  const lastTier = p.tiers[p.tiers.length - 1];
+  const combos = cartesianProduct(outerTiers);
+  return combos.map(combo => {
+    const label = combo.join(" - ");
+    const chips = lastTier.map(v => {
+      const variant = label + ": " + v;
+      const key = p.id + "__" + variant;
+      const active = isChipActive(key);
+      const cur = taskSelections.get(key);
+      const qty = cur ? cur.qty : 0;
+      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
+          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+        </button>`;
+    }).join("");
+    return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
+  }).join("");
+}
+
+function buildProductItemEl(p, opts){
+  const { isManage, isSortMode, isFirst, isLast, filtered } = opts;
+  const div = document.createElement("div");
+  div.className = "item";
+  div.dataset.id = p.id;
+  const hasTiers = p.tiers && p.tiers.length >= 2;
+  const hasFlat = p.variants && p.variants.length;
+  let variantsHtml = "";
+
+  if(hasTiers){
+    variantsHtml = isManage ? renderTiersStaticHtml(p) : renderTiersSelectionHtml(p);
+  } else if(hasFlat){
+    variantsHtml = p.variants.map(v => {
+      if(isManage){
+        return `<span class="vchip static">${escapeHtml(v)}</span>`;
+      }
+      const key = p.id + "__" + v;
+      const active = isChipActive(key);
+      const cur = taskSelections.get(key);
+      const qty = cur ? cur.qty : 0;
+      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
+          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+        </button>`;
+    }).join("");
+  } else if(!isManage){
+    // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
+    const key = p.id;
+    const active = isChipActive(key);
+    const cur = taskSelections.get(key);
+    const qty = cur ? cur.qty : 0;
+    variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+        <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
+        ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+      </button>`;
+  }
+  div.innerHTML = `
+    ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
+    ${isSortMode ? `<div class="orderBtns">
+        <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
+        <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
+        <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
+        <button type="button" class="orderBtn bottomBtn" title="Đưa xuống cuối danh sách" ${isLast ? "disabled" : ""}>⤓</button>
+      </div>` : ""}
+    <div class="body">
+      <div class="titlerow">
+        <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
+        ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
+        ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
+      </div>
+      ${(!isManage && editingLinkIds.has(p.id)) ? `
+        <div class="linkEditBox">
+          <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
+          <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
+          <div class="row row-nowrap" style="margin-top:6px;">
+            <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
+            <button type="button" class="btn-outline linkCancelBtn" style="flex:1;">Hủy</button>
+          </div>
+          <div class="status linkStatus"></div>
+        </div>
+      ` : ""}
+      <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
+    </div>
+  `;
+  if(isSortMode){
+    const upBtn = div.querySelector(".upBtn");
+    const downBtn = div.querySelector(".downBtn");
+    const topBtn = div.querySelector(".topBtn");
+    const bottomBtn = div.querySelector(".bottomBtn");
+    if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
+    if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
+    if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
+    if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
+  } else if(isManage){
+    div.querySelector(".rowCheck").addEventListener("change", e => {
+      if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
+      updateActionBar();
+      updateSelectAllState(filtered);
+    });
+    div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+    div.querySelector(".delBtn").addEventListener("click", async () => {
+      if(!confirm(`Xóa sản phẩm "${p.name}"?`)) return;
+      try{
+        await deleteDoc(doc(db, "catalog", p.id));
+        selected.delete(p.id);
+      }catch(e){
+        showError("Không xóa được sản phẩm: " + e.message);
+      }
+    });
+  } else {
+    // ---- Nút ✏️ chèn/sửa link file in (chỉ ở tab Thêm việc) ----
+    const editLinkBtn = div.querySelector(".editLinkBtn");
+    if(editLinkBtn){
+      editLinkBtn.addEventListener("click", () => {
+        if(editingLinkIds.has(p.id)) editingLinkIds.delete(p.id);
+        else editingLinkIds.add(p.id);
+        renderList();
+      });
+    }
+    const linkSaveBtn = div.querySelector(".linkSaveBtn");
+    const linkCancelBtn = div.querySelector(".linkCancelBtn");
+    if(linkSaveBtn){
+      linkSaveBtn.addEventListener("click", async () => {
+        const statusEl = div.querySelector(".linkStatus");
+        const newName = div.querySelector(".linkEditName").value.trim();
+        const rawLink = div.querySelector(".linkEditUrl").value.trim();
+        if(!newName){
+          statusEl.textContent = "Tên sản phẩm không được để trống.";
+          statusEl.className = "status err";
+          return;
+        }
+        let linkToSave = "";
+        if(rawLink){
+          if(!isValidHttpUrl(rawLink)){
+            statusEl.textContent = "Link không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+            statusEl.className = "status err";
+            return;
+          }
+          linkToSave = rawLink;
+        }
+        if(newName.toLowerCase() !== p.name.toLowerCase()){
+          const dup = allProducts.find(x => x.id !== p.id && x.name.toLowerCase() === newName.toLowerCase());
+          if(dup){
+            statusEl.textContent = `Tên "${newName}" đã trùng với 1 sản phẩm khác trong danh mục.`;
+            statusEl.className = "status err";
+            return;
+          }
+        }
+        try{
+          await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
+          editingLinkIds.delete(p.id);
+          renderList();
+        }catch(e){
+          statusEl.textContent = "Lỗi khi lưu: " + e.message;
+          statusEl.className = "status err";
+        }
+      });
+    }
+    if(linkCancelBtn){
+      linkCancelBtn.addEventListener("click", () => {
+        editingLinkIds.delete(p.id);
+        renderList();
+      });
+    }
+    div.querySelectorAll(".vchip").forEach(chip => {
+      chip.addEventListener("click", e => {
+        const key = chip.dataset.key;
+        const variant = key.slice(p.id.length + 2);
+        const act = e.target.dataset.act;
+        let cur = taskSelections.get(key);
+        if(act === "remove"){
+          taskSelections.delete(key);
+          if(pinnedKey === key) pinnedKey = null;
+        } else if(act === "minus"){
+          if(cur){
+            cur.qty -= 1;
+            if(cur.qty <= 0){
+              taskSelections.delete(key);
+              if(pinnedKey === key) pinnedKey = null;
+            }
+          }
+        } else {
+          if(!cur){
+            cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
+            taskSelections.set(key, cur);
+          }
+          cur.qty += 1;
+          if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
+        }
+        renderList();
+      });
+    });
+  }
+  return div;
+}
+
+function renderListView(){
+  const list = document.getElementById("list");
+  const filtered = getFiltered();
+  const isManage = mode === "manage";
+  const isSortMode = isManage && sortMode;
+  list.innerHTML = "";
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    updateActionBar();
+    updateSelectAllState(filtered);
+    updateTaskBar();
+    return;
+  }
+  filtered.forEach((p, idx) => {
+    const div = buildProductItemEl(p, {
+      isManage, isSortMode,
+      isFirst: idx === 0,
+      isLast: idx === filtered.length - 1,
+      filtered
+    });
+    list.appendChild(div);
+  });
+  updateActionBar();
+  updateSelectAllState(filtered);
+  updateTaskBar();
+}
+
+// ---- Chế độ xem dạng lưới (chỉ ở tab Thêm việc) ----
+function countVariants(p){
+  if(p.tiers && p.tiers.length >= 2){
+    const outer = p.tiers.slice(0, -1);
+    const last = p.tiers[p.tiers.length - 1];
+    return cartesianProduct(outer).length * last.length;
+  }
+  if(p.variants && p.variants.length) return p.variants.length;
+  return 0;
+}
+
+// Tổng số lượng đã chọn + số phân loại đã chọn của 1 sản phẩm, dựa trực tiếp
+// vào field productId đã lưu sẵn trong mỗi taskSelections — không cần dựng
+// lại key theo từng kiểu phân loại.
+function productSelectionSummary(p){
+  let totalQty = 0, chosenCount = 0;
+  for(const val of taskSelections.values()){
+    if(val.productId === p.id){
+      totalQty += val.qty;
+      chosenCount += 1;
+    }
+  }
+  return { totalQty, chosenCount };
+}
+
+function renderGridView(){
+  const list = document.getElementById("list");
+  const filtered = getFiltered();
+  list.innerHTML = "";
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    updateTaskBar();
+    return;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "gridWrap";
+  filtered.forEach(p => {
+    const hasVariant = (p.tiers && p.tiers.length >= 2) || (p.variants && p.variants.length);
+    const { totalQty, chosenCount } = productSelectionSummary(p);
+    const active = totalQty > 0;
+    const card = document.createElement("div");
+    card.className = "gcard" + (active ? " active" : "");
+    card.dataset.id = p.id;
+    const initial = (p.name.trim()[0] || "?").toUpperCase();
+    let statusHtml;
+    if(!hasVariant && active){
+      // Sản phẩm đơn đã chọn — cho phép bớt số lượng ngay trên ô, không cần mở gì thêm
+      statusHtml = `<div class="gqtyRow"><span class="gminus" data-act="minus">−</span><span class="gqty">×${totalQty}</span></div>`;
+    } else if(hasVariant){
+      statusHtml = `<span class="gstatus">${countVariants(p)} phân loại${chosenCount ? " · đã chọn " + chosenCount : ""}</span>`;
+    } else {
+      statusHtml = `<span class="gstatus">Sản phẩm đơn</span>`;
+    }
+    card.innerHTML = `
+      <div class="gtop">
+        <div class="gavatar">${escapeHtml(initial)}</div>
+        <div class="gname">${escapeHtml(p.name)}</div>
+      </div>
+      ${statusHtml}
+    `;
+    card.addEventListener("click", e => {
+      if(hasVariant){
+        // Có phân loại — mở bảng chọn nhanh thay vì cố nhồi hết chip vào ô
+        openGridDetail(p.id);
+        return;
+      }
+      // Sản phẩm đơn — chạm là cộng luôn, chạm nút "−" để bớt, giống hệt
+      // cơ chế chip "Chọn sản phẩm này" ở chế độ danh sách.
+      const actEl = e.target.closest("[data-act]");
+      const key = p.id;
+      let cur = taskSelections.get(key);
+      if(actEl && actEl.dataset.act === "minus"){
+        if(cur){
+          cur.qty -= 1;
+          if(cur.qty <= 0){
+            taskSelections.delete(key);
+            if(pinnedKey === key) pinnedKey = null;
+          }
+        }
+      } else {
+        if(!cur){
+          cur = { productName: p.name, variant: "", qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
+          taskSelections.set(key, cur);
+        }
+        cur.qty += 1;
+        if(!gomMode) pinnedKey = key;
+      }
+      renderList();
+    });
+    wrap.appendChild(card);
+  });
+  list.appendChild(wrap);
+  updateTaskBar();
+}
+
+function openGridDetail(productId){
+  gridDetailProductId = productId;
+  renderGridDetailOverlay();
+  document.getElementById("gridDetailOverlay").classList.add("show");
+}
+function closeGridDetail(){
+  document.getElementById("gridDetailOverlay").classList.remove("show");
+  gridDetailProductId = null;
+}
+function renderGridDetailOverlay(){
+  const p = allProducts.find(x => x.id === gridDetailProductId);
+  if(!p){ closeGridDetail(); return; }
+  const body = document.getElementById("gridDetailBody");
+  body.innerHTML = "";
+  body.appendChild(buildProductItemEl(p, { isManage: false, isSortMode: false, isFirst: true, isLast: true, filtered: [p] }));
+}
+document.getElementById("gridDetailCloseBtn").addEventListener("click", closeGridDetail);
+
+const listViewBtn = document.getElementById("listViewBtn");
+const gridViewBtn = document.getElementById("gridViewBtn");
+function updateViewModeButtons(){
+  listViewBtn.classList.toggle("active", viewMode === "list");
+  gridViewBtn.classList.toggle("active", viewMode === "grid");
+}
+listViewBtn.addEventListener("click", () => {
+  if(viewMode === "list") return;
+  viewMode = "list";
+  localStorage.setItem("catalogViewMode", "list");
+  updateViewModeButtons();
+  renderList();
+});
+gridViewBtn.addEventListener("click", () => {
+  if(viewMode === "grid") return;
+  viewMode = "grid";
+  localStorage.setItem("catalogViewMode", "grid");
+  updateViewModeButtons();
+  renderList();
+});
+updateViewModeButtons();
+
+function renderList(){
+  if(mode === "task" && viewMode === "grid"){
+    renderGridView();
+  } else {
+    renderListView();
+  }
+  // Nếu đang mở bảng chọn nhanh của grid, làm mới nội dung bảng đó theo dữ
+  // liệu mới nhất (vd sau khi đổi số lượng phân loại bên trong bảng).
+  if(gridDetailProductId){
+    renderGridDetailOverlay();
+  }
+}
+
+// Xác định 1 phân loại có đang được tô sáng (ghim) trong danh sách hay không.
+// - Trong chế độ gom: mọi sp thuộc nhóm đang gom đều tô sáng (giữ nguyên như trước).
+// - Ngoài chế độ gom: chỉ phân loại vừa chọn gần nhất (đang ghim) mới tô sáng;
+//   các đơn lẻ đã chốt trước đó vẫn nằm trong giỏ hàng nhưng không còn tô sáng.
+function isChipActive(key){
+  const cur = taskSelections.get(key);
+  if(!cur) return false;
+  if(gomMode) return cur.orderId === currentGroupId;
+  return key === pinnedKey;
+}
+
+// Nhấp ra ngoài 1 chip phân loại (nút/chỗ khác trên trang) cũng tự bỏ ghim,
+// giống như khi chọn 1 phân loại khác — chỉ áp dụng ngoài chế độ gom.
+document.addEventListener("click", e => {
+  if(gomMode || !pinnedKey) return;
+  if(e.target.closest(".vchip")) return; // để handler riêng của chip xử lý
+  pinnedKey = null;
+  renderList();
+});
+
+function updateTaskBar(){
+  const bar = document.getElementById("taskbar");
+  const n = taskSelections.size;
+  document.getElementById("taskCount").textContent = n;
+  bar.classList.toggle("show", mode === "task" && n > 0);
+  if(n === 0) closeSelectedModal();
+}
+
+function getOrderLabel(orderId){
+  if(gomMode && orderId === currentGroupId){
+    const nm = groupNameInput.value.trim();
+    return (nm || "mã tự sinh") + " (đang gom)";
+  }
+  if(groupNames.has(orderId)){
+    return groupNames.get(orderId) || "Đơn gộp (mã tự sinh)";
+  }
+  return "Sản phẩm lẻ";
+}
+
+function renderSelectedModal(){
+  const body = document.getElementById("selectedListBody");
+  if(taskSelections.size === 0){
+    body.innerHTML = '<div class="muted">Chưa chọn sản phẩm nào.</div>';
+    return;
+  }
+  const groups = new Map();
+  for(const [key, val] of taskSelections.entries()){
+    if(!groups.has(val.orderId)) groups.set(val.orderId, []);
+    groups.get(val.orderId).push({ key, ...val });
+  }
+  let html = "";
+  for(const items of groups.values()){
+    const orderId = items[0].orderId;
+    html += `<div class="selgroup"><div class="selgroup-title">${escapeHtml(getOrderLabel(orderId))} — ${items.length} phân loại</div>`;
+    items.forEach(it => {
+      html += `<div class="selrow">
+        <span class="selname">${escapeHtml(it.productName)}${it.variant ? " — " + escapeHtml(it.variant) : ""} ×${it.qty}</span>
+        <button type="button" class="selremove" data-key="${escapeHtml(it.key)}">Xóa</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+  body.querySelectorAll(".selremove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      taskSelections.delete(key);
+      if(pinnedKey === key) pinnedKey = null;
+      renderSelectedModal();
+      renderList();
+    });
+  });
+}
+
+function closeSelectedModal(){
+  document.getElementById("selectedOverlay").classList.remove("show");
+}
+
+document.getElementById("viewSelectedBtn").addEventListener("click", () => {
+  renderSelectedModal();
+  document.getElementById("selectedOverlay").classList.add("show");
+});
+document.getElementById("selectedCloseBtn").addEventListener("click", closeSelectedModal);
+
+document.getElementById("sendToIndexBtn").addEventListener("click", async () => {
+  if(taskSelections.size === 0) return;
+  const entries = Array.from(taskSelections.values());
+
+  // Xác định tên đơn cho từng orderId có trong lượt gửi này
+  const orderNames = new Map();
+  entries.forEach(e => {
+    if(!orderNames.has(e.orderId)){
+      let nm = null;
+      if(gomMode && e.orderId === currentGroupId){
+        nm = groupNameInput.value.trim() || null;
+      } else if(groupNames.has(e.orderId)){
+        nm = groupNames.get(e.orderId);
+      }
+      orderNames.set(e.orderId, nm || newOrderName());
+    }
+  });
+
+  try{
+    for(const e of entries){
+      const prod = allProducts.find(pr => pr.id === e.productId);
+      await addDoc(tasksCol, {
+        name: e.variant ? `${e.productName} — ${e.variant}` : e.productName,
+        qty: e.qty,
+        status: "cho_in",
+        note: "",
+        link: (prod && prod.link) ? prod.link : "",
+        orderId: e.orderId,
+        orderName: orderNames.get(e.orderId),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+    taskSelections.clear();
+    groupNames.clear();
+    pinnedKey = null;
+    exitGomMode();
+    renderList();
+    alert(`Đã thêm ${entries.length} việc vào danh sách hôm nay. Mở trang chính để xem tab In.`);
+  }catch(err){
+    showError("Không gửi được sang danh sách hôm nay: " + err.message);
+  }
+});
+
+function updateSelectAllState(filtered){
+  const box = document.getElementById("selectAllBox");
+  const idsShown = filtered.map(p => p.id);
+  box.checked = idsShown.length > 0 && idsShown.every(id => selected.has(id));
+}
+
+document.getElementById("selectAllBox").addEventListener("change", e => {
+  const filtered = getFiltered();
+  if(e.target.checked) filtered.forEach(p => selected.add(p.id));
+  else filtered.forEach(p => selected.delete(p.id));
+  renderList();
+});
+
+function updateActionBar(){
+  const n = selected.size;
+  document.getElementById("selCount").textContent = `Đã chọn ${n} sản phẩm`;
+  document.getElementById("topDelBtn").classList.toggle("enabled", n > 0);
+}
+
+document.getElementById("topDelBtn").addEventListener("click", async () => {
+  if(selected.size === 0) return;
+  if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
+  try{
+    for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
+    selected.clear();
+  }catch(e){
+    showError("Không xóa được sản phẩm đã chọn: " + e.message);
+  }
+});
+
+document.getElementById("bulkBtn").addEventListener("click", async () => {
+  const raw = document.getElementById("bulkInput").value;
+  const statusEl = document.getElementById("bulkStatus");
+  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  if(lines.length === 0){
+    statusEl.textContent = "Chưa có nội dung để nhập.";
+    statusEl.className = "status err";
+    return;
+  }
+  let created = 0, merged = 0, skipped = 0, mismatched = 0;
+  let nextOrder = getMaxOrder() + ORDER_STEP;
+  // Bản sao làm việc trong bộ nhớ: allProducts chỉ được cập nhật qua onSnapshot
+  // (bất đồng bộ), nên nếu không theo dõi riêng, 2 dòng trùng tên sản phẩm MỚI
+  // trong cùng 1 lượt dán sẽ không thấy nhau -> bị tạo thành 2 sản phẩm trùng.
+  // workingList luôn phản ánh đúng trạng thái "sau khi xử lý xong các dòng
+  // trước đó", kể cả sản phẩm vừa mới tạo trong chính lượt dán này.
+  const workingList = allProducts.map(p => ({
+    id: p.id, name: p.name,
+    variants: p.variants ? [...p.variants] : [],
+    tiers: p.tiers ? p.tiers.map(arr => [...arr]) : null
+  }));
+  try{
+    for(const line of lines){
+      const parsed = parseLine(line);
+      if(!parsed){ skipped++; continue; }
+      const existing = workingList.find(p => p.name.toLowerCase() === parsed.name.toLowerCase());
+      if(existing){
+        const existingHasTiers = existing.tiers && existing.tiers.length >= 2;
+        const existingHasFlat = existing.variants && existing.variants.length > 0;
+        const parsedIsTiered = !!parsed.tiers;
+        const parsedIsFlat = parsed.variants && parsed.variants.length > 0;
+
+        if(parsedIsTiered && existingHasFlat && !existingHasTiers){
+          // Sản phẩm đang ở dạng 1 tầng (phẳng) mà dòng mới lại đưa dạng 2 tầng
+          // -> không tự đổi cấu trúc ngầm, tránh mất/ẩn dữ liệu variants cũ.
+          mismatched++;
+        } else if(parsedIsFlat && existingHasTiers){
+          // Ngược lại: sản phẩm đã có 2 tầng mà dòng mới chỉ đưa danh sách phẳng.
+          mismatched++;
+        } else if(parsedIsTiered){
+          const mergedTiers = mergeTiers(existing.tiers, parsed.tiers);
+          await updateDoc(doc(db, "catalog", existing.id), { tiers: tiersToFirestore(mergedTiers) });
+          existing.tiers = mergedTiers;
+          merged++;
+        } else if(parsedIsFlat){
+          const mergedVariants = Array.from(new Set([...(existing.variants || []), ...parsed.variants]));
+          await updateDoc(doc(db, "catalog", existing.id), { variants: mergedVariants });
+          existing.variants = mergedVariants;
+          merged++;
+        } else {
+          // Dòng chỉ có tên, không phân loại -> sản phẩm đã tồn tại thì giữ nguyên.
+          merged++;
+        }
+      } else {
+        // Sản phẩm mới mặc định xếp ở cuối danh sách hiện có (order lớn nhất + bước nhảy)
+        const ref = await addDoc(catalogCol, { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers), order: nextOrder });
+        nextOrder += ORDER_STEP;
+        workingList.push({ id: ref.id, name: parsed.name, variants: [...parsed.variants], tiers: parsed.tiers ? parsed.tiers.map(arr => [...arr]) : null });
+        created++;
+      }
+    }
+    const parts = [`${created} sp mới`, `${merged} sp gộp thêm phân loại`];
+    if(mismatched > 0) parts.push(`${mismatched} dòng bỏ qua (khác cấu trúc phân loại với sản phẩm đã có, cần sửa tay qua nút ✏️ Sửa)`);
+    parts.push(`${skipped} dòng bỏ qua (sai định dạng)`);
+    statusEl.textContent = "Xong: " + parts.join(", ") + ".";
+    statusEl.className = "status ok";
+    document.getElementById("bulkInput").value = "";
+    closeFullscreen();
+  }catch(e){
+    statusEl.textContent = "Lỗi khi nhập danh sách: " + e.message;
+    statusEl.className = "status err";
+  }
+});
+
+// Giữ nguyên nội dung này khớp với đoạn <p class="muted"> tĩnh nằm dưới
+// ô #bulkInput ở trên — nếu sửa 1 chỗ thì nhớ sửa luôn chỗ kia.
+const BULK_FORMAT_HELP = `Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
+      1) Không phân loại: <b>Tên sản phẩm</b><br>
+      2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
+      3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
+      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.`;
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if(allProducts.length === 0){
+    alert("Danh mục đang trống, chưa có gì để xuất.");
+    return;
+  }
+  const text = allProducts.map(productToLine).join("\n");
+  // Chỉ để xem / sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây không ghi gì
+  // xuống Firestore, tránh nhầm lẫn với việc sửa từng sản phẩm.
+  openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true,
+    `Đây là toàn bộ danh mục hiện có, mỗi dòng 1 sản phẩm theo đúng định dạng nhập liệu.<br>
+     Chỉ để xem và sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây sẽ không ghi gì xuống hệ thống.`);
+});
+
+const bulkTextarea = document.getElementById("bulkInput");
+document.getElementById("expandBtn").addEventListener("click", () => {
+  openEditorRaw("Nhập / sửa danh sách", bulkTextarea.value, async (text) => {
+    bulkTextarea.value = text;
+    return true;
+  }, BULK_FORMAT_HELP);
+});
+
+function closeFullscreen(){
+  document.getElementById("editorOverlay").classList.remove("show");
+}
+
+function openEditorRaw(title, initialText, onSave, descriptionHtml){
+  document.getElementById("editorTitle").textContent = title;
+  document.getElementById("editorDesc").innerHTML = descriptionHtml;
+  document.getElementById("editorTextarea").value = initialText;
+  document.getElementById("editorOverlay").classList.add("show");
+  editorSaveHandler = onSave;
+}
+
+function openEditor(product){
+  const line = productToLine(product);
+  openEditorRaw("Sửa: " + product.name, line, async (text) => {
+    const firstLine = text.split("\n").map(l => l.trim()).filter(Boolean)[0] || "";
+    const parsed = parseLine(firstLine);
+    if(!parsed){
+      alert("Định dạng không hợp lệ, cần có ít nhất tên sản phẩm");
+      return false;
+    }
+    const dup = allProducts.find(p => p.id !== product.id && p.name.toLowerCase() === parsed.name.toLowerCase());
+    if(dup){
+      alert(`Tên "${parsed.name}" đã trùng với 1 sản phẩm khác đang có trong danh mục.\nĐổi tên khác, hoặc nếu muốn gộp 2 sản phẩm làm 1, hãy xóa sản phẩm này rồi dùng ô "Nhập / sửa danh sách" để gộp phân loại vào sản phẩm còn lại.`);
+      return false;
+    }
+    try{
+      await updateDoc(doc(db, "catalog", product.id), { name: parsed.name, variants: parsed.variants, tiers: tiersToFirestore(parsed.tiers) });
+      return true;
+    }catch(e){
+      showError("Không lưu được sản phẩm: " + e.message);
+      return false;
+    }
+  }, 'Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)');
+}
+
+document.getElementById("editorCancel").addEventListener("click", closeFullscreen);
+document.getElementById("editorSave").addEventListener("click", async () => {
+  const text = document.getElementById("editorTextarea").value;
+  if(editorSaveHandler){
+    const result = await editorSaveHandler(text);
+    if(result === false) return;
+  }
+  closeFullscreen();
+});
+</script>
+</body>
+</html>
