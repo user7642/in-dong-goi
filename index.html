@@ -378,6 +378,9 @@
   <button class="del-btn" id="batchDel">Xóa</button>
 </div>
 
+<!-- jsQR: thư viện thuần JS đọc mã QR từ dữ liệu ảnh (canvas), dùng để đọc
+     trực tiếp mã QR in trên phiếu giao thay vì dò chữ theo mẫu từng hãng. -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -1093,11 +1096,51 @@ async function deleteTask(id){
 
 // ---- Phiếu giao (ship label PDF) — gắn theo order, không theo item ----
 
-// ---- Trích mã vận đơn từ PDF phiếu giao (đọc lớp text bằng pdf.js, KHÔNG
-// dùng OCR — chỉ hoạt động với PDF có lớp chữ thật, không phải ảnh scan) ----
-// Mỗi hãng vận chuyển in phiếu theo mẫu khác nhau nên cần quy tắc riêng.
-// Trả về { carrier, code } nếu nhận diện được, hoặc null nếu không (mẫu lạ
-// hoặc PDF là ảnh scan không có lớp chữ).
+// ---- Trích mã vận đơn từ PDF phiếu giao ----
+// Có 2 cách, dùng kết hợp:
+//  1) Đọc MÃ QR in trên phiếu (render trang PDF ra canvas rồi giải mã bằng
+//     jsQR) — ĐÂY LÀ CÁCH CHÍNH. Mã QR trên các phiếu đã kiểm tra (J&T, SPX,
+//     GHN) đều encode ĐÚNG mã vận đơn dạng chữ thuần, không kèm nhãn hay chữ
+//     rác gì khác — nên không cần biết trước mẫu của từng hãng, không sợ hãng
+//     đổi cách trình bày, và vẫn đọc được kể cả khi PDF là ảnh scan (miễn ảnh
+//     đủ nét để thấy mã QR), vì làm việc trên ảnh render chứ không phụ thuộc
+//     lớp text của PDF.
+//  2) Đọc LỚP TEXT bằng pdf.js (cách cũ) — dùng làm dự phòng khi trang không
+//     có mã QR nào đọc được, VÀ dùng để suy ra tên hãng hiển thị (carrier)
+//     khi lớp text có ghi rõ (vd "Mã vận đơn:"), vì bản thân mã QR chỉ cho
+//     biết con số/chuỗi, không cho biết đó là hãng nào.
+async function renderPdfPageToCanvas(page, scale){
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d");
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas;
+}
+
+async function extractQrFromPdf(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  // Thử nhiều độ phân giải (scale) tăng dần: ảnh nét hơn thì đọc mã QR nhỏ dễ
+  // hơn, nhưng cũng chậm hơn — nên chỉ tăng scale khi lần thử trước thất bại.
+  const scales = [2, 3, 4];
+  for(let i = 1; i <= pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    for(const scale of scales){
+      const canvas = await renderPdfPageToCanvas(page, scale);
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const qr = window.jsQR(imageData.data, imageData.width, imageData.height);
+      console.log(`[DEBUG ship-label] QR trang ${i}, scale ${scale}:`, qr ? qr.data : null);
+      if(qr && qr.data && qr.data.trim()){
+        return qr.data.trim();
+      }
+    }
+  }
+  return null;
+}
+
 async function extractPdfText(file){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -1129,20 +1172,65 @@ function detectTracking(text){
   // khác nhau ở tên hãng hiển thị (dựa vào logo/từ khóa xuất hiện trong text).
   const m = text.match(/Mã vận đơn:?\s*([A-Za-z0-9]{5,})/i);
   if(m){
+    // Logo hãng (SPX/GHN) trên phiếu thường là ẢNH, không phải chữ thật, nên
+    // pdf.js không đọc được — không thể dựa vào việc tìm chữ "spx"/"giao hàng
+    // nhanh" xuất hiện đâu đó trong toàn bộ text (dễ đoán sai, ví dụ chữ
+    // "Shopee" có thể nằm trong ghi chú của phiếu GHN chứ không phải logo).
+    // Đáng tin hơn: tự mã vận đơn (m[1]) — mã của SPX Express LUÔN có tiền
+    // tố "SPX" (vd: SPXVN067735684667), nên ưu tiên kiểm tra ngay trên mã.
     let carrier = "SHOPEE";
-    if(/giao\s*h[àa]ng\s*nhanh/i.test(text)) carrier = "GHN";
-    else if(/spx/i.test(text)) carrier = "SPX";
+    if(/^spx/i.test(m[1])) carrier = "SPX";
+    else if(/giao\s*h[àa]ng\s*nhanh|\bghn\b/i.test(text)) carrier = "GHN";
     return { carrier, code: m[1] };
   }
   return null;
+}
+
+// Suy đoán tên hãng chỉ dựa trên HÌNH DẠNG của mã vận đơn — dùng khi mã QR
+// đọc được nhưng không có (hoặc không khớp) thông tin từ lớp text để biết
+// chắc là hãng nào. Đây là suy đoán tạm, không chắc chắn 100%, nên luôn log
+// ra console để người dùng biết mà tự đổi tên đơn nếu đoán sai.
+function guessCarrierFromCode(code){
+  if(/^spx/i.test(code)) return "SPX";
+  if(/^\d{9,15}$/.test(code)) return "JNT"; // J&T: mã vận đơn toàn số
+  return "DH"; // không rõ hãng — người dùng tự đổi tên nếu cần
 }
 
 async function extractTrackingFromPdf(file){
   // Không "nuốt" lỗi ở đây nữa — để lỗi văng ra ngoài cho nơi gọi phân biệt
   // được 2 trường hợp: "đọc PDF lỗi" (do thư viện/mạng) vs "đọc được nhưng
   // không khớp mẫu nào" (PDF ảnh scan hoặc mẫu hãng lạ).
-  const text = await extractPdfText(file);
-  return detectTracking(text);
+
+  // Đọc song song cả 2 cách để có đủ dữ kiện chọn kết quả tin cậy nhất.
+  const [qrCode, text] = await Promise.all([
+    extractQrFromPdf(file).catch(e => {
+      console.warn("[DEBUG ship-label] Lỗi khi đọc mã QR:", e);
+      return null;
+    }),
+    extractPdfText(file)
+  ]);
+  console.log("[DEBUG ship-label] File:", file.name, "| Mã QR đọc được:", qrCode, "| Độ dài text:", text.length);
+
+  const textResult = detectTracking(text);
+  console.log("[DEBUG ship-label] Kết quả nhận diện từ lớp text:", textResult);
+
+  if(qrCode){
+    // Nếu lớp text cũng nhận diện được VÀ mã trùng với mã QR (không phân
+    // biệt hoa/thường) → dùng luôn tên hãng từ lớp text (đáng tin hơn vì đọc
+    // trực tiếp nhãn "Mã vận đơn:" + từ khóa hãng trên phiếu).
+    if(textResult && textResult.code.toUpperCase() === qrCode.toUpperCase().replace(/[^A-Z0-9]/g, "")){
+      return { carrier: textResult.carrier, code: qrCode };
+    }
+    // Ngược lại (PDF ảnh scan không có lớp text, hoặc mẫu hãng lạ không khớp
+    // quy tắc nào) — vẫn có mã vận đơn đúng từ QR, chỉ đoán tạm tên hãng.
+    const carrier = guessCarrierFromCode(qrCode);
+    console.log("[DEBUG ship-label] Không đối chiếu được với lớp text — đoán hãng theo hình dạng mã:", carrier);
+    return { carrier, code: qrCode };
+  }
+
+  // Không đọc được mã QR nào (phiếu không có QR, hoặc ảnh quá mờ) — dùng kết
+  // quả từ lớp text nếu có.
+  return textResult;
 }
 
 // Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
@@ -1185,11 +1273,14 @@ async function uploadShipLabel(orderId, file){
         confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
       if(shouldRename) await renameOrder(orderId, newTitle);
     } else {
-      // TẠM THỜI hiện rõ lỗi thật (nếu có) để debug — sẽ gộp lại thành 1
-      // thông báo gọn hơn sau khi xác định được nguyên nhân cụ thể.
+      // DEBUG: in ra console của DevTools (F12 > tab Console) thay vì hiện
+      // trên UI — người dùng thường vẫn để UI gọn, chỉ mở console khi cần
+      // soi lỗi. UI vẫn chỉ hiện 1 thông báo ngắn gọn như cũ.
       if(readErrorMsg){
-        showError("[DEBUG] Lỗi khi đọc PDF bằng pdf.js: " + readErrorMsg);
+        console.error("[DEBUG ship-label] Lỗi khi đọc PDF bằng pdf.js:", readErrorMsg);
+        showError("Không đọc được file PDF này để tự nhận diện mã vận đơn — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
       } else {
+        console.warn("[DEBUG ship-label] Không khớp mẫu carrier nào. File:", file.name);
         showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
       }
       // Không giữ tên gốc lộn xộn từ điện thoại — đổi theo tên đơn hiện tại
