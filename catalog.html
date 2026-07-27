@@ -103,24 +103,28 @@
   .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
   .muted{color:var(--muted);font-size:13px;}
 
-  /* ---- Chế độ xem Mosaic — nhiều cột tự cân bằng theo chiều cao (kiểu
-     Cloudinary Mosaic / Pinterest), mỗi ô cao thấp khác nhau tùy số phân
-     loại thực tế, hiển thị đầy đủ chip ngay trong ô — không cần mở bảng
-     riêng nữa. Dùng CSS multi-column (column-fill:balance) để trình duyệt
-     tự chia và cân bằng chiều cao giữa các cột mà không cần đo bằng JS. ---- */
+  /* ---- Chế độ xem Lưới (Grid) — nhiều cột, số cột tự điều chỉnh theo
+     chiều rộng khung (auto-fill), MỖI HÀNG tự co giãn theo ô cao nhất
+     trong hàng đó (hành vi mặc định của CSS Grid: các ô cùng hàng luôn
+     bằng chiều cao nhau, ô ít nội dung sẽ có khoảng trống dưới) — đúng
+     như bản in mẫu (hàng 1 cao vì nhiều chữ, hàng 2/3 thấp vì trống).
+     Có viền quanh mỗi ô để nhìn rõ ranh giới lưới. ---- */
   #viewModeRow button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
   .gridWrap{
-    column-width:180px;column-gap:10px;column-fill:balance;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+    gap:0;padding:1px 0 0 1px;
   }
-  /* Mỗi ô mosaic vẫn là 1 .item (giữ nguyên toàn bộ style tên SP + chip
-     phân loại có sẵn), chỉ đổi cách đặt trong layout: không kéo full-width
-     theo chiều ngang, không bị chia cột con nội bộ (checkbox/orderBtns –
-     vốn không xuất hiện ở tab Thêm việc) mà nằm gọn trong 1 cột mosaic. */
+  /* Mỗi ô lưới vẫn là 1 .item (giữ nguyên toàn bộ style tên SP + chip
+     phân loại có sẵn) — chỉ đổi cách đặt trong layout. margin âm để các
+     viền của ô liền kề chồng lên nhau thành 1 đường kẻ chung như bảng in,
+     tránh viền đôi giữa các ô. */
   .gridWrap .item{
-    display:block;break-inside:avoid;page-break-inside:avoid;
-    margin:0 0 10px;background:var(--card);
+    display:flex;flex-direction:column;justify-content:flex-start;
+    margin:0 0 -1px -1px;border-radius:0;
+    background:var(--card);position:relative;
   }
-  .gridWrap .item.active{border-color:var(--blue);background:var(--blue-bg);}
+  .gridWrap .item.active{border-color:var(--blue);background:var(--blue-bg);z-index:1;}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
   .linkEditBox{
@@ -318,9 +322,10 @@ let editingLinkIds = new Set();
 let mode = "task";
 
 // ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, xếp dọc 1 cột full-width)
-// hoặc 'grid' (Mosaic — nhiều cột cao thấp tự cân bằng, vẫn hiển thị đầy đủ
-// chip phân loại ngay trong ô, không cần mở bảng riêng). Ghi nhớ lựa chọn
-// giữa các lần mở trang bằng localStorage. ----
+// hoặc 'grid' (nhiều cột, số cột tự đổi theo chiều rộng, các ô cùng hàng
+// luôn bằng chiều cao nhau — vẫn hiển thị đầy đủ chip phân loại ngay trong
+// ô, không cần mở bảng riêng). Ghi nhớ lựa chọn giữa các lần mở trang bằng
+// localStorage. ----
 let viewMode = localStorage.getItem("catalogViewMode") || "list";
 
 // ---- Gom sản phẩm (grouping into one order) ----
@@ -924,7 +929,7 @@ function renderListView(){
   updateTaskBar();
 }
 
-// ---- Chế độ xem Mosaic (chỉ ở tab Thêm việc) ----
+// ---- Chế độ xem Lưới (chỉ ở tab Thêm việc) ----
 // Tổng số lượng đã chọn của 1 sản phẩm — dùng để tô viền/nền ô khi sản phẩm
 // đang có ít nhất 1 phân loại (hoặc cả sản phẩm đơn) được chọn.
 function productSelectedQty(p){
@@ -944,10 +949,10 @@ function renderGridView(){
     updateTaskBar();
     return;
   }
-  // Mosaic: mỗi ô hiển thị đầy đủ tên sản phẩm + toàn bộ chip phân loại —
-  // giống hệt nội dung ở chế độ Danh sách — chỉ khác cách sắp xếp: nhiều
-  // cột cao thấp tự nhiên theo nội dung, tự cân bằng chiều cao giữa các
-  // cột (CSS multi-column), thay vì xếp dọc 1 cột full-width.
+  // Mỗi ô hiển thị đầy đủ tên sản phẩm + toàn bộ chip phân loại — giống hệt
+  // nội dung ở chế độ Danh sách — chỉ khác cách sắp xếp: nhiều cột (CSS
+  // Grid auto-fill, tự đổi số cột theo chiều rộng khung), các ô cùng hàng
+  // tự co giãn bằng chiều cao ô cao nhất trong hàng đó.
   const wrap = document.createElement("div");
   wrap.className = "gridWrap";
   filtered.forEach((p, idx) => {
