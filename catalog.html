@@ -103,31 +103,24 @@
   .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
   .muted{color:var(--muted);font-size:13px;}
 
-  /* ---- Chế độ xem dạng lưới (grid) — các ô cố định 1 chiều cao như nhau,
-     không phình to theo số phân loại; chi tiết phân loại xem ở bảng chọn
-     nhanh riêng khi chạm vào ô. ---- */
+  /* ---- Chế độ xem Mosaic — nhiều cột tự cân bằng theo chiều cao (kiểu
+     Cloudinary Mosaic / Pinterest), mỗi ô cao thấp khác nhau tùy số phân
+     loại thực tế, hiển thị đầy đủ chip ngay trong ô — không cần mở bảng
+     riêng nữa. Dùng CSS multi-column (column-fill:balance) để trình duyệt
+     tự chia và cân bằng chiều cao giữa các cột mà không cần đo bằng JS. ---- */
   #viewModeRow button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
-  .gridWrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
-  .gcard{
-    position:relative;border:1.5px solid var(--border);border-radius:10px;padding:10px;
-    height:104px;display:flex;flex-direction:column;justify-content:space-between;
-    cursor:pointer;background:var(--card);
+  .gridWrap{
+    column-width:180px;column-gap:10px;column-fill:balance;
   }
-  .gcard.active{border-color:var(--blue);background:var(--blue-bg);}
-  .gcard .gtop{display:flex;align-items:flex-start;gap:8px;}
-  .gcard .gavatar{
-    width:26px;height:26px;flex-shrink:0;border-radius:7px;background:var(--blue-bg);color:var(--blue);
-    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  /* Mỗi ô mosaic vẫn là 1 .item (giữ nguyên toàn bộ style tên SP + chip
+     phân loại có sẵn), chỉ đổi cách đặt trong layout: không kéo full-width
+     theo chiều ngang, không bị chia cột con nội bộ (checkbox/orderBtns –
+     vốn không xuất hiện ở tab Thêm việc) mà nằm gọn trong 1 cột mosaic. */
+  .gridWrap .item{
+    display:block;break-inside:avoid;page-break-inside:avoid;
+    margin:0 0 10px;background:var(--card);
   }
-  .gcard.active .gavatar{background:var(--blue);color:#fff;}
-  .gcard .gname{
-    font-size:13px;font-weight:600;line-height:1.3;
-    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
-  }
-  .gcard .gstatus{font-size:11.5px;color:var(--muted);}
-  .gcard.active .gstatus{color:var(--blue);}
-  .gcard .gqtyRow{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--blue);}
-  .gcard .gqtyRow .gminus{background:#fff;color:var(--text);border-radius:6px;padding:1px 9px;font-weight:700;}
+  .gridWrap .item.active{border-color:var(--blue);background:var(--blue-bg);}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
   .linkEditBox{
@@ -286,14 +279,6 @@
   </div>
 </div>
 
-<div class="editor-overlay" id="gridDetailOverlay">
-  <h3>Chọn phân loại</h3>
-  <div id="gridDetailBody" style="flex:1;overflow:auto;"></div>
-  <div class="editor-actions">
-    <button class="btn-outline" id="gridDetailCloseBtn">Đóng</button>
-  </div>
-</div>
-
 <footer>
   <a class="back" href="index.html">← Về trang chính</a>
   <a class="back" href="huong-dan.html">📖 Xem hướng dẫn sử dụng</a>
@@ -332,12 +317,11 @@ let editingLinkIds = new Set();
 // 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
 let mode = "task";
 
-// ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, như hiện tại) hoặc
-// 'grid' (dạng lưới, các ô đều nhau, xem chi tiết phân loại qua bảng chọn
-// nhanh riêng). Ghi nhớ lựa chọn giữa các lần mở trang bằng localStorage. ----
+// ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, xếp dọc 1 cột full-width)
+// hoặc 'grid' (Mosaic — nhiều cột cao thấp tự cân bằng, vẫn hiển thị đầy đủ
+// chip phân loại ngay trong ô, không cần mở bảng riêng). Ghi nhớ lựa chọn
+// giữa các lần mở trang bằng localStorage. ----
 let viewMode = localStorage.getItem("catalogViewMode") || "list";
-// Sản phẩm đang mở bảng chọn nhanh (chỉ dùng ở chế độ lưới)
-let gridDetailProductId = null;
 
 // ---- Gom sản phẩm (grouping into one order) ----
 let gomMode = false;
@@ -370,7 +354,6 @@ document.querySelectorAll(".tab").forEach(t => {
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     t.classList.add("active");
     mode = t.dataset.mode;
-    if(mode === "manage") closeGridDetail();
     applyModeUI();
     renderList();
   });
@@ -941,29 +924,15 @@ function renderListView(){
   updateTaskBar();
 }
 
-// ---- Chế độ xem dạng lưới (chỉ ở tab Thêm việc) ----
-function countVariants(p){
-  if(p.tiers && p.tiers.length >= 2){
-    const outer = p.tiers.slice(0, -1);
-    const last = p.tiers[p.tiers.length - 1];
-    return cartesianProduct(outer).length * last.length;
-  }
-  if(p.variants && p.variants.length) return p.variants.length;
-  return 0;
-}
-
-// Tổng số lượng đã chọn + số phân loại đã chọn của 1 sản phẩm, dựa trực tiếp
-// vào field productId đã lưu sẵn trong mỗi taskSelections — không cần dựng
-// lại key theo từng kiểu phân loại.
-function productSelectionSummary(p){
-  let totalQty = 0, chosenCount = 0;
+// ---- Chế độ xem Mosaic (chỉ ở tab Thêm việc) ----
+// Tổng số lượng đã chọn của 1 sản phẩm — dùng để tô viền/nền ô khi sản phẩm
+// đang có ít nhất 1 phân loại (hoặc cả sản phẩm đơn) được chọn.
+function productSelectedQty(p){
+  let totalQty = 0;
   for(const val of taskSelections.values()){
-    if(val.productId === p.id){
-      totalQty += val.qty;
-      chosenCount += 1;
-    }
+    if(val.productId === p.id) totalQty += val.qty;
   }
-  return { totalQty, chosenCount };
+  return totalQty;
 }
 
 function renderGridView(){
@@ -975,84 +944,24 @@ function renderGridView(){
     updateTaskBar();
     return;
   }
+  // Mosaic: mỗi ô hiển thị đầy đủ tên sản phẩm + toàn bộ chip phân loại —
+  // giống hệt nội dung ở chế độ Danh sách — chỉ khác cách sắp xếp: nhiều
+  // cột cao thấp tự nhiên theo nội dung, tự cân bằng chiều cao giữa các
+  // cột (CSS multi-column), thay vì xếp dọc 1 cột full-width.
   const wrap = document.createElement("div");
   wrap.className = "gridWrap";
-  filtered.forEach(p => {
-    const hasVariant = (p.tiers && p.tiers.length >= 2) || (p.variants && p.variants.length);
-    const { totalQty, chosenCount } = productSelectionSummary(p);
-    const active = totalQty > 0;
-    const card = document.createElement("div");
-    card.className = "gcard" + (active ? " active" : "");
-    card.dataset.id = p.id;
-    const initial = (p.name.trim()[0] || "?").toUpperCase();
-    let statusHtml;
-    if(!hasVariant && active){
-      // Sản phẩm đơn đã chọn — cho phép bớt số lượng ngay trên ô, không cần mở gì thêm
-      statusHtml = `<div class="gqtyRow"><span class="gminus" data-act="minus">−</span><span class="gqty">×${totalQty}</span></div>`;
-    } else if(hasVariant){
-      statusHtml = `<span class="gstatus">${countVariants(p)} phân loại${chosenCount ? " · đã chọn " + chosenCount : ""}</span>`;
-    } else {
-      statusHtml = `<span class="gstatus">Sản phẩm đơn</span>`;
-    }
-    card.innerHTML = `
-      <div class="gtop">
-        <div class="gavatar">${escapeHtml(initial)}</div>
-        <div class="gname">${escapeHtml(p.name)}</div>
-      </div>
-      ${statusHtml}
-    `;
-    card.addEventListener("click", e => {
-      if(hasVariant){
-        // Có phân loại — mở bảng chọn nhanh thay vì cố nhồi hết chip vào ô
-        openGridDetail(p.id);
-        return;
-      }
-      // Sản phẩm đơn — chạm là cộng luôn, chạm nút "−" để bớt, giống hệt
-      // cơ chế chip "Chọn sản phẩm này" ở chế độ danh sách.
-      const actEl = e.target.closest("[data-act]");
-      const key = p.id;
-      let cur = taskSelections.get(key);
-      if(actEl && actEl.dataset.act === "minus"){
-        if(cur){
-          cur.qty -= 1;
-          if(cur.qty <= 0){
-            taskSelections.delete(key);
-            if(pinnedKey === key) pinnedKey = null;
-          }
-        }
-      } else {
-        if(!cur){
-          cur = { productName: p.name, variant: "", qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
-          taskSelections.set(key, cur);
-        }
-        cur.qty += 1;
-        if(!gomMode) pinnedKey = key;
-      }
-      renderList();
+  filtered.forEach((p, idx) => {
+    const el = buildProductItemEl(p, {
+      isManage: false, isSortMode: false,
+      isFirst: idx === 0, isLast: idx === filtered.length - 1,
+      filtered
     });
-    wrap.appendChild(card);
+    if(productSelectedQty(p) > 0) el.classList.add("active");
+    wrap.appendChild(el);
   });
   list.appendChild(wrap);
   updateTaskBar();
 }
-
-function openGridDetail(productId){
-  gridDetailProductId = productId;
-  renderGridDetailOverlay();
-  document.getElementById("gridDetailOverlay").classList.add("show");
-}
-function closeGridDetail(){
-  document.getElementById("gridDetailOverlay").classList.remove("show");
-  gridDetailProductId = null;
-}
-function renderGridDetailOverlay(){
-  const p = allProducts.find(x => x.id === gridDetailProductId);
-  if(!p){ closeGridDetail(); return; }
-  const body = document.getElementById("gridDetailBody");
-  body.innerHTML = "";
-  body.appendChild(buildProductItemEl(p, { isManage: false, isSortMode: false, isFirst: true, isLast: true, filtered: [p] }));
-}
-document.getElementById("gridDetailCloseBtn").addEventListener("click", closeGridDetail);
 
 const listViewBtn = document.getElementById("listViewBtn");
 const gridViewBtn = document.getElementById("gridViewBtn");
@@ -1081,11 +990,6 @@ function renderList(){
     renderGridView();
   } else {
     renderListView();
-  }
-  // Nếu đang mở bảng chọn nhanh của grid, làm mới nội dung bảng đó theo dữ
-  // liệu mới nhất (vd sau khi đổi số lượng phân loại bên trong bảng).
-  if(gridDetailProductId){
-    renderGridDetailOverlay();
   }
 }
 
