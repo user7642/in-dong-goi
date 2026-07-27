@@ -265,9 +265,33 @@
   }
   .note-dot{color:var(--blue);font-size:16px;line-height:0;margin-left:2px;}
 
-  .edit-fields{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;}
-  .edit-fields input[type=text]{flex:1;min-width:100px;font-size:14px;padding:8px 9px;border:1px solid var(--border);border-radius:8px;}
-  .edit-fields input[type=number]{width:60px;font-size:14px;padding:8px 6px;border:1px solid var(--border);border-radius:8px;text-align:center;}
+  /* Overlay sửa việc (tên + số lượng) — kiểu giống editor-overlay trong
+     catalog.html: phủ toàn màn hình, dọc, chỗ nhập rộng rãi cho dễ bấm trên
+     điện thoại thay vì ô nhỏ nhét chung 1 hàng như trước. */
+  .task-editor-overlay{
+    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:50;
+    display:none;flex-direction:column;padding:16px;
+    max-width:var(--maxw);margin:0 auto;
+  }
+  .task-editor-overlay.show{display:flex;}
+  .task-editor-overlay h3{font-size:16px;margin:0 0 16px 0;}
+  .task-editor-overlay .field-block{margin-bottom:16px;}
+  .task-editor-overlay .field-block.grow{flex:1;display:flex;flex-direction:column;margin-bottom:0;}
+  .task-editor-overlay label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+  .task-editor-overlay input[type=number]{
+    width:110px;font-size:17px;padding:13px 10px;border:1px solid var(--border);
+    border-radius:10px;text-align:center;
+  }
+  .task-editor-overlay textarea{
+    flex:1;min-height:160px;font-size:16px;padding:12px;border:1px solid var(--border);
+    border-radius:10px;resize:vertical;line-height:1.5;font-family:inherit;
+  }
+  .task-editor-overlay .editor-actions{display:flex;gap:8px;margin-top:14px;}
+  .task-editor-overlay .editor-actions button{
+    flex:1;padding:13px;font-size:15px;font-weight:600;border:none;border-radius:8px;cursor:pointer;
+  }
+  .task-editor-overlay .editor-actions .cancel-btn{background:var(--gray-bg);color:var(--text);}
+  .task-editor-overlay .editor-actions .save-btn{background:var(--blue);color:#fff;}
 
   .batchbar{
     position:fixed;
@@ -378,6 +402,24 @@
   <button class="del-btn" id="batchDel">Xóa</button>
 </div>
 
+<!-- Overlay sửa tên việc + số lượng — mở toàn màn hình khi bấm ✏️ Sửa, thay
+     cho 2 ô nhỏ nhét chung 1 hàng như trước (khó bấm trên điện thoại). -->
+<div class="task-editor-overlay" id="taskEditorOverlay">
+  <h3>Sửa việc</h3>
+  <div class="field-block">
+    <label for="taskEditorQty">Số lượng</label>
+    <input type="number" id="taskEditorQty" min="1">
+  </div>
+  <div class="field-block grow">
+    <label for="taskEditorName">Tên việc</label>
+    <textarea id="taskEditorName"></textarea>
+  </div>
+  <div class="editor-actions">
+    <button class="cancel-btn" id="taskEditorCancel">Hủy</button>
+    <button class="save-btn" id="taskEditorSave">Lưu</button>
+  </div>
+</div>
+
 <!-- jsQR: thư viện thuần JS đọc mã QR từ dữ liệu ảnh (canvas), dùng để đọc
      trực tiếp mã QR in trên phiếu giao thay vì dò chữ theo mẫu từng hãng. -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -418,7 +460,7 @@ let searchTerm = "";
 
 // UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
 let openNotes = new Set();
-let editingTaskIds = new Set();
+let taskEditorCurrentId = null; // đơn đang mở trong overlay "Sửa việc" (null = đang đóng)
 let editingOrderIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
 let uploadingShipLabelIds = new Set();
@@ -436,6 +478,9 @@ const selectAllBox = document.getElementById("selectAllBox");
 const clearAllBtn = document.getElementById("clearAllBtn");
 const downloadAllWrap = document.getElementById("downloadAllWrap");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
+const taskEditorOverlay = document.getElementById("taskEditorOverlay");
+const taskEditorQty = document.getElementById("taskEditorQty");
+const taskEditorName = document.getElementById("taskEditorName");
 
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
@@ -462,6 +507,27 @@ function attachClickAwayCommit(containerEl, commitFn){
   });
   return commit;
 }
+
+// ---- Overlay "Sửa việc" (tên + số lượng) — phủ toàn màn hình, chỗ nhập
+// rộng rãi cho dễ bấm trên điện thoại, giống kiểu editor-overlay bên
+// catalog.html thay vì nhét 2 ô nhỏ chung 1 hàng như trước. ----
+function openTaskEditor(t){
+  taskEditorCurrentId = t.id;
+  taskEditorQty.value = t.qty || 1;
+  taskEditorName.value = t.name;
+  taskEditorOverlay.classList.add("show");
+  setTimeout(() => taskEditorName.focus(), 0);
+}
+
+function closeTaskEditor(){
+  taskEditorCurrentId = null;
+  taskEditorOverlay.classList.remove("show");
+}
+
+document.getElementById("taskEditorCancel").addEventListener("click", closeTaskEditor);
+document.getElementById("taskEditorSave").addEventListener("click", () => {
+  if(taskEditorCurrentId) saveTaskEdit(taskEditorCurrentId, taskEditorName.value, taskEditorQty.value);
+});
 
 // ---- Helpers: id / name generation for orders ----
 function randCode(len){
@@ -868,33 +934,7 @@ function renderItem(t){
   const info = document.createElement("div");
   info.className = "info";
 
-  if(editingTaskIds.has(t.id)){
-    info.innerHTML = `<div class="meta">Sửa việc:</div>`;
-    const fields = document.createElement("div");
-    fields.className = "edit-fields";
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.value = t.name;
-    const qtyInput = document.createElement("input");
-    qtyInput.type = "number";
-    qtyInput.min = "1";
-    qtyInput.value = t.qty || 1;
-    const saveBtn = document.createElement("button");
-    saveBtn.className = "mini primary";
-    saveBtn.textContent = "Lưu";
-    const cancelBtn = document.createElement("button");
-    cancelBtn.className = "mini";
-    cancelBtn.textContent = "Hủy";
-    const commit = attachClickAwayCommit(fields, () => saveTaskEdit(t.id, nameInput.value, qtyInput.value));
-    saveBtn.addEventListener("click", commit);
-    cancelBtn.addEventListener("click", () => { editingTaskIds.delete(t.id); render(); });
-    fields.appendChild(nameInput);
-    fields.appendChild(qtyInput);
-    fields.appendChild(saveBtn);
-    fields.appendChild(cancelBtn);
-    info.appendChild(fields);
-    setTimeout(() => nameInput.focus(), 0);
-  } else {
+  {
     const nameDiv = document.createElement("div");
     nameDiv.className = "name";
     nameDiv.textContent = t.name;
@@ -961,7 +1001,7 @@ function renderItem(t){
     const editBtn = document.createElement("button");
     editBtn.className = "mini";
     editBtn.textContent = "✏️ Sửa";
-    editBtn.addEventListener("click", () => { editingTaskIds.add(t.id); render(); });
+    editBtn.addEventListener("click", () => openTaskEditor(t));
     actions.appendChild(editBtn);
 
     const noteBtn = document.createElement("button");
@@ -1074,7 +1114,7 @@ async function saveTaskEdit(id, name, qty){
   if(!n){ showError("Tên sản phẩm không được để trống."); return; }
   try{
     await updateDoc(doc(db, "tasks", id), { name: n, qty: q, updatedAt: serverTimestamp() });
-    editingTaskIds.delete(id);
+    closeTaskEditor();
     render();
   }catch(e){ showError("Không lưu được thay đổi: " + e.message); }
 }
@@ -1131,7 +1171,6 @@ async function extractQrFromPdf(file){
       const ctx = canvas.getContext("2d");
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const qr = window.jsQR(imageData.data, imageData.width, imageData.height);
-      console.log(`[DEBUG ship-label] QR trang ${i}, scale ${scale}:`, qr ? qr.data : null);
       if(qr && qr.data && qr.data.trim()){
         return qr.data.trim();
       }
@@ -1181,19 +1220,13 @@ async function extractTrackingFromPdf(file){
 
   // Đọc song song cả 2 cách; ưu tiên QR, chỉ dùng text khi QR không ra gì.
   const [qrCode, text] = await Promise.all([
-    extractQrFromPdf(file).catch(e => {
-      console.warn("[DEBUG ship-label] Lỗi khi đọc mã QR:", e);
-      return null;
-    }),
+    extractQrFromPdf(file).catch(() => null),
     extractPdfText(file)
   ]);
-  console.log("[DEBUG ship-label] File:", file.name, "| Mã QR đọc được:", qrCode, "| Độ dài text:", text.length);
 
   if(qrCode) return qrCode;
 
-  const textCode = detectTrackingFromText(text);
-  console.log("[DEBUG ship-label] Không có QR — kết quả dò từ lớp text:", textCode);
-  return textCode;
+  return detectTrackingFromText(text);
 }
 
 // Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
@@ -1235,14 +1268,9 @@ async function uploadShipLabel(orderId, file){
         confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
       if(shouldRename) await renameOrder(orderId, newTitle);
     } else {
-      // DEBUG: in ra console của DevTools (F12 > tab Console) thay vì hiện
-      // trên UI — người dùng thường vẫn để UI gọn, chỉ mở console khi cần
-      // soi lỗi. UI vẫn chỉ hiện 1 thông báo ngắn gọn như cũ.
       if(readErrorMsg){
-        console.error("[DEBUG ship-label] Lỗi khi đọc PDF bằng pdf.js:", readErrorMsg);
         showError("Không đọc được file PDF này để tự nhận diện mã vận đơn — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
       } else {
-        console.warn("[DEBUG ship-label] Không đọc được mã vận đơn (không có QR, không khớp mẫu text nào). File:", file.name);
         showError("Không nhận diện được mã vận đơn từ file này (mẫu lạ hoặc PDF ảnh scan) — vẫn tải phiếu lên bình thường, bạn có thể tự đổi tên đơn nếu cần.");
       }
       // Không giữ tên gốc lộn xộn từ điện thoại — đổi theo tên đơn hiện tại
