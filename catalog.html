@@ -103,6 +103,32 @@
   .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
   .muted{color:var(--muted);font-size:13px;}
 
+  /* ---- Chế độ xem dạng lưới (grid) — các ô cố định 1 chiều cao như nhau,
+     không phình to theo số phân loại; chi tiết phân loại xem ở bảng chọn
+     nhanh riêng khi chạm vào ô. ---- */
+  #viewModeRow button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+  .gridWrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .gcard{
+    position:relative;border:1.5px solid var(--border);border-radius:10px;padding:10px;
+    height:104px;display:flex;flex-direction:column;justify-content:space-between;
+    cursor:pointer;background:var(--card);
+  }
+  .gcard.active{border-color:var(--blue);background:var(--blue-bg);}
+  .gcard .gtop{display:flex;align-items:flex-start;gap:8px;}
+  .gcard .gavatar{
+    width:26px;height:26px;flex-shrink:0;border-radius:7px;background:var(--blue-bg);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  }
+  .gcard.active .gavatar{background:var(--blue);color:#fff;}
+  .gcard .gname{
+    font-size:13px;font-weight:600;line-height:1.3;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  }
+  .gcard .gstatus{font-size:11.5px;color:var(--muted);}
+  .gcard.active .gstatus{color:var(--blue);}
+  .gcard .gqtyRow{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--blue);}
+  .gcard .gqtyRow .gminus{background:#fff;color:var(--text);border-radius:6px;padding:1px 9px;font-weight:700;}
+
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
   .linkEditBox{
     margin-top:8px;padding:10px 10px 6px;border:1px solid var(--blue);
@@ -182,6 +208,11 @@
     <div id="gomStatusLine" style="display:none;"></div>
   </div>
 
+  <div class="row header-toolbar" id="viewModeRow" style="display:none;">
+    <button class="btn-outline" id="listViewBtn" type="button">☰ Danh sách</button>
+    <button class="btn-outline" id="gridViewBtn" type="button">▦ Lưới</button>
+  </div>
+
   <div class="row header-toolbar" id="sortModeRow" style="display:none;">
     <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
   </div>
@@ -255,6 +286,14 @@
   </div>
 </div>
 
+<div class="editor-overlay" id="gridDetailOverlay">
+  <h3>Chọn phân loại</h3>
+  <div id="gridDetailBody" style="flex:1;overflow:auto;"></div>
+  <div class="editor-actions">
+    <button class="btn-outline" id="gridDetailCloseBtn">Đóng</button>
+  </div>
+</div>
+
 <footer>
   <a class="back" href="index.html">← Về trang chính</a>
   <a class="back" href="huong-dan.html">📖 Xem hướng dẫn sử dụng</a>
@@ -293,6 +332,13 @@ let editingLinkIds = new Set();
 // 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
 let mode = "task";
 
+// ---- Chế độ xem ở tab Thêm việc: 'list' (mặc định, như hiện tại) hoặc
+// 'grid' (dạng lưới, các ô đều nhau, xem chi tiết phân loại qua bảng chọn
+// nhanh riêng). Ghi nhớ lựa chọn giữa các lần mở trang bằng localStorage. ----
+let viewMode = localStorage.getItem("catalogViewMode") || "list";
+// Sản phẩm đang mở bảng chọn nhanh (chỉ dùng ở chế độ lưới)
+let gridDetailProductId = null;
+
 // ---- Gom sản phẩm (grouping into one order) ----
 let gomMode = false;
 let currentGroupId = null;
@@ -324,6 +370,7 @@ document.querySelectorAll(".tab").forEach(t => {
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     t.classList.add("active");
     mode = t.dataset.mode;
+    if(mode === "manage") closeGridDetail();
     applyModeUI();
     renderList();
   });
@@ -360,6 +407,7 @@ function applyModeUI(){
   sortModeBtn.classList.toggle("active", sortMode);
   document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
   document.getElementById("gomBar").style.display = isManage ? "none" : "block";
+  document.getElementById("viewModeRow").style.display = isManage ? "none" : "flex";
   if(isManage){
     document.getElementById("gomStatusLine").style.display = "none";
   } else {
@@ -690,7 +738,183 @@ function renderTiersSelectionHtml(p){
   }).join("");
 }
 
-function renderList(){
+function buildProductItemEl(p, opts){
+  const { isManage, isSortMode, isFirst, isLast, filtered } = opts;
+  const div = document.createElement("div");
+  div.className = "item";
+  div.dataset.id = p.id;
+  const hasTiers = p.tiers && p.tiers.length >= 2;
+  const hasFlat = p.variants && p.variants.length;
+  let variantsHtml = "";
+
+  if(hasTiers){
+    variantsHtml = isManage ? renderTiersStaticHtml(p) : renderTiersSelectionHtml(p);
+  } else if(hasFlat){
+    variantsHtml = p.variants.map(v => {
+      if(isManage){
+        return `<span class="vchip static">${escapeHtml(v)}</span>`;
+      }
+      const key = p.id + "__" + v;
+      const active = isChipActive(key);
+      const cur = taskSelections.get(key);
+      const qty = cur ? cur.qty : 0;
+      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
+          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+        </button>`;
+    }).join("");
+  } else if(!isManage){
+    // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
+    const key = p.id;
+    const active = isChipActive(key);
+    const cur = taskSelections.get(key);
+    const qty = cur ? cur.qty : 0;
+    variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+        <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
+        ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+      </button>`;
+  }
+  div.innerHTML = `
+    ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
+    ${isSortMode ? `<div class="orderBtns">
+        <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
+        <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
+        <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
+        <button type="button" class="orderBtn bottomBtn" title="Đưa xuống cuối danh sách" ${isLast ? "disabled" : ""}>⤓</button>
+      </div>` : ""}
+    <div class="body">
+      <div class="titlerow">
+        <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
+        ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
+        ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
+      </div>
+      ${(!isManage && editingLinkIds.has(p.id)) ? `
+        <div class="linkEditBox">
+          <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
+          <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
+          <div class="row row-nowrap" style="margin-top:6px;">
+            <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
+            <button type="button" class="btn-outline linkCancelBtn" style="flex:1;">Hủy</button>
+          </div>
+          <div class="status linkStatus"></div>
+        </div>
+      ` : ""}
+      <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
+    </div>
+  `;
+  if(isSortMode){
+    const upBtn = div.querySelector(".upBtn");
+    const downBtn = div.querySelector(".downBtn");
+    const topBtn = div.querySelector(".topBtn");
+    const bottomBtn = div.querySelector(".bottomBtn");
+    if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
+    if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
+    if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
+    if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
+  } else if(isManage){
+    div.querySelector(".rowCheck").addEventListener("change", e => {
+      if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
+      updateActionBar();
+      updateSelectAllState(filtered);
+    });
+    div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
+    div.querySelector(".delBtn").addEventListener("click", async () => {
+      if(!confirm(`Xóa sản phẩm "${p.name}"?`)) return;
+      try{
+        await deleteDoc(doc(db, "catalog", p.id));
+        selected.delete(p.id);
+      }catch(e){
+        showError("Không xóa được sản phẩm: " + e.message);
+      }
+    });
+  } else {
+    // ---- Nút ✏️ chèn/sửa link file in (chỉ ở tab Thêm việc) ----
+    const editLinkBtn = div.querySelector(".editLinkBtn");
+    if(editLinkBtn){
+      editLinkBtn.addEventListener("click", () => {
+        if(editingLinkIds.has(p.id)) editingLinkIds.delete(p.id);
+        else editingLinkIds.add(p.id);
+        renderList();
+      });
+    }
+    const linkSaveBtn = div.querySelector(".linkSaveBtn");
+    const linkCancelBtn = div.querySelector(".linkCancelBtn");
+    if(linkSaveBtn){
+      linkSaveBtn.addEventListener("click", async () => {
+        const statusEl = div.querySelector(".linkStatus");
+        const newName = div.querySelector(".linkEditName").value.trim();
+        const rawLink = div.querySelector(".linkEditUrl").value.trim();
+        if(!newName){
+          statusEl.textContent = "Tên sản phẩm không được để trống.";
+          statusEl.className = "status err";
+          return;
+        }
+        let linkToSave = "";
+        if(rawLink){
+          if(!isValidHttpUrl(rawLink)){
+            statusEl.textContent = "Link không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+            statusEl.className = "status err";
+            return;
+          }
+          linkToSave = rawLink;
+        }
+        if(newName.toLowerCase() !== p.name.toLowerCase()){
+          const dup = allProducts.find(x => x.id !== p.id && x.name.toLowerCase() === newName.toLowerCase());
+          if(dup){
+            statusEl.textContent = `Tên "${newName}" đã trùng với 1 sản phẩm khác trong danh mục.`;
+            statusEl.className = "status err";
+            return;
+          }
+        }
+        try{
+          await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
+          editingLinkIds.delete(p.id);
+          renderList();
+        }catch(e){
+          statusEl.textContent = "Lỗi khi lưu: " + e.message;
+          statusEl.className = "status err";
+        }
+      });
+    }
+    if(linkCancelBtn){
+      linkCancelBtn.addEventListener("click", () => {
+        editingLinkIds.delete(p.id);
+        renderList();
+      });
+    }
+    div.querySelectorAll(".vchip").forEach(chip => {
+      chip.addEventListener("click", e => {
+        const key = chip.dataset.key;
+        const variant = key.slice(p.id.length + 2);
+        const act = e.target.dataset.act;
+        let cur = taskSelections.get(key);
+        if(act === "remove"){
+          taskSelections.delete(key);
+          if(pinnedKey === key) pinnedKey = null;
+        } else if(act === "minus"){
+          if(cur){
+            cur.qty -= 1;
+            if(cur.qty <= 0){
+              taskSelections.delete(key);
+              if(pinnedKey === key) pinnedKey = null;
+            }
+          }
+        } else {
+          if(!cur){
+            cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
+            taskSelections.set(key, cur);
+          }
+          cur.qty += 1;
+          if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
+        }
+        renderList();
+      });
+    });
+  }
+  return div;
+}
+
+function renderListView(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
   const isManage = mode === "manage";
@@ -704,184 +928,165 @@ function renderList(){
     return;
   }
   filtered.forEach((p, idx) => {
-    const div = document.createElement("div");
-    div.className = "item";
-    div.dataset.id = p.id;
-    const isFirst = idx === 0;
-    const isLast = idx === filtered.length - 1;
-    const hasTiers = p.tiers && p.tiers.length >= 2;
-    const hasFlat = p.variants && p.variants.length;
-    let variantsHtml = "";
-
-    if(hasTiers){
-      variantsHtml = isManage ? renderTiersStaticHtml(p) : renderTiersSelectionHtml(p);
-    } else if(hasFlat){
-      variantsHtml = p.variants.map(v => {
-        if(isManage){
-          return `<span class="vchip static">${escapeHtml(v)}</span>`;
-        }
-        const key = p.id + "__" + v;
-        const active = isChipActive(key);
-        const cur = taskSelections.get(key);
-        const qty = cur ? cur.qty : 0;
-        return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-            <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-            ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-          </button>`;
-      }).join("");
-    } else if(!isManage){
-      // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
-      const key = p.id;
-      const active = isChipActive(key);
-      const cur = taskSelections.get(key);
-      const qty = cur ? cur.qty : 0;
-      variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
-          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-        </button>`;
-    }
-    div.innerHTML = `
-      ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
-      ${isSortMode ? `<div class="orderBtns">
-          <button type="button" class="orderBtn upBtn" title="Đẩy lên 1 bậc" ${isFirst ? "disabled" : ""}>▲</button>
-          <button type="button" class="orderBtn topBtn" title="Đưa lên đầu danh sách" ${isFirst ? "disabled" : ""}>⤒</button>
-          <button type="button" class="orderBtn downBtn" title="Đẩy xuống 1 bậc" ${isLast ? "disabled" : ""}>▼</button>
-          <button type="button" class="orderBtn bottomBtn" title="Đưa xuống cuối danh sách" ${isLast ? "disabled" : ""}>⤓</button>
-        </div>` : ""}
-      <div class="body">
-        <div class="titlerow">
-          <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
-          ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
-          ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
-        </div>
-        ${(!isManage && editingLinkIds.has(p.id)) ? `
-          <div class="linkEditBox">
-            <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
-            <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
-            <div class="row row-nowrap" style="margin-top:6px;">
-              <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
-              <button type="button" class="btn-outline linkCancelBtn" style="flex:1;">Hủy</button>
-            </div>
-            <div class="status linkStatus"></div>
-          </div>
-        ` : ""}
-        <div class="variants">${variantsHtml || '<span class="muted">Không có phân loại (sản phẩm đơn)</span>'}</div>
-      </div>
-    `;
-    if(isSortMode){
-      const upBtn = div.querySelector(".upBtn");
-      const downBtn = div.querySelector(".downBtn");
-      const topBtn = div.querySelector(".topBtn");
-      const bottomBtn = div.querySelector(".bottomBtn");
-      if(!isFirst) upBtn.addEventListener("click", () => moveItem(p.id, -1));
-      if(!isLast) downBtn.addEventListener("click", () => moveItem(p.id, 1));
-      if(!isFirst) topBtn.addEventListener("click", () => moveToTop(p.id));
-      if(!isLast) bottomBtn.addEventListener("click", () => moveToBottom(p.id));
-    } else if(isManage){
-      div.querySelector(".rowCheck").addEventListener("change", e => {
-        if(e.target.checked) selected.add(p.id); else selected.delete(p.id);
-        updateActionBar();
-        updateSelectAllState(filtered);
-      });
-      div.querySelector(".editBtn").addEventListener("click", () => openEditor(p));
-      div.querySelector(".delBtn").addEventListener("click", async () => {
-        if(!confirm(`Xóa sản phẩm "${p.name}"?`)) return;
-        try{
-          await deleteDoc(doc(db, "catalog", p.id));
-          selected.delete(p.id);
-        }catch(e){
-          showError("Không xóa được sản phẩm: " + e.message);
-        }
-      });
-    } else {
-      // ---- Nút ✏️ chèn/sửa link file in (chỉ ở tab Thêm việc) ----
-      const editLinkBtn = div.querySelector(".editLinkBtn");
-      if(editLinkBtn){
-        editLinkBtn.addEventListener("click", () => {
-          if(editingLinkIds.has(p.id)) editingLinkIds.delete(p.id);
-          else editingLinkIds.add(p.id);
-          renderList();
-        });
-      }
-      const linkSaveBtn = div.querySelector(".linkSaveBtn");
-      const linkCancelBtn = div.querySelector(".linkCancelBtn");
-      if(linkSaveBtn){
-        linkSaveBtn.addEventListener("click", async () => {
-          const statusEl = div.querySelector(".linkStatus");
-          const newName = div.querySelector(".linkEditName").value.trim();
-          const rawLink = div.querySelector(".linkEditUrl").value.trim();
-          if(!newName){
-            statusEl.textContent = "Tên sản phẩm không được để trống.";
-            statusEl.className = "status err";
-            return;
-          }
-          let linkToSave = "";
-          if(rawLink){
-            if(!isValidHttpUrl(rawLink)){
-              statusEl.textContent = "Link không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
-              statusEl.className = "status err";
-              return;
-            }
-            linkToSave = rawLink;
-          }
-          if(newName.toLowerCase() !== p.name.toLowerCase()){
-            const dup = allProducts.find(x => x.id !== p.id && x.name.toLowerCase() === newName.toLowerCase());
-            if(dup){
-              statusEl.textContent = `Tên "${newName}" đã trùng với 1 sản phẩm khác trong danh mục.`;
-              statusEl.className = "status err";
-              return;
-            }
-          }
-          try{
-            await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
-            editingLinkIds.delete(p.id);
-            renderList();
-          }catch(e){
-            statusEl.textContent = "Lỗi khi lưu: " + e.message;
-            statusEl.className = "status err";
-          }
-        });
-      }
-      if(linkCancelBtn){
-        linkCancelBtn.addEventListener("click", () => {
-          editingLinkIds.delete(p.id);
-          renderList();
-        });
-      }
-      div.querySelectorAll(".vchip").forEach(chip => {
-        chip.addEventListener("click", e => {
-          const key = chip.dataset.key;
-          const variant = key.slice(p.id.length + 2);
-          const act = e.target.dataset.act;
-          let cur = taskSelections.get(key);
-          if(act === "remove"){
-            taskSelections.delete(key);
-            if(pinnedKey === key) pinnedKey = null;
-          } else if(act === "minus"){
-            if(cur){
-              cur.qty -= 1;
-              if(cur.qty <= 0){
-                taskSelections.delete(key);
-                if(pinnedKey === key) pinnedKey = null;
-              }
-            }
-          } else {
-            if(!cur){
-              cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
-              taskSelections.set(key, cur);
-            }
-            cur.qty += 1;
-            if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
-          }
-          renderList();
-        });
-      });
-    }
+    const div = buildProductItemEl(p, {
+      isManage, isSortMode,
+      isFirst: idx === 0,
+      isLast: idx === filtered.length - 1,
+      filtered
+    });
     list.appendChild(div);
   });
   updateActionBar();
   updateSelectAllState(filtered);
   updateTaskBar();
+}
+
+// ---- Chế độ xem dạng lưới (chỉ ở tab Thêm việc) ----
+function countVariants(p){
+  if(p.tiers && p.tiers.length >= 2){
+    const outer = p.tiers.slice(0, -1);
+    const last = p.tiers[p.tiers.length - 1];
+    return cartesianProduct(outer).length * last.length;
+  }
+  if(p.variants && p.variants.length) return p.variants.length;
+  return 0;
+}
+
+// Tổng số lượng đã chọn + số phân loại đã chọn của 1 sản phẩm, dựa trực tiếp
+// vào field productId đã lưu sẵn trong mỗi taskSelections — không cần dựng
+// lại key theo từng kiểu phân loại.
+function productSelectionSummary(p){
+  let totalQty = 0, chosenCount = 0;
+  for(const val of taskSelections.values()){
+    if(val.productId === p.id){
+      totalQty += val.qty;
+      chosenCount += 1;
+    }
+  }
+  return { totalQty, chosenCount };
+}
+
+function renderGridView(){
+  const list = document.getElementById("list");
+  const filtered = getFiltered();
+  list.innerHTML = "";
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    updateTaskBar();
+    return;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "gridWrap";
+  filtered.forEach(p => {
+    const hasVariant = (p.tiers && p.tiers.length >= 2) || (p.variants && p.variants.length);
+    const { totalQty, chosenCount } = productSelectionSummary(p);
+    const active = totalQty > 0;
+    const card = document.createElement("div");
+    card.className = "gcard" + (active ? " active" : "");
+    card.dataset.id = p.id;
+    const initial = (p.name.trim()[0] || "?").toUpperCase();
+    let statusHtml;
+    if(!hasVariant && active){
+      // Sản phẩm đơn đã chọn — cho phép bớt số lượng ngay trên ô, không cần mở gì thêm
+      statusHtml = `<div class="gqtyRow"><span class="gminus" data-act="minus">−</span><span class="gqty">×${totalQty}</span></div>`;
+    } else if(hasVariant){
+      statusHtml = `<span class="gstatus">${countVariants(p)} phân loại${chosenCount ? " · đã chọn " + chosenCount : ""}</span>`;
+    } else {
+      statusHtml = `<span class="gstatus">Sản phẩm đơn</span>`;
+    }
+    card.innerHTML = `
+      <div class="gtop">
+        <div class="gavatar">${escapeHtml(initial)}</div>
+        <div class="gname">${escapeHtml(p.name)}</div>
+      </div>
+      ${statusHtml}
+    `;
+    card.addEventListener("click", e => {
+      if(hasVariant){
+        // Có phân loại — mở bảng chọn nhanh thay vì cố nhồi hết chip vào ô
+        openGridDetail(p.id);
+        return;
+      }
+      // Sản phẩm đơn — chạm là cộng luôn, chạm nút "−" để bớt, giống hệt
+      // cơ chế chip "Chọn sản phẩm này" ở chế độ danh sách.
+      const actEl = e.target.closest("[data-act]");
+      const key = p.id;
+      let cur = taskSelections.get(key);
+      if(actEl && actEl.dataset.act === "minus"){
+        if(cur){
+          cur.qty -= 1;
+          if(cur.qty <= 0){
+            taskSelections.delete(key);
+            if(pinnedKey === key) pinnedKey = null;
+          }
+        }
+      } else {
+        if(!cur){
+          cur = { productName: p.name, variant: "", qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
+          taskSelections.set(key, cur);
+        }
+        cur.qty += 1;
+        if(!gomMode) pinnedKey = key;
+      }
+      renderList();
+    });
+    wrap.appendChild(card);
+  });
+  list.appendChild(wrap);
+  updateTaskBar();
+}
+
+function openGridDetail(productId){
+  gridDetailProductId = productId;
+  renderGridDetailOverlay();
+  document.getElementById("gridDetailOverlay").classList.add("show");
+}
+function closeGridDetail(){
+  document.getElementById("gridDetailOverlay").classList.remove("show");
+  gridDetailProductId = null;
+}
+function renderGridDetailOverlay(){
+  const p = allProducts.find(x => x.id === gridDetailProductId);
+  if(!p){ closeGridDetail(); return; }
+  const body = document.getElementById("gridDetailBody");
+  body.innerHTML = "";
+  body.appendChild(buildProductItemEl(p, { isManage: false, isSortMode: false, isFirst: true, isLast: true, filtered: [p] }));
+}
+document.getElementById("gridDetailCloseBtn").addEventListener("click", closeGridDetail);
+
+const listViewBtn = document.getElementById("listViewBtn");
+const gridViewBtn = document.getElementById("gridViewBtn");
+function updateViewModeButtons(){
+  listViewBtn.classList.toggle("active", viewMode === "list");
+  gridViewBtn.classList.toggle("active", viewMode === "grid");
+}
+listViewBtn.addEventListener("click", () => {
+  if(viewMode === "list") return;
+  viewMode = "list";
+  localStorage.setItem("catalogViewMode", "list");
+  updateViewModeButtons();
+  renderList();
+});
+gridViewBtn.addEventListener("click", () => {
+  if(viewMode === "grid") return;
+  viewMode = "grid";
+  localStorage.setItem("catalogViewMode", "grid");
+  updateViewModeButtons();
+  renderList();
+});
+updateViewModeButtons();
+
+function renderList(){
+  if(mode === "task" && viewMode === "grid"){
+    renderGridView();
+  } else {
+    renderListView();
+  }
+  // Nếu đang mở bảng chọn nhanh của grid, làm mới nội dung bảng đó theo dữ
+  // liệu mới nhất (vd sau khi đổi số lượng phân loại bên trong bảng).
+  if(gridDetailProductId){
+    renderGridDetailOverlay();
+  }
 }
 
 // Xác định 1 phân loại có đang được tô sáng (ghim) trong danh sách hay không.
