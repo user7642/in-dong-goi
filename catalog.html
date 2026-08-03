@@ -109,6 +109,9 @@
     background:var(--blue-bg);border-radius:10px;
   }
   .linkEditBox input{margin-bottom:6px;}
+  .imgPreviewBox{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-height:20px;}
+  .imgPreview{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:#fff;}
+  .imgPreviewMsg{font-size:12px;}
 
   /* Nhiều tầng phân loại (VD: Chủ đề x Kích thước) */
   .groupRow{margin-bottom:10px;}
@@ -495,7 +498,8 @@ onSnapshot(q, snap => {
       id: d.id, ...data,
       tiers: tiersFromFirestore(data.tiers),
       order: (typeof data.order === "number" ? data.order : null),
-      link: data.link || ""
+      link: data.link || "",
+      image: data.image || ""
     };
   });
   sortProductsInPlace();
@@ -750,13 +754,15 @@ function renderList(){
         </div>` : ""}
       <div class="body">
         <div class="titlerow">
-          <div class="name">${escapeHtml(p.name)}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
+          <div class="name">${escapeHtml(p.name)}${p.image ? ` <a class="linkchip" href="${escapeHtml(p.image)}" target="_blank" rel="noopener" title="Xem ảnh sản phẩm">🖼</a>` : ""}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
           ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
-          ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa link file in">✏️</button></div>` : ""}
+          ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa ảnh & link file in">✏️</button></div>` : ""}
         </div>
         ${(!isManage && editingLinkIds.has(p.id)) ? `
           <div class="linkEditBox">
             <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
+            <input type="text" class="linkEditImage" value="${escapeHtml(p.image || "")}" placeholder="Dán URL ảnh sản phẩm — https://...">
+            <div class="imgPreviewBox"><img class="imgPreview" src="${escapeHtml(p.image || "")}" style="display:${p.image ? "block" : "none"};"><span class="imgPreviewMsg muted"></span></div>
             <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
             <div class="row row-nowrap" style="margin-top:6px;">
               <button type="button" class="btn-blue linkSaveBtn" style="flex:1;">Lưu</button>
@@ -805,15 +811,50 @@ function renderList(){
       }
       const linkSaveBtn = div.querySelector(".linkSaveBtn");
       const linkCancelBtn = div.querySelector(".linkCancelBtn");
+      const linkEditImage = div.querySelector(".linkEditImage");
+      if(linkEditImage){
+        const previewImg = div.querySelector(".imgPreview");
+        const previewMsg = div.querySelector(".imgPreviewMsg");
+        const updatePreview = () => {
+          const url = linkEditImage.value.trim();
+          if(!url){
+            previewImg.style.display = "none";
+            previewMsg.textContent = "";
+            return;
+          }
+          previewMsg.textContent = "Đang tải ảnh xem trước...";
+          previewImg.style.display = "none";
+          previewImg.src = url;
+        };
+        previewImg.addEventListener("load", () => {
+          previewImg.style.display = "block";
+          previewMsg.textContent = "";
+        });
+        previewImg.addEventListener("error", () => {
+          previewImg.style.display = "none";
+          previewMsg.textContent = "⚠️ Không tải được ảnh từ URL này — kiểm tra lại link.";
+        });
+        linkEditImage.addEventListener("input", updatePreview);
+      }
       if(linkSaveBtn){
         linkSaveBtn.addEventListener("click", async () => {
           const statusEl = div.querySelector(".linkStatus");
           const newName = div.querySelector(".linkEditName").value.trim();
+          const rawImage = linkEditImage ? linkEditImage.value.trim() : (p.image || "");
           const rawLink = div.querySelector(".linkEditUrl").value.trim();
           if(!newName){
             statusEl.textContent = "Tên sản phẩm không được để trống.";
             statusEl.className = "status err";
             return;
+          }
+          let imageToSave = "";
+          if(rawImage){
+            if(!isValidHttpUrl(rawImage)){
+              statusEl.textContent = "URL ảnh không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+              statusEl.className = "status err";
+              return;
+            }
+            imageToSave = rawImage;
           }
           let linkToSave = "";
           if(rawLink){
@@ -833,7 +874,7 @@ function renderList(){
             }
           }
           try{
-            await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave });
+            await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave, image: imageToSave });
             editingLinkIds.delete(p.id);
             renderList();
           }catch(e){
@@ -995,6 +1036,7 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
         status: "cho_in",
         note: "",
         link: (prod && prod.link) ? prod.link : "",
+        image: (prod && prod.image) ? prod.image : "",
         orderId: e.orderId,
         orderName: orderNames.get(e.orderId),
         createdAt: serverTimestamp(),
