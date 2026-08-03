@@ -118,6 +118,15 @@
   .groupRow{margin-bottom:10px;}
   .groupRow:last-child{margin-bottom:0;}
   .groupName{font-size:13px;color:var(--text);font-weight:700;margin-bottom:5px;}
+  .groupImgBtn{
+    border:none;background:none;font-size:12.5px;cursor:pointer;margin-left:4px;
+    color:var(--blue);vertical-align:middle;padding:2px 4px;
+  }
+  .groupImgEditBox{
+    margin:0 0 10px;padding:9px 9px 5px;border:1px solid var(--blue);
+    background:var(--blue-bg);border-radius:10px;
+  }
+  .groupImgEditBox input{margin-bottom:6px;}
   .groupOpts{display:flex;flex-wrap:wrap;gap:6px;}
   .status{font-size:13px;margin-top:8px;min-height:18px;}
   .status.ok{color:var(--green);}
@@ -292,6 +301,11 @@ let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "
 let editorSaveHandler = null;
 // Danh sách sản phẩm đang mở form "chèn link file in" ở tab Thêm việc.
 let editingLinkIds = new Set();
+// Danh sách sản phẩm đang mở form gán ảnh riêng cho 1 nhãn tầng 1 (dạng
+// key: productId__tenTang1) — chỉ dùng cho sản phẩm có ĐÚNG 2 tầng phân loại,
+// vì thực tế chỉ tầng 1 mới cần ảnh riêng biệt (giống cách Shopee gán ảnh
+// theo "Phân loại 1", xem ảnh 2 người dùng gửi).
+let editingGroupImageIds = new Set();
 
 // ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
 // 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
@@ -555,25 +569,6 @@ function cartesianProduct(arrays){
   }, [[]]);
 }
 
-// Danh sách đầy đủ các nhãn phân loại của 1 sản phẩm (dùng cho dropdown gán
-// ảnh riêng theo phân loại) — cùng công thức ghép chuỗi với renderTiersSelectionHtml()
-// và vchip phẳng, để đảm bảo khớp CHÍNH XÁC với "variant" dùng làm key lúc chọn thêm việc.
-function getAllVariantLabels(p){
-  if(p.tiers && p.tiers.length >= 2){
-    const outerTiers = p.tiers.slice(0, -1);
-    const lastTier = p.tiers[p.tiers.length - 1];
-    const combos = cartesianProduct(outerTiers);
-    const labels = [];
-    combos.forEach(combo => {
-      const label = combo.join(" - ");
-      lastTier.forEach(v => labels.push(label + ": " + v));
-    });
-    return labels;
-  }
-  if(p.variants && p.variants.length) return [...p.variants];
-  return [];
-}
-
 // Firestore không cho phép lưu mảng lồng mảng trực tiếp (nested array).
 // Nội bộ code vẫn dùng tiers dạng [["a","b"],["c","d"]] cho tiện xử lý,
 // nhưng khi ghi lên Firestore phải bọc từng tầng trong 1 object.
@@ -700,6 +695,9 @@ function renderTiersSelectionHtml(p){
   const combos = cartesianProduct(outerTiers);
   return combos.map(combo => {
     const label = combo.join(" - ");
+    const groupKey = p.id + "__" + label;
+    const hasImg = !!(p.variantImages && p.variantImages[label]);
+    const editingGroup = editingGroupImageIds.has(groupKey);
     const chips = lastTier.map(v => {
       const variant = label + ": " + v;
       const key = p.id + "__" + variant;
@@ -711,7 +709,23 @@ function renderTiersSelectionHtml(p){
           ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
         </button>`;
     }).join("");
-    return `<div class="groupRow"><div class="groupName">${escapeHtml(label)} :</div><div class="groupOpts">${chips}</div></div>`;
+    return `<div class="groupRow">
+        <div class="groupName">${escapeHtml(label)} :
+          <button type="button" class="groupImgBtn" data-groupkey="${escapeHtml(groupKey)}" title="${hasImg ? "Đã có ảnh riêng cho phân loại này — bấm để sửa" : "Gán ảnh riêng cho phân loại này"}">${hasImg ? "🖼" : "➕🖼"}</button>
+        </div>
+        ${editingGroup ? `
+          <div class="groupImgEditBox">
+            <input type="text" class="groupImgInput" value="${escapeHtml((p.variantImages && p.variantImages[label]) || "")}" placeholder='Dán URL ảnh riêng cho "${escapeHtml(label)}" — để trống = dùng ảnh mặc định'>
+            <div class="imgPreviewBox"><img class="imgPreview" src="${escapeHtml((p.variantImages && p.variantImages[label]) || "")}" style="display:${hasImg ? "block" : "none"};"><span class="imgPreviewMsg muted"></span></div>
+            <div class="row row-nowrap" style="margin-top:4px;">
+              <button type="button" class="btn-blue groupImgSaveBtn" style="flex:1;">Lưu</button>
+              <button type="button" class="btn-outline groupImgCancelBtn" style="flex:1;">Hủy</button>
+            </div>
+            <div class="status groupImgStatus"></div>
+          </div>
+        ` : ""}
+        <div class="groupOpts">${chips}</div>
+      </div>`;
   }).join("");
 }
 
@@ -782,12 +796,6 @@ function renderList(){
         ${(!isManage && editingLinkIds.has(p.id)) ? `
           <div class="linkEditBox">
             <input type="text" class="linkEditName" value="${escapeHtml(p.name)}" placeholder="Tên sản phẩm">
-            ${getAllVariantLabels(p).length ? `
-              <select class="linkEditVariantSelect">
-                <option value="">🔹 Ảnh mặc định (dùng khi phân loại chưa có ảnh riêng)</option>
-                ${getAllVariantLabels(p).map(v => `<option value="${escapeHtml(v)}">${p.variantImages && p.variantImages[v] ? "🖼 " : ""}${escapeHtml(v)}</option>`).join("")}
-              </select>
-            ` : ""}
             <input type="text" class="linkEditImage" value="${escapeHtml(p.image || "")}" placeholder="Dán URL ảnh sản phẩm — https://...">
             <div class="imgPreviewBox"><img class="imgPreview" src="${escapeHtml(p.image || "")}" style="display:${p.image ? "block" : "none"};"><span class="imgPreviewMsg muted"></span></div>
             <input type="text" class="linkEditUrl" value="${escapeHtml(p.link || "")}" placeholder="Dán link file in (PDF hoặc ảnh) — https://...">
@@ -839,7 +847,6 @@ function renderList(){
       const linkSaveBtn = div.querySelector(".linkSaveBtn");
       const linkCancelBtn = div.querySelector(".linkCancelBtn");
       const linkEditImage = div.querySelector(".linkEditImage");
-      const variantSelect = div.querySelector(".linkEditVariantSelect");
       if(linkEditImage){
         const previewImg = div.querySelector(".imgPreview");
         const previewMsg = div.querySelector(".imgPreviewMsg");
@@ -864,36 +871,25 @@ function renderList(){
         });
         linkEditImage.addEventListener("input", updatePreview);
       }
-      // Đổi lựa chọn "Ảnh mặc định" / 1 phân loại cụ thể trong dropdown -> đổ
-      // đúng URL đang gán cho lựa chọn đó (hoặc rỗng nếu phân loại chưa có
-      // ảnh riêng, để trống nghĩa là "đang dùng ảnh mặc định của sản phẩm").
-      if(variantSelect){
-        variantSelect.addEventListener("change", () => {
-          const v = variantSelect.value;
-          const url = v ? ((p.variantImages && p.variantImages[v]) || "") : (p.image || "");
-          linkEditImage.value = url;
-          linkEditImage.placeholder = v
-            ? "Dán URL ảnh riêng cho phân loại này — để trống = dùng ảnh mặc định"
-            : "Dán URL ảnh sản phẩm — https://...";
-          linkEditImage.dispatchEvent(new Event("input"));
-        });
-      }
       if(linkSaveBtn){
         linkSaveBtn.addEventListener("click", async () => {
           const statusEl = div.querySelector(".linkStatus");
           const newName = div.querySelector(".linkEditName").value.trim();
           const rawImage = linkEditImage ? linkEditImage.value.trim() : "";
           const rawLink = div.querySelector(".linkEditUrl").value.trim();
-          const targetVariant = variantSelect ? variantSelect.value : "";
           if(!newName){
             statusEl.textContent = "Tên sản phẩm không được để trống.";
             statusEl.className = "status err";
             return;
           }
-          if(rawImage && !isValidHttpUrl(rawImage)){
-            statusEl.textContent = "URL ảnh không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
-            statusEl.className = "status err";
-            return;
+          let imageToSave = "";
+          if(rawImage){
+            if(!isValidHttpUrl(rawImage)){
+              statusEl.textContent = "URL ảnh không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+              statusEl.className = "status err";
+              return;
+            }
+            imageToSave = rawImage;
           }
           let linkToSave = "";
           if(rawLink){
@@ -912,21 +908,8 @@ function renderList(){
               return;
             }
           }
-          const patch = { name: newName, link: linkToSave };
-          if(targetVariant){
-            // Đang sửa ảnh RIÊNG cho 1 phân loại — chỉ cập nhật đúng mục đó
-            // trong variantImages, không đụng tới ảnh mặc định của sản phẩm.
-            const newVariantImages = { ...(p.variantImages || {}) };
-            if(rawImage) newVariantImages[targetVariant] = rawImage;
-            else delete newVariantImages[targetVariant];
-            patch.variantImages = newVariantImages;
-          } else {
-            // Đang sửa "Ảnh mặc định" — chỉ đụng tới field image, không đụng
-            // tới variantImages của các phân loại đã gán riêng trước đó.
-            patch.image = rawImage;
-          }
           try{
-            await updateDoc(doc(db, "catalog", p.id), patch);
+            await updateDoc(doc(db, "catalog", p.id), { name: newName, link: linkToSave, image: imageToSave });
             editingLinkIds.delete(p.id);
             renderList();
           }catch(e){
@@ -941,6 +924,57 @@ function renderList(){
           renderList();
         });
       }
+      div.querySelectorAll(".groupImgBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const gk = btn.dataset.groupkey;
+          if(editingGroupImageIds.has(gk)) editingGroupImageIds.delete(gk);
+          else editingGroupImageIds.add(gk);
+          renderList();
+        });
+      });
+      div.querySelectorAll(".groupRow").forEach(row => {
+        const box = row.querySelector(".groupImgEditBox");
+        const btn = row.querySelector(".groupImgBtn");
+        if(!box || !btn) return;
+        const groupKey = btn.dataset.groupkey;
+        const label = groupKey.slice(p.id.length + 2);
+        const input = box.querySelector(".groupImgInput");
+        const previewImg = box.querySelector(".imgPreview");
+        const previewMsg = box.querySelector(".imgPreviewMsg");
+        const updatePreview = () => {
+          const url = input.value.trim();
+          if(!url){ previewImg.style.display = "none"; previewMsg.textContent = ""; return; }
+          previewMsg.textContent = "Đang tải ảnh xem trước...";
+          previewImg.style.display = "none";
+          previewImg.src = url;
+        };
+        previewImg.addEventListener("load", () => { previewImg.style.display = "block"; previewMsg.textContent = ""; });
+        previewImg.addEventListener("error", () => { previewImg.style.display = "none"; previewMsg.textContent = "⚠️ Không tải được ảnh từ URL này — kiểm tra lại link."; });
+        input.addEventListener("input", updatePreview);
+        box.querySelector(".groupImgSaveBtn").addEventListener("click", async () => {
+          const statusEl = box.querySelector(".groupImgStatus");
+          const raw = input.value.trim();
+          if(raw && !isValidHttpUrl(raw)){
+            statusEl.textContent = "URL ảnh không hợp lệ — phải bắt đầu bằng http:// hoặc https://";
+            statusEl.className = "status err";
+            return;
+          }
+          const newVariantImages = { ...(p.variantImages || {}) };
+          if(raw) newVariantImages[label] = raw; else delete newVariantImages[label];
+          try{
+            await updateDoc(doc(db, "catalog", p.id), { variantImages: newVariantImages });
+            editingGroupImageIds.delete(groupKey);
+            renderList();
+          }catch(e){
+            statusEl.textContent = "Lỗi khi lưu: " + e.message;
+            statusEl.className = "status err";
+          }
+        });
+        box.querySelector(".groupImgCancelBtn").addEventListener("click", () => {
+          editingGroupImageIds.delete(groupKey);
+          renderList();
+        });
+      });
       div.querySelectorAll(".vchip").forEach(chip => {
         chip.addEventListener("click", e => {
           const key = chip.dataset.key;
@@ -1088,9 +1122,16 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
         status: "cho_in",
         note: "",
         link: (prod && prod.link) ? prod.link : "",
-        image: (prod && prod.variantImages && e.variant && prod.variantImages[e.variant])
-          ? prod.variantImages[e.variant]
-          : ((prod && prod.image) ? prod.image : ""),
+        image: (() => {
+          // Ảnh riêng theo phân loại CHỈ áp dụng cho sản phẩm 2 tầng, và chỉ
+          // gán theo TẦNG 1 (vd "Biển Báo Cấm"), không theo cả tổ hợp
+          // "tầng1: tầng2" — đúng thực tế Shopee chỉ cho gán ảnh ở Phân loại 1.
+          if(prod && prod.variantImages && e.variant && e.variant.includes(": ")){
+            const tier1 = e.variant.split(": ")[0];
+            if(prod.variantImages[tier1]) return prod.variantImages[tier1];
+          }
+          return (prod && prod.image) ? prod.image : "";
+        })(),
         orderId: e.orderId,
         orderName: orderNames.get(e.orderId),
         createdAt: serverTimestamp(),
