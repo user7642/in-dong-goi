@@ -193,8 +193,25 @@
   .order-item-summary:last-of-type{border-bottom:none;}
   .order-item-summary input[type=checkbox]{width:20px;height:20px;flex-shrink:0;margin-top:4px;accent-color:var(--blue);}
   .info-summary{flex:1;min-width:0;}
-  .name-summary{font-size:14px;font-weight:600;line-height:1.35;word-break:break-word;}
-  .meta-summary{font-size:12.5px;color:var(--muted);margin-top:3px;}
+  /* Tiêu đề: 1 dòng, dài quá thì ẩn bớt (ellipsis) — giống kiểu Shopee. */
+  .name-summary{
+    font-size:14px;font-weight:600;line-height:1.35;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* Dòng dưới: phân loại bên trái (ẩn bớt nếu dài) + số lượng bên phải,
+     luôn giữ chỗ cố định cho SL để không bao giờ bị đẩy mất. */
+  .meta-row-summary{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin-top:3px;
+  }
+  .classification-summary{
+    flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:12.5px;color:var(--muted);
+  }
+  .qty-summary{
+    flex-shrink:0;font-size:12.5px;color:var(--muted);
+  }
 
   .order-summary-footer{
     display:flex;justify-content:space-between;align-items:center;
@@ -969,6 +986,19 @@ function renderOrderBox(g){
   return box;
 }
 
+// Tên sản phẩm thường được gõ theo dạng "Tên gốc — Phân loại" (dấu gạch
+// ngang dài "—"). Hàm này tách ra 2 phần để hiển thị tiêu đề và phân loại
+// trên 2 dòng riêng thay vì dính liền — nếu không có "—" thì coi cả chuỗi
+// là tiêu đề, không có phân loại.
+function splitProductName(name){
+  name = name || "";
+  const idx = name.indexOf("—");
+  if(idx === -1) return { title: name, classification: "" };
+  const title = name.slice(0, idx).trim();
+  const classification = name.slice(idx + 1).trim();
+  return title ? { title, classification } : { title: classification, classification: "" };
+}
+
 // Dòng 1 sản phẩm trong thẻ tóm tắt — chỉ ảnh/tiêu đề/SL + checkbox (dùng
 // cho chọn hàng loạt), KHÔNG có nút thao tác (những nút đó chuyển hết vào
 // trang chi tiết vì ít khi dùng tới).
@@ -991,9 +1021,11 @@ function renderItemSummary(t){
 
   const info = document.createElement("div");
   info.className = "info-summary";
+  const { title, classification } = splitProductName(t.name);
   const nameDiv = document.createElement("div");
   nameDiv.className = "name-summary";
-  nameDiv.textContent = t.name;
+  nameDiv.title = t.name;
+  nameDiv.textContent = title;
   if(currentTab === "xong" && t.shipped){
     const badge = document.createElement("span");
     badge.className = "shipped-badge";
@@ -1001,8 +1033,16 @@ function renderItemSummary(t){
     nameDiv.appendChild(badge);
   }
   const metaDiv = document.createElement("div");
-  metaDiv.className = "meta-summary";
-  metaDiv.textContent = "SL: " + (t.qty || 1);
+  metaDiv.className = "meta-row-summary";
+  const classDiv = document.createElement("span");
+  classDiv.className = "classification-summary";
+  classDiv.title = classification;
+  classDiv.textContent = classification;
+  const qtyDiv = document.createElement("span");
+  qtyDiv.className = "qty-summary";
+  qtyDiv.textContent = "SL: " + (t.qty || 1);
+  metaDiv.appendChild(classDiv);
+  metaDiv.appendChild(qtyDiv);
   info.appendChild(nameDiv);
   info.appendChild(metaDiv);
   row.appendChild(info);
