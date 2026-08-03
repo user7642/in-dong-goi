@@ -711,7 +711,7 @@ function renderTiersSelectionHtml(p){
     }).join("");
     return `<div class="groupRow">
         <div class="groupName">${escapeHtml(label)} :
-          <button type="button" class="groupImgBtn" data-groupkey="${escapeHtml(groupKey)}" title="${hasImg ? "Đã có ảnh riêng cho phân loại này — bấm để sửa" : "Gán ảnh riêng cho phân loại này"}">${hasImg ? "🖼" : "➕🖼"}</button>
+          <button type="button" class="groupImgBtn" data-groupkey="${escapeHtml(groupKey)}" title="${hasImg ? "Đã có ảnh riêng cho phân loại này — bấm để sửa" : "Gán ảnh riêng cho phân loại này"}">${hasImg ? "🖼" : "➕"}</button>
         </div>
         ${editingGroup ? `
           <div class="groupImgEditBox">
@@ -789,9 +789,8 @@ function renderList(){
         </div>` : ""}
       <div class="body">
         <div class="titlerow">
-          <div class="name">${escapeHtml(p.name)}${p.image ? ` <a class="linkchip" href="${escapeHtml(p.image)}" target="_blank" rel="noopener" title="Xem ảnh sản phẩm">🖼</a>` : ""}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
+          <div class="name">${escapeHtml(p.name)}${(!isManage) ? ` <button type="button" class="groupImgBtn editLinkBtn" title="${p.image ? "Đã có ảnh sản phẩm — bấm để sửa ảnh / link file in" : "Gán ảnh sản phẩm & link file in"}">${p.image ? "🖼" : "➕"}</button>` : (p.image ? ` <a class="linkchip" href="${escapeHtml(p.image)}" target="_blank" rel="noopener" title="Xem ảnh sản phẩm">🖼</a>` : "")}${p.link ? ` <a class="linkchip" href="${escapeHtml(p.link)}" target="_blank" rel="noopener" title="Mở file in">🔗</a>` : ""}</div>
           ${(isManage && !isSortMode) ? `<div class="rowActions"><button class="editBtn">✏️ Sửa</button><button class="delBtn">🗑</button></div>` : ""}
-          ${(!isManage) ? `<div class="rowActions"><button type="button" class="editLinkBtn" title="Chèn/sửa ảnh & link file in">✏️</button></div>` : ""}
         </div>
         ${(!isManage && editingLinkIds.has(p.id)) ? `
           <div class="linkEditBox">
