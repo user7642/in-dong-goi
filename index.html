@@ -182,8 +182,9 @@
   .thumb-placeholder{
     width:56px;height:56px;flex-shrink:0;border-radius:8px;
     background:var(--gray-bg);display:flex;align-items:center;justify-content:center;
-    font-size:22px;color:var(--muted);
+    font-size:22px;color:var(--muted);overflow:hidden;
   }
+  .thumb-placeholder img{width:100%;height:100%;object-fit:cover;display:block;}
 
   .order-item-summary{
     display:flex;gap:10px;align-items:flex-start;
@@ -734,6 +735,23 @@ function formatDT(ts){
 const STATUS_LABEL = { in: "Chờ in", dong_goi: "Chờ đóng gói", xong: "Đã xong" };
 const STATUS_COLOR_CLASS = { in: "st-warn", dong_goi: "st-info", xong: "st-ready" };
 
+// Khung ảnh sản phẩm — hiện ảnh thật nếu task có field "image" (URL, gán từ
+// catalog.html), ảnh lỗi tự rơi về icon 🖼 mặc định thay vì để ô vỡ hình.
+function renderThumb(t){
+  const thumb = document.createElement("div");
+  thumb.className = "thumb-placeholder";
+  if(t.image){
+    const img = document.createElement("img");
+    img.src = t.image;
+    img.alt = t.name || "";
+    img.addEventListener("error", () => { thumb.innerHTML = ""; thumb.textContent = "🖼"; });
+    thumb.appendChild(img);
+  } else {
+    thumb.textContent = "🖼";
+  }
+  return thumb;
+}
+
 // ---- Grouping helpers ----
 function orderPackInfo(orderId){
   const items = allTasks.filter(t => t.orderId === orderId);
@@ -969,12 +987,7 @@ function renderItemSummary(t){
   });
   row.appendChild(cb);
 
-  // Khung ảnh thu nhỏ — hiện chưa có cơ chế gắn ảnh thật, để sẵn chỗ chờ
-  // tính năng chèn link ảnh sau này.
-  const thumb = document.createElement("div");
-  thumb.className = "thumb-placeholder";
-  thumb.textContent = "🖼";
-  row.appendChild(thumb);
+  row.appendChild(renderThumb(t));
 
   const info = document.createElement("div");
   info.className = "info-summary";
@@ -1084,10 +1097,7 @@ function renderItemDetail(t){
   const row = document.createElement("div");
   row.className = "detail-item-card";
 
-  const thumb = document.createElement("div");
-  thumb.className = "thumb-placeholder";
-  thumb.textContent = "🖼";
-  row.appendChild(thumb);
+  row.appendChild(renderThumb(t));
 
   const info = document.createElement("div");
   info.className = "info";
