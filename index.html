@@ -380,6 +380,9 @@
     display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;
   }
   .selectAllRow input{width:20px;height:20px;accent-color:var(--blue);}
+  .listToolbarRight{display:flex;align-items:center;gap:8px;}
+  .totalQtyInfo{font-size:13px;color:var(--muted);white-space:nowrap;}
+  .totalQtyInfo b{color:var(--text);}
   .clearAllBtn{
     border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;
     background:#fde8e8;color:var(--red);cursor:pointer;
@@ -439,7 +442,10 @@
   <div id="errArea"></div>
   <div class="listToolbar" id="listToolbar">
     <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
-    <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
+    <div class="listToolbarRight">
+      <span class="totalQtyInfo" id="totalQtyInfo">Số lượng: 0</span>
+      <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
+    </div>
   </div>
   <div class="carrierBar" id="carrierBar" style="display:none;">
     <button class="carrierViewToggle" id="carrierViewToggle" type="button"></button>
@@ -526,6 +532,7 @@ const addbar = document.getElementById("addbar");
 const errArea = document.getElementById("errArea");
 const selectAllBox = document.getElementById("selectAllBox");
 const clearAllBtn = document.getElementById("clearAllBtn");
+const totalQtyInfo = document.getElementById("totalQtyInfo");
 const downloadAllWrap = document.getElementById("downloadAllWrap");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
 
@@ -909,10 +916,20 @@ function updateSelectAllBox(shown){
   selectAllBox.indeterminate = nSel > 0 && nSel < n;
 }
 
+// Đếm SỐ KIỆN HÀNG (số đơn/orderId khác nhau) đang ở 1 trạng thái — dùng cho
+// badge số trên tab (thay vì đếm số dòng sản phẩm/task như trước). Nhiều sản
+// phẩm cùng orderId chỉ tính là 1 kiện. Không phụ thuộc từ khóa tìm kiếm,
+// giống cách badge cũ luôn phản ánh TOÀN BỘ dữ liệu chứ không theo bộ lọc.
+function countOrdersByStatus(status){
+  const ids = new Set();
+  allTasks.forEach(t => { if(t.status === status) ids.add(t.orderId || t.id); });
+  return ids.size;
+}
+
 function render(){
-  const badgeIn = allTasks.filter(t => t.status === "cho_in").length;
-  const badgeDG = allTasks.filter(t => t.status === "cho_dong_goi").length;
-  const badgeXong = allTasks.filter(t => t.status === "xong").length;
+  const badgeIn = countOrdersByStatus("cho_in");
+  const badgeDG = countOrdersByStatus("cho_dong_goi");
+  const badgeXong = countOrdersByStatus("xong");
   document.getElementById("badge-in").textContent = badgeIn;
   document.getElementById("badge-dong_goi").textContent = badgeDG;
   document.getElementById("badge-xong").textContent = badgeXong;
@@ -920,6 +937,13 @@ function render(){
   const baseShown = getShown(); // theo tab + tìm kiếm, CHƯA lọc theo hãng
   const shown = applyCarrierFilter(baseShown);
   updateSelectAllBox(shown);
+
+  // Tổng số lượng (cộng dồn field qty của từng sản phẩm) của danh sách ĐANG
+  // HIỂN THỊ — theo đúng tab + tìm kiếm + lọc hãng hiện tại, nằm cùng hàng với
+  // "Chọn tất cả" (căn phải) — đây là con số "số lượng" cũ từng nằm cạnh tên
+  // tab, giờ chuyển xuống đây; số cạnh tên tab đổi thành số kiện hàng.
+  const totalQtyShown = shown.reduce((s, t) => s + (t.qty || 1), 0);
+  totalQtyInfo.innerHTML = `Số lượng: <b>${totalQtyShown}</b>`;
 
   list.innerHTML = "";
 
