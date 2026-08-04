@@ -1494,20 +1494,21 @@ function detectCarrierFromText(text){
   return null;
 }
 
-// Dự phòng khi text layer không khớp mẫu nào (ví dụ phiếu GHN không in rõ
-// chữ "Giao Hàng Nhanh"/"GHN" ở phần đọc được) — suy hãng từ chính MÃ VẬN
-// ĐƠN đã đọc được (QR hoặc text):
-//  - SPX: mã luôn có tiền tố "SPX" ngay đầu (vd "SPXVN0123456789") — dò
+// Dự phòng khi text layer không khớp mẫu nào (phiếu GHN không có chữ
+// "Giao Hàng Nhanh"/"GHN" nào trong text layer — logo hãng trên phiếu là
+// ẢNH, không phải chữ, nên không thể dò bằng regex text được) — suy hãng từ
+// chính MÃ VẬN ĐƠN đã đọc được (QR hoặc text):
+//  - SPX: mã luôn có tiền tố "SPX" ngay đầu (vd "SPXVN060792078418") — dò
 //    thẳng trong mã, không phụ thuộc text layer có ghi rõ tên hãng hay không.
-//  - GHN: mã thường NGẮN hơn hẳn mã SPX (mã SPX quan sát được dài, kiểu
-//    "GYA8MTK8" trở lên — 8+ ký tự); mã GHN quan sát được ngắn hơn mốc đó.
-//    Đây chỉ là suy đoán may rủi (heuristic độ dài), dùng SAU CÙNG khi không
-//    còn cách nào khác — nếu sau này thấy sai nhiều thì nên thay bằng mẫu
-//    chữ/số cụ thể của GHN thay vì dựa độ dài.
+//  - GHN: mã quan sát được có đúng 8 ký tự (vd "GYA8MTK8"), ngắn hơn hẳn mã
+//    SPX (18 ký tự) — dùng ngưỡng "độ dài ≤ 8" làm dấu hiệu nhận GHN. Đây
+//    vẫn là suy đoán heuristic dựa trên 1 mẫu quan sát được, chỉ dùng SAU
+//    CÙNG khi không còn cách nào khác — nếu sau này gặp mã GHN dài/ngắn khác
+//    8 ký tự thì cần chỉnh lại ngưỡng này.
 function detectCarrierFromCode(code){
   if(!code) return null;
   if(/^SPX/i.test(code)) return "spx";
-  if(code.length < 8) return "ghn";
+  if(code.length <= 8) return "ghn";
   return null;
 }
 
