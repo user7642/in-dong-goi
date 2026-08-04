@@ -280,9 +280,44 @@
     background:var(--gray-bg);border-radius:10px;padding:12px 14px;
     cursor:pointer;user-select:none;font-weight:600;font-size:14px;
   }
+  .carrierGroupHeadRight{display:flex;align-items:center;gap:8px;}
   .carrierGroupHead .carrierGroupCount{color:var(--muted);font-weight:400;font-size:12.5px;}
-  .carrierGroupHead .expand-arrow{margin-left:8px;}
+  .carrierGroupHead .expand-arrow{margin-left:2px;}
   .carrierGroupBody{padding-top:10px;}
+
+  /* ---- Chế độ "Đối soát bàn giao" (bật riêng theo từng nhóm hãng, chỉ tồn
+     tại trong bộ nhớ, KHÔNG lưu vào dữ liệu thật) — dùng tông màu amber để
+     tách biệt hẳn với xanh dương (chọn hàng loạt) / xanh lá (đã giao). ---- */
+  .reconcile-toggle-btn{
+    border:1px solid var(--amber);background:#fff;color:var(--amber);
+    border-radius:8px;padding:5px 9px;font-size:12px;font-weight:600;
+    cursor:pointer;white-space:nowrap;
+  }
+  .reconcile-toggle-btn.active{background:var(--amber);color:#fff;}
+  .reconcileBar{
+    position:sticky;top:106px;z-index:15;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+    background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);
+    border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:600;
+  }
+  .reconcileFilterBtn{
+    border:1px solid var(--amber);background:#fff;color:var(--amber);
+    border-radius:14px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .reconcileFilterBtn.active{background:var(--amber);color:#fff;}
+  .reconcileRow{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+    background:var(--amber-bg);padding:9px 12px;border-bottom:1px solid var(--border);
+    cursor:default;
+  }
+  .reconcileCheckLabel{
+    display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--amber);cursor:pointer;
+  }
+  .reconcileCheckLabel input{width:19px;height:19px;accent-color:var(--amber);}
+  .reconcileBackBtn{
+    border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:600;
+    background:#fde8e8;color:var(--red);cursor:pointer;white-space:nowrap;
+  }
 
   /* Dòng xem trước ghi chú chung của cả đơn — luôn hiện ngay dưới header,
      không cần mở khu vực mở rộng mới thấy. */
@@ -504,6 +539,22 @@ let carrierFilter = "all";
 // Các nhóm hãng đang mở (accordion) — mặc định TẤT CẢ đều gập.
 let expandedCarrierGroups = new Set();
 
+// ---- Tab "Đã xong": chế độ "🤝 Đối soát bàn giao" (bật riêng theo từng
+// nhóm hãng). Đây là trạng thái TẠM, chỉ tồn tại trong bộ nhớ — KHÔNG lưu
+// vào Firestore/localStorage, tự mất khi rời tab "Đã xong", tắt chế độ của
+// nhóm đó, hoặc tải lại trang. Hoàn toàn tách biệt với checkbox `selected`
+// (chọn hàng loạt) và cờ `shipped` ("Đã giao") đã có sẵn.
+let reconcileActiveGroups = new Set();   // key = carrier, nhóm đang bật đối soát
+let reconcileConfirmed = new Set();      // orderId đã tích "Đã xác nhận bàn giao"
+let reconcileFilterUnconfirmed = new Set(); // key = carrier đang bật lọc "chỉ hiện chưa xác nhận"
+
+// Reset toàn bộ trạng thái đối soát — gọi khi rời tab "Đã xong".
+function resetReconcileState(){
+  reconcileActiveGroups.clear();
+  reconcileConfirmed.clear();
+  reconcileFilterUnconfirmed.clear();
+}
+
 // UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
 let editingOrderIds = new Set();
 // orderId đang mở ô chỉnh sửa hãng vận chuyển (dòng "Đơn vị VC:") — tách
@@ -577,6 +628,7 @@ document.querySelectorAll(".tab").forEach(t => {
     t.classList.add("active");
     currentTab = t.dataset.tab;
     selected.clear();
+    if(currentTab !== "xong") resetReconcileState();
     addbar.style.display = currentTab === "in" ? "flex" : "none";
     clearAllBtn.style.display = currentTab === "xong" ? "inline-block" : "none";
     render();
@@ -878,6 +930,7 @@ function renderXongByCarrier(shownTasks){
     allGroups = allGroups.concat(groups);
 
     const isExpanded = expandedCarrierGroups.has(key);
+    const isReconciling = reconcileActiveGroups.has(key);
     const wrap = document.createElement("div");
     wrap.className = "carrierGroup";
 
@@ -889,8 +942,34 @@ function renderXongByCarrier(shownTasks){
     });
     const left = document.createElement("span");
     left.textContent = CARRIER_LABEL[key] || key;
+
     const right = document.createElement("span");
-    right.innerHTML = `<span class="carrierGroupCount">${groups.length} đơn</span><span class="expand-arrow">${isExpanded ? "▾" : "▸"}</span>`;
+    right.className = "carrierGroupHeadRight";
+    const reconcileBtn = document.createElement("button");
+    reconcileBtn.className = "reconcile-toggle-btn" + (isReconciling ? " active" : "");
+    reconcileBtn.textContent = isReconciling ? "✖ Tắt đối soát" : "🤝 Đối soát bàn giao";
+    reconcileBtn.title = "Đối soát bàn giao — tích tạm để kiểm lại từng đơn trước khi bàn giao, không ảnh hưởng dữ liệu thật";
+    reconcileBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      if(isReconciling){
+        reconcileActiveGroups.delete(key);
+        groups.forEach(g => reconcileConfirmed.delete(g.orderId));
+        reconcileFilterUnconfirmed.delete(key);
+      } else {
+        reconcileActiveGroups.add(key);
+        expandedCarrierGroups.add(key); // mở nhóm ra để thấy ngay ô tích
+      }
+      render();
+    });
+    right.appendChild(reconcileBtn);
+    const countSpan = document.createElement("span");
+    countSpan.className = "carrierGroupCount";
+    countSpan.textContent = `${groups.length} đơn`;
+    right.appendChild(countSpan);
+    const arrowSpan = document.createElement("span");
+    arrowSpan.className = "expand-arrow";
+    arrowSpan.textContent = isExpanded ? "▾" : "▸";
+    right.appendChild(arrowSpan);
     head.appendChild(left);
     head.appendChild(right);
     wrap.appendChild(head);
@@ -898,7 +977,32 @@ function renderXongByCarrier(shownTasks){
     if(isExpanded){
       const body = document.createElement("div");
       body.className = "carrierGroupBody";
-      groups.forEach(g => body.appendChild(renderOrderBox(g)));
+
+      if(isReconciling){
+        const confirmedCount = groups.filter(g => reconcileConfirmed.has(g.orderId)).length;
+        const totalCount = groups.length;
+        const filterOn = reconcileFilterUnconfirmed.has(key);
+
+        const bar = document.createElement("div");
+        bar.className = "reconcileBar";
+        const countLabel = document.createElement("span");
+        countLabel.textContent = `Đã xác nhận ${confirmedCount}/${totalCount} — còn ${totalCount - confirmedCount} chưa xác nhận`;
+        const filterBtn = document.createElement("button");
+        filterBtn.className = "reconcileFilterBtn" + (filterOn ? " active" : "");
+        filterBtn.textContent = filterOn ? "👁 Hiện tất cả" : "👁 Chỉ hiện chưa xác nhận";
+        filterBtn.addEventListener("click", () => {
+          if(filterOn) reconcileFilterUnconfirmed.delete(key); else reconcileFilterUnconfirmed.add(key);
+          render();
+        });
+        bar.appendChild(countLabel);
+        bar.appendChild(filterBtn);
+        body.appendChild(bar);
+      }
+
+      const bodyGroups = (isReconciling && reconcileFilterUnconfirmed.has(key))
+        ? groups.filter(g => !reconcileConfirmed.has(g.orderId))
+        : groups;
+      bodyGroups.forEach(g => body.appendChild(renderOrderBox(g, isReconciling)));
       wrap.appendChild(body);
     }
     list.appendChild(wrap);
@@ -987,7 +1091,8 @@ function render(){
 // Thẻ tóm tắt 1 đơn hàng trong danh sách — kiểu Shopee, giờ là TẦNG DUY NHẤT
 // (không còn trang "Chi tiết đơn hàng" toàn màn hình). Bấm vào header (giờ
 // tạo + trạng thái) để mở/đóng khu vực mở rộng chứa phiếu giao + ghi chú.
-function renderOrderBox(g){
+function renderOrderBox(g, isReconciling){
+  isReconciling = !!isReconciling;
   const box = document.createElement("div");
   box.className = "order-box";
 
@@ -995,6 +1100,40 @@ function renderOrderBox(g){
   if(currentTab === "dong_goi"){
     info = orderPackInfo(g.orderId);
     box.classList.add(info.eligible ? "ready" : "warn");
+  }
+
+  // Hàng ô tích "Đối soát bàn giao" — tách biệt hoàn toàn với checkbox
+  // `selected` (chọn hàng loạt) và nút "🚚 Đã giao" đã có sẵn; chỉ tồn tại
+  // trong bộ nhớ (xem reconcileConfirmed), không đụng tới trạng thái thật.
+  if(isReconciling){
+    const isConfirmed = reconcileConfirmed.has(g.orderId);
+    const rrow = document.createElement("div");
+    rrow.className = "reconcileRow";
+    rrow.addEventListener("click", e => e.stopPropagation());
+
+    const label = document.createElement("label");
+    label.className = "reconcileCheckLabel";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = isConfirmed;
+    cb.addEventListener("change", () => {
+      if(cb.checked) reconcileConfirmed.add(g.orderId); else reconcileConfirmed.delete(g.orderId);
+      render();
+    });
+    label.appendChild(cb);
+    const labelText = document.createElement("span");
+    labelText.textContent = "Đã xác nhận bàn giao";
+    label.appendChild(labelText);
+    rrow.appendChild(label);
+
+    if(!isConfirmed){
+      const backBtn = document.createElement("button");
+      backBtn.className = "reconcileBackBtn";
+      backBtn.textContent = "↩ Lùi lại (chưa có hàng)";
+      backBtn.addEventListener("click", () => revertOrderItems(g.items));
+      rrow.appendChild(backBtn);
+    }
+    box.appendChild(rrow);
   }
 
   const isExpanded = expandedOrderIds.has(g.orderId);
