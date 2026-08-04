@@ -833,6 +833,33 @@ function orderIdsBecomingEmpty(deletedIds){
   return result;
 }
 
+// ---- Tab "Đã xong": đơn "đã giao" tự chuyển xuống cuối danh sách, đơn vừa
+// "Bỏ đã giao" nhảy lên ĐẦU TUYỆT ĐỐI danh sách — áp dụng CHUNG cho mọi chế
+// độ xem (cả "Nhóm theo hãng" lẫn "Theo thứ tự hoàn thành"), vì hàm này chạy
+// TRƯỚC khi vào groupShown()/renderXongByCarrier() nên cả 2 nơi đều thừa
+// hưởng cùng 1 thứ tự. Cố ý ưu tiên việc "vừa bỏ đã giao" hơn cả mốc thời
+// gian hoàn thành — người dùng bấm "Bỏ đã giao" nghĩa là phát hiện SAI ngay
+// lúc đối soát, cần thấy lại đơn đó NGAY LẬP TỨC ở trên cùng, không phải tìm
+// theo đúng vị trí thời gian hoàn thành cũ của nó.
+// 3 nhóm, xếp theo đúng thứ tự này:
+//   1) "Vừa bỏ đã giao" (shipped=false NHƯNG từng có shippedAt) — lên đầu,
+//      bỏ gần đây nhất thì đứng trên cùng.
+//   2) Task bình thường, CHƯA từng đụng tới "Đã giao" lần nào — giữ nguyên
+//      thứ tự hoàn thành cũ (không đổi hành vi trước đây).
+//   3) "Đã giao" — luôn xuống cuối, giao gần đây nhất đứng đầu nhóm này.
+function sortXongByShipped(shown){
+  const ts = v => (v && typeof v.toMillis === "function") ? v.toMillis() : 0;
+  const justUnshipped = [], normal = [], shipped = [];
+  shown.forEach(t => {
+    if(t.shipped) shipped.push(t);
+    else if(t.shippedAt) justUnshipped.push(t);
+    else normal.push(t);
+  });
+  justUnshipped.sort((a, b) => ts(b.shippedAt) - ts(a.shippedAt));
+  shipped.sort((a, b) => ts(b.shippedAt) - ts(a.shippedAt));
+  return justUnshipped.concat(normal, shipped);
+}
+
 // ---- Render ----
 // Trả về danh sách task theo TAB + TỪ KHÓA TÌM KIẾM — CHƯA áp dụng lọc theo
 // hãng vận chuyển (xem applyCarrierFilter()). Tách riêng để carrierBar luôn
@@ -845,7 +872,7 @@ function getShown(){
   // TTL (xem phần "Đã xong" trong hướng dẫn), tập dữ liệu status=xong đã tự
   // giới hạn trong khoảng 7 ngày gần nhất, không phình vô hạn. Bỏ slice() để
   // tìm kiếm (Lỗi A) có thể quét đúng toàn bộ 7 ngày thay vì chỉ 50 mục mới nhất.
-  else shown = allTasks.filter(t => t.status === "xong").slice().reverse();
+  else shown = sortXongByShipped(allTasks.filter(t => t.status === "xong").slice().reverse());
 
   if(searchTerm){
     shown = shown.filter(t =>
@@ -1549,6 +1576,10 @@ async function revertStatus(t){
     // (thật sự), nhãn "🚚 Đã giao" cũ sẽ tự hiện sẵn dù chưa ai bấm, gây sai
     // lệch dữ liệu đối soát.
     patch.shipped = false;
+    // Xoá luôn shippedAt (mốc sắp xếp "vừa bỏ đã giao" lên đầu) — vì đơn đang
+    // RỜI HẲN khỏi "xong", không phải kiểu "bỏ đã giao để sửa lại" nữa, nên
+    // không nên giữ ưu tiên lên đầu cho lần "xong" kế tiếp của nó.
+    patch.shippedAt = deleteField();
   }
   try{
     await updateDoc(doc(db, "tasks", t.id), patch);
@@ -1557,7 +1588,9 @@ async function revertStatus(t){
 
 async function markShipped(id, value){
   try{
-    await updateDoc(doc(db, "tasks", id), { shipped: value, updatedAt: serverTimestamp() });
+    // shippedAt ghi lại MỌI LẦN bấm (cả bật lẫn tắt) — dùng làm mốc sắp xếp
+    // cho quy tắc "đã giao xuống cuối / bỏ đã giao lên đầu" (sortXongByShipped()).
+    await updateDoc(doc(db, "tasks", id), { shipped: value, shippedAt: serverTimestamp(), updatedAt: serverTimestamp() });
   }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
 }
 
