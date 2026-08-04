@@ -120,6 +120,42 @@
   .gcard .vchip{font-size:12px;padding:4px 6px 4px 9px;margin:2px 3px 2px 0;}
   .gcard .vchip .qtytag{padding:1px 1px;}
   .gcard .vchip .chipminus,.gcard .vchip .chipx{margin-left:3px;padding:1px 5px;}
+
+  /* ---- Bộ 3 nút chuyển chế độ xem (☰ list / ▦ lưới chip / 🖼 ảnh) ---- */
+  .viewSwitch{display:flex;gap:4px;}
+  .vswBtn{padding:6px 10px;font-size:14px;line-height:1;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);cursor:pointer;}
+  .vswBtn.active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+
+  /* ---- Chế độ xem ẢNH ----
+     Ảnh to + tên bên dưới, giống lưới ảnh sản phẩm sàn TMĐT. Bảng chọn phân
+     loại (.img-overlay) nằm ĐÈ lên chính ảnh đó, mặc định ẩn:
+     - Máy tính (có chuột thật): rê chuột vào ảnh -> tự hiện (CSS :hover,
+       chỉ bật trong @media (hover:hover) để tránh hover bị "dính" trên cảm ứng).
+     - Điện thoại (không hover): chạm vào ảnh -> bật class .open bằng JS,
+       chạm ra ngoài -> tự đóng (xử lý ở listener click ngoài trang, dùng
+       chung cơ chế với việc bỏ ghim chip hiện có). */
+  .img-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  @media (max-width:420px){ .img-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  .img-card{display:flex;flex-direction:column;}
+  .img-thumb{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:var(--gray-bg);border:1px solid var(--border);cursor:pointer;}
+  .img-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .img-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--muted);}
+  .img-badge{position:absolute;top:6px;right:6px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;}
+  .img-name{font-size:12.5px;font-weight:600;margin-top:6px;text-align:center;line-height:1.3;}
+  .img-overlay{
+    position:absolute;inset:0;background:rgba(255,255,255,.97);
+    display:flex;align-items:center;justify-content:center;padding:8px;
+    opacity:0;pointer-events:none;transition:opacity .12s;overflow:auto;
+  }
+  .img-card.open .img-overlay{opacity:1;pointer-events:auto;}
+  @media (hover:hover) and (pointer:fine){
+    .img-card:hover .img-overlay{opacity:1;pointer-events:auto;}
+  }
+  .img-overlay-inner{width:100%;}
+  .img-overlay .option-wrap{justify-content:center;}
+  .img-overlay .vchip{font-size:11.5px;padding:4px 6px 4px 8px;margin:2px;}
+  .img-overlay .gsub-row{flex-direction:column;align-items:flex-start;gap:2px;margin-top:6px;}
+  .img-overlay .gsub-opts{justify-content:flex-start;}
   .muted{color:var(--muted);font-size:13px;}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
@@ -250,7 +286,11 @@
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
       <div class="row row-nowrap" style="gap:6px;margin:0;">
-        <button class="btn-outline" id="viewToggleBtn" type="button" style="padding:6px 10px;font-size:13px;"></button>
+        <div class="viewSwitch" id="viewSwitch">
+          <button class="vswBtn" data-view="list" type="button" title="Xem danh sách">☰</button>
+          <button class="vswBtn" data-view="grid" type="button" title="Xem lưới">▦</button>
+          <button class="vswBtn" data-view="image" type="button" title="Xem ảnh">🖼</button>
+        </div>
         <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
       </div>
     </div>
@@ -383,11 +423,14 @@ let sortMode = false;
 // ảnh riêng theo phân loại...) hoặc 'grid' (lưới, chỉ để chọn nhanh, KHÔNG
 // có các nút chức năng — chỉ dùng ở tab "Thêm việc"). Tab "Quản lý danh mục"
 // luôn dùng list view vì cần checkbox + nút sửa/xóa/sắp xếp cùng lúc.
-// Khai báo NGAY TẠI ĐÂY (trước applyModeUI()/updateViewToggleBtn() bên dưới)
+// Khai báo NGAY TẠI ĐÂY (trước applyModeUI()/updateViewSwitch() bên dưới)
 // — để ở cuối file từng gây lỗi "Cannot access 'viewMode' before
-// initialization" vì updateViewToggleBtn() đọc biến này sớm hơn lúc nó
+// initialization" vì hàm cập nhật nút đọc biến này sớm hơn lúc nó
 // được khai báo (temporal dead zone của let). ----
 let viewMode = "grid";
+// Ở chế độ xem ảnh: id sản phẩm đang mở overlay chọn phân loại trên điện
+// thoại (chạm để bật/tắt, vì không có hover thật như máy tính).
+let openImageCardId = null;
 
 function applyModeUI(){
   const isManage = mode === "manage";
@@ -401,7 +444,7 @@ function applyModeUI(){
   const sortModeBtn = document.getElementById("sortModeBtn");
   sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
   sortModeBtn.classList.toggle("active", sortMode);
-  document.getElementById("viewToggleBtn").style.display = isManage ? "none" : "inline-block";
+  document.getElementById("viewSwitch").style.display = isManage ? "none" : "flex";
   document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
   document.getElementById("gomBar").style.display = isManage ? "none" : "block";
   if(isManage){
@@ -411,7 +454,7 @@ function applyModeUI(){
   }
 }
 applyModeUI();
-updateViewToggleBtn();
+updateViewSwitch();
 
 document.getElementById("sortModeBtn").addEventListener("click", () => {
   sortMode = !sortMode;
@@ -756,15 +799,18 @@ function renderTiersSelectionHtml(p){
   }).join("");
 }
 
-function updateViewToggleBtn(){
-  const btn = document.getElementById("viewToggleBtn");
-  btn.textContent = viewMode === "grid" ? "☰ Xem danh sách" : "▦ Xem lưới";
+function updateViewSwitch(){
+  document.querySelectorAll(".vswBtn").forEach(b => {
+    b.classList.toggle("active", b.dataset.view === viewMode);
+  });
 }
 
-document.getElementById("viewToggleBtn").addEventListener("click", () => {
-  viewMode = (viewMode === "grid") ? "list" : "grid";
-  updateViewToggleBtn();
-  renderList();
+document.querySelectorAll(".vswBtn").forEach(b => {
+  b.addEventListener("click", () => {
+    viewMode = b.dataset.view;
+    updateViewSwitch();
+    renderList();
+  });
 });
 
 // Tạo 1 nút chip lựa chọn — dùng chung giữa list view và grid view để logic
@@ -852,12 +898,63 @@ function renderGrid(filtered){
   return wrap;
 }
 
+// Tổng số lượng đã chọn của 1 sản phẩm, gộp mọi phân loại — dùng để hiện
+// badge số trên ảnh (chế độ xem ảnh), giúp lướt mắt biết ngay sản phẩm nào
+// đã chọn mà không cần bấm mở overlay.
+function countSelectedForProduct(p){
+  let n = 0;
+  for(const val of taskSelections.values()){
+    if(val.productId === p.id) n += val.qty;
+  }
+  return n;
+}
+
+function renderImageGrid(filtered){
+  const wrap = document.createElement("div");
+  wrap.className = "img-grid";
+  filtered.forEach(p => {
+    const hasTiers = p.tiers && p.tiers.length >= 2;
+    const hasFlat = p.variants && p.variants.length;
+    let inner;
+    if(hasTiers){
+      inner = renderGridTiersHtml(p);
+    } else if(hasFlat){
+      inner = `<div class="option-wrap">${p.variants.map(v => chipHtml(p, v, v)).join("")}</div>`;
+    } else {
+      inner = `<div class="option-wrap">${chipHtml(p, "", isChipActive(p.id) ? "Đã chọn" : "➕ Chọn sản phẩm này")}</div>`;
+    }
+    const count = countSelectedForProduct(p);
+    const card = document.createElement("div");
+    card.className = "img-card" + (openImageCardId === p.id ? " open" : "");
+    card.dataset.id = p.id;
+    card.innerHTML = `
+      <div class="img-thumb">
+        ${p.image ? `<img src="${escapeHtml(p.image)}" alt="">` : `<div class="img-placeholder">🖼</div>`}
+        ${count > 0 ? `<span class="img-badge">${count}</span>` : ""}
+        <div class="img-overlay"><div class="img-overlay-inner">${inner}</div></div>
+      </div>
+      <div class="img-name">${escapeHtml(p.name)}</div>
+    `;
+    attachVchipListeners(card, p);
+    // Chạm vào ảnh (điện thoại không có hover) -> bật/tắt overlay. Chạm
+    // đúng vào 1 chip bên trong overlay thì bỏ qua, để attachVchipListeners
+    // xử lý chọn/bỏ chọn, không đóng overlay ngay lập tức.
+    card.querySelector(".img-thumb").addEventListener("click", e => {
+      if(e.target.closest(".vchip")) return;
+      openImageCardId = (openImageCardId === p.id) ? null : p.id;
+      renderList();
+    });
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
 function renderList(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
   const isManage = mode === "manage";
   const isSortMode = isManage && sortMode;
-  const useGrid = !isManage && viewMode === "grid";
+  const useGrid = !isManage && (viewMode === "grid" || viewMode === "image");
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
@@ -867,7 +964,7 @@ function renderList(){
     return;
   }
   if(useGrid){
-    list.appendChild(renderGrid(filtered));
+    list.appendChild(viewMode === "image" ? renderImageGrid(filtered) : renderGrid(filtered));
     updateActionBar();
     updateSelectAllState(filtered);
     updateTaskBar();
@@ -1154,11 +1251,19 @@ function isChipActive(key){
 
 // Nhấp ra ngoài 1 chip phân loại (nút/chỗ khác trên trang) cũng tự bỏ ghim,
 // giống như khi chọn 1 phân loại khác — chỉ áp dụng ngoài chế độ gom.
+// Đồng thời: chạm ra ngoài 1 thẻ ảnh đang mở overlay (chế độ xem ảnh, trên
+// điện thoại) cũng tự đóng lại overlay đó.
 document.addEventListener("click", e => {
-  if(gomMode || !pinnedKey) return;
-  if(e.target.closest(".vchip")) return; // để handler riêng của chip xử lý
-  pinnedKey = null;
-  renderList();
+  let needsRerender = false;
+  if(openImageCardId && !e.target.closest(".img-card")){
+    openImageCardId = null;
+    needsRerender = true;
+  }
+  if(!gomMode && pinnedKey && !e.target.closest(".vchip")){
+    pinnedKey = null;
+    needsRerender = true;
+  }
+  if(needsRerender) renderList();
 });
 
 function updateTaskBar(){
