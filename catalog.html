@@ -93,15 +93,33 @@
   .item .editBtn{background:var(--gray-bg);color:var(--text);font-size:13px;padding:6px 10px;flex-shrink:0;}
   .item .delBtn{background:var(--gray-bg);color:var(--red);font-size:13px;padding:6px 10px;flex-shrink:0;}
   .item .rowActions{display:flex;gap:6px;flex-shrink:0;}
-  .item .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
-  .item .vchip.selected{background:var(--blue);color:#fff;}
-  .item .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
-  .item .vchip .vlabel{cursor:pointer;padding:2px 4px;}
-  .item .vchip .qtytag{padding:2px 2px;}
-  .item .vchip .chipminus,.item .vchip .chipx{
+  .vchip{display:inline-flex;align-items:center;background:var(--green-bg);color:var(--green);border-radius:12px;padding:5px 6px 5px 11px;font-size:13px;margin:3px 5px 3px 0;border:none;font-weight:600;}
+  .vchip.selected{background:var(--blue);color:#fff;}
+  .vchip.static{background:var(--gray-bg);color:var(--text);cursor:default;font-weight:500;}
+  .vchip .vlabel{cursor:pointer;padding:2px 4px;}
+  .vchip .qtytag{padding:2px 2px;}
+  .vchip .chipminus,.vchip .chipx{
     margin-left:4px;font-weight:700;opacity:.85;cursor:pointer;padding:2px 6px;border-radius:8px;
   }
-  .item .vchip.selected .chipminus,.item .vchip.selected .chipx{background:rgba(255,255,255,.18);}
+  .vchip.selected .chipminus,.vchip.selected .chipx{background:rgba(255,255,255,.18);}
+
+  /* ---- Chế độ xem LƯỚI (chỉ ở tab Thêm việc) ----
+     Masonry bằng CSS columns: mỗi thẻ cao theo đúng nội dung của nó, không
+     bị kéo giãn theo hàng dài nhất như CSS Grid thường -> không vỡ layout
+     khi sản phẩm có 2 tầng phân loại xen với sản phẩm 1 tầng/không phân loại. */
+  .grid-container{column-width:190px;column-gap:8px;}
+  .gcard{break-inside:avoid;margin-bottom:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 10px;}
+  .gcard-title{font-size:13px;font-weight:700;margin-bottom:6px;line-height:1.3;}
+  .gcard .option-wrap{display:flex;flex-wrap:wrap;gap:5px;}
+  /* Mỗi nhóm tầng 1 hiển thị 1 hàng ngang: nhãn bên trái, chip bên phải,
+     khít khao thay vì nhãn chiếm hẳn 1 dòng riêng như bên list view. */
+  .gsub-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:5px;}
+  .gsub-row:first-child{margin-top:0;}
+  .gsub-label{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;}
+  .gsub-opts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+  .gcard .vchip{font-size:12px;padding:4px 6px 4px 9px;margin:2px 3px 2px 0;}
+  .gcard .vchip .qtytag{padding:1px 1px;}
+  .gcard .vchip .chipminus,.gcard .vchip .chipx{margin-left:3px;padding:1px 5px;}
   .muted{color:var(--muted);font-size:13px;}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
@@ -231,7 +249,10 @@
   <section>
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
-      <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
+      <div class="row row-nowrap" style="gap:6px;margin:0;">
+        <button class="btn-outline" id="viewToggleBtn" type="button" style="padding:6px 10px;font-size:13px;"></button>
+        <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
+      </div>
     </div>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo tên hoặc phân loại...">
 
@@ -370,6 +391,7 @@ function applyModeUI(){
   const sortModeBtn = document.getElementById("sortModeBtn");
   sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
   sortModeBtn.classList.toggle("active", sortMode);
+  document.getElementById("viewToggleBtn").style.display = isManage ? "none" : "inline-block";
   document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
   document.getElementById("gomBar").style.display = isManage ? "none" : "block";
   if(isManage){
@@ -379,6 +401,7 @@ function applyModeUI(){
   }
 }
 applyModeUI();
+updateViewToggleBtn();
 
 document.getElementById("sortModeBtn").addEventListener("click", () => {
   sortMode = !sortMode;
@@ -723,14 +746,124 @@ function renderTiersSelectionHtml(p){
   }).join("");
 }
 
+// ---- Chế độ xem: 'list' (mặc định, đầy đủ nút chức năng — gán ảnh/link,
+// ảnh riêng theo phân loại...) hoặc 'grid' (lưới, chỉ để chọn nhanh, KHÔNG
+// có các nút chức năng — chỉ dùng ở tab "Thêm việc"). Tab "Quản lý danh mục"
+// luôn dùng list view vì cần checkbox + nút sửa/xóa/sắp xếp cùng lúc. ----
+let viewMode = "grid";
+
+function updateViewToggleBtn(){
+  const btn = document.getElementById("viewToggleBtn");
+  btn.textContent = viewMode === "grid" ? "☰ Xem danh sách" : "▦ Xem lưới";
+}
+
+document.getElementById("viewToggleBtn").addEventListener("click", () => {
+  viewMode = (viewMode === "grid") ? "list" : "grid";
+  updateViewToggleBtn();
+  renderList();
+});
+
+// Tạo 1 nút chip lựa chọn — dùng chung giữa list view và grid view để logic
+// chọn/số lượng/ghim (isChipActive, taskSelections...) luôn nhất quán ở cả 2
+// nơi, không phải viết/khớp tay 2 lần.
+function chipHtml(p, variant, displayText){
+  const key = variant ? (p.id + "__" + variant) : p.id;
+  const active = isChipActive(key);
+  const cur = taskSelections.get(key);
+  const qty = cur ? cur.qty : 0;
+  return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
+      <span class="vlabel" data-act="add">${escapeHtml(displayText)}</span>
+      ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+    </button>`;
+}
+
+// Gắn sự kiện click cho mọi .vchip bên trong 1 container (item list HOẶC
+// thẻ lưới) — cùng 1 logic add/minus/remove/ghim như bản list view gốc.
+function attachVchipListeners(container, p){
+  container.querySelectorAll(".vchip").forEach(chip => {
+    chip.addEventListener("click", e => {
+      const key = chip.dataset.key;
+      const variant = key.slice(p.id.length + 2);
+      const act = e.target.dataset.act;
+      let cur = taskSelections.get(key);
+      if(act === "remove"){
+        taskSelections.delete(key);
+        if(pinnedKey === key) pinnedKey = null;
+      } else if(act === "minus"){
+        if(cur){
+          cur.qty -= 1;
+          if(cur.qty <= 0){
+            taskSelections.delete(key);
+            if(pinnedKey === key) pinnedKey = null;
+          }
+        }
+      } else {
+        if(!cur){
+          cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
+          taskSelections.set(key, cur);
+        }
+        cur.qty += 1;
+        if(!gomMode) pinnedKey = key;
+      }
+      renderList();
+    });
+  });
+}
+
+// Bản rút gọn của renderTiersSelectionHtml: mỗi tổ hợp tầng ngoài hiển thị
+// thành 1 hàng ngang (nhãn trái, chip phải), KHÔNG có nút gán ảnh riêng theo
+// phân loại (nút chức năng đó chỉ có ở list view, theo đúng yêu cầu).
+function renderGridTiersHtml(p){
+  const outerTiers = p.tiers.slice(0, -1);
+  const lastTier = p.tiers[p.tiers.length - 1];
+  const combos = cartesianProduct(outerTiers);
+  return combos.map(combo => {
+    const label = combo.join(" - ");
+    const chips = lastTier.map(v => chipHtml(p, label + ": " + v, v)).join("");
+    return `<div class="gsub-row"><span class="gsub-label">${escapeHtml(label)}:</span><div class="gsub-opts">${chips}</div></div>`;
+  }).join("");
+}
+
+function renderGrid(filtered){
+  const wrap = document.createElement("div");
+  wrap.className = "grid-container";
+  filtered.forEach(p => {
+    const hasTiers = p.tiers && p.tiers.length >= 2;
+    const hasFlat = p.variants && p.variants.length;
+    let inner;
+    if(hasTiers){
+      inner = renderGridTiersHtml(p);
+    } else if(hasFlat){
+      inner = `<div class="option-wrap">${p.variants.map(v => chipHtml(p, v, v)).join("")}</div>`;
+    } else {
+      inner = `<div class="option-wrap">${chipHtml(p, "", isChipActive(p.id) ? "Đã chọn" : "➕ Chọn sản phẩm này")}</div>`;
+    }
+    const card = document.createElement("div");
+    card.className = "gcard";
+    card.dataset.id = p.id;
+    card.innerHTML = `<div class="gcard-title">${escapeHtml(p.name)}</div>${inner}`;
+    attachVchipListeners(card, p);
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
 function renderList(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
   const isManage = mode === "manage";
   const isSortMode = isManage && sortMode;
+  const useGrid = !isManage && viewMode === "grid";
   list.innerHTML = "";
   if(filtered.length === 0){
     list.innerHTML = '<div class="muted">Chưa có sản phẩm nào.</div>';
+    updateActionBar();
+    updateSelectAllState(filtered);
+    updateTaskBar();
+    return;
+  }
+  if(useGrid){
+    list.appendChild(renderGrid(filtered));
     updateActionBar();
     updateSelectAllState(filtered);
     updateTaskBar();
