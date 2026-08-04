@@ -227,6 +227,11 @@
   .order-code-row .code-label{color:var(--muted);}
   .order-code-row .code-value{font-weight:600;display:flex;align-items:center;gap:6px;}
   .ship-label-chip{font-size:12px;margin-left:2px;}
+  /* Placeholder cho đơn chưa có mã vận đơn thật — cố tình KHÔNG dùng chuỗi
+     ký tự giả nữa (xem renderOrderName() trong script). Độ rộng cân đối do
+     CSS quyết định, không phụ thuộc số ký tự của mã thật (mỗi hãng dài ngắn
+     khác nhau: GHN ~8 ký tự, SPX ~18 ký tự...). */
+  .order-name-placeholder{color:var(--border);font-weight:400;letter-spacing:1px;}
   .order-code-row .copy-btn{
     border:none;background:none;color:var(--blue);font-size:12px;font-weight:700;
     cursor:pointer;padding:2px 4px;
@@ -250,6 +255,42 @@
   .order-header-right{display:flex;align-items:center;gap:6px;}
   .header-dot{font-size:12px;line-height:1;}
   .expand-arrow{font-size:10px;color:var(--muted);margin-left:2px;}
+  .carrier-chip{
+    font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-bg);
+    border-radius:8px;padding:2px 7px;line-height:1.4;
+  }
+
+  /* ---- Tab "Đã xong": thanh chuyển chế độ xem + chip lọc theo hãng ---- */
+  .carrierBar{
+    display:none;flex-direction:column;gap:8px;
+    padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);
+    max-width:var(--maxw);margin:0 auto;
+  }
+  .carrierViewToggle{
+    align-self:flex-start;border:1px solid var(--border);background:var(--gray-bg);
+    color:var(--text);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;
+    cursor:pointer;
+  }
+  .carrierChips{display:flex;gap:6px;flex-wrap:wrap;}
+  .carrierChip{
+    border:1px solid var(--border);background:var(--card);color:var(--text);
+    border-radius:14px;padding:5px 10px;font-size:12.5px;font-weight:600;
+    cursor:pointer;display:flex;align-items:center;gap:5px;
+  }
+  .carrierChip .n{color:var(--muted);font-weight:400;}
+  .carrierChip.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .carrierChip.active .n{color:#dbe8ff;}
+
+  /* ---- Accordion nhóm theo hãng (chế độ xem "Nhóm theo hãng") ---- */
+  .carrierGroup{margin-bottom:12px;}
+  .carrierGroupHead{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--gray-bg);border-radius:10px;padding:12px 14px;
+    cursor:pointer;user-select:none;font-weight:600;font-size:14px;
+  }
+  .carrierGroupHead .carrierGroupCount{color:var(--muted);font-weight:400;font-size:12.5px;}
+  .carrierGroupHead .expand-arrow{margin-left:8px;}
+  .carrierGroupBody{padding-top:10px;}
 
   /* Dòng xem trước ghi chú chung của cả đơn — luôn hiện ngay dưới header,
      không cần mở khu vực mở rộng mới thấy. */
@@ -396,6 +437,10 @@
     <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
     <button class="clearAllBtn" id="clearAllBtn" style="display:none;">🧹 Làm sạch</button>
   </div>
+  <div class="carrierBar" id="carrierBar" style="display:none;">
+    <button class="carrierViewToggle" id="carrierViewToggle" type="button"></button>
+    <div class="carrierChips" id="carrierChips"></div>
+  </div>
   <div id="list"></div>
   <div class="quicklink" style="padding-top:8px;"><a href="huong-dan.html" style="background:var(--green-bg);color:var(--green);">📖 Hướng dẫn sử dụng</a></div>
 </main>
@@ -447,6 +492,16 @@ let allTasks = [];
 let selected = new Set();
 let searchTerm = "";
 
+// ---- Tab "Đã xong": chế độ xem + lọc theo hãng vận chuyển ----
+// "carrier" = nhóm theo hãng (accordion), "completion" = theo thứ tự hoàn
+// tất (như cũ). Nhớ lựa chọn gần nhất qua localStorage — mặc định lần đầu là
+// "carrier" theo thống nhất, nhưng nếu người dùng từng đổi thì giữ nguyên.
+let xongViewMode = localStorage.getItem("xongViewMode") || "carrier";
+// Lọc nhanh theo 1 hãng cụ thể (áp dụng ở cả 2 chế độ xem) — "all" = không lọc.
+let carrierFilter = "all";
+// Các nhóm hãng đang mở (accordion) — mặc định TẤT CẢ đều gập.
+let expandedCarrierGroups = new Set();
+
 // UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
 let editingOrderIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
@@ -493,20 +548,20 @@ function attachClickAwayCommit(containerEl, commitFn){
   return commit;
 }
 
-// ---- Helpers: id / name generation for orders ----
-function randCode(len){
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
-  return s;
-}
+// ---- Helpers: id generation for orders ----
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-// Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
-// thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
-// mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
-// extractTrackingFromPdf ở trên) — nên chỉ cần nhìn ký tự đầu là phân biệt
-// được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
-function newOrderName(){ return "#" + randCode(9); }
+// Không còn sinh "tên tự động" giả (kiểu "#ABC123XYZ") cho đơn chưa đặt tên
+// nữa — orderName để trống (null/"") cho tới khi quét được mã vận đơn thật từ
+// PDF phiếu giao (xem extractTrackingFromPdf ở dưới). Ở mọi nơi hiển thị,
+// orderName trống được render bằng placeholder CSS "┈┈┈┈┈┈┈┈┈" (class
+// "order-name-placeholder", xem hàm renderOrderName()) thay vì một chuỗi ký
+// tự giả — tránh gây hiểu lầm với mã vận đơn thật, và không phụ thuộc vào
+// việc "đoán" độ dài mã thật (mã thật của mỗi hãng dài ngắn khác nhau).
+function renderOrderName(name){
+  const n = (name || "").trim();
+  return n ? escapeHtml(n) : '<span class="order-name-placeholder">┈┈┈┈┈┈┈┈┈</span>';
+}
+function isBlankOrderName(name){ return !((name || "").trim()); }
 
 // ---- Tabs ----
 document.querySelectorAll(".tab").forEach(t => {
@@ -567,7 +622,7 @@ async function addTask(){
       status: "cho_in",
       note: "",
       orderId: newOrderId(),
-      orderName: newOrderName(),
+      orderName: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -636,6 +691,14 @@ function formatDT(ts){
 const STATUS_LABEL = { in: "Chờ in", dong_goi: "Chờ đóng gói", xong: "Đã xong" };
 const STATUS_COLOR_CLASS = { in: "st-warn", dong_goi: "st-info", xong: "st-ready" };
 
+// ---- Đơn vị vận chuyển ----
+// Danh sách hãng đã nhận diện được từ mẫu phiếu thật (xem detectCarrierFromText).
+// "unknown" đại diện cho các đơn chưa nhận diện được hãng (mẫu lạ, PDF ảnh
+// scan không đọc được text, hoặc chưa đính phiếu giao) — vẫn xử lý như 1
+// nhóm/carrier bình thường trong UI, chỉ khác là luôn xếp cuối danh sách.
+const CARRIER_LABEL = { "jt": "J&T Express", "spx": "SPX Express", "ghn": "Giao Hàng Nhanh", "unknown": "Chưa rõ hãng" };
+const CARRIER_ORDER = ["jt", "spx", "ghn", "unknown"]; // thứ tự cố định khi hiển thị nhóm — "unknown" luôn ở cuối
+
 // Khung ảnh sản phẩm — hiện ảnh thật nếu task có field "image" (URL, gán từ
 // catalog.html), ảnh lỗi tự rơi về icon 🖼 mặc định thay vì để ô vỡ hình.
 function renderThumb(t){
@@ -671,14 +734,19 @@ function groupShown(shown){
   shown.forEach(t => {
     const oid = t.orderId || t.id;
     if(!map.has(oid)){
-      map.set(oid, { orderId: oid, orderName: t.orderName || t.name, shipLabelUrl: "", note: "", items: [] });
+      // Không còn fallback về t.name nữa: orderName rỗng phải hiện placeholder
+      // "┈┈┈┈┈┈┈┈┈" (renderOrderName()) chứ không phải tên sản phẩm — trước
+      // đây fallback này vô hại vì orderName luôn có giá trị (mã "#..." tự
+      // sinh), giờ orderName có thể thật sự rỗng nên phải bỏ fallback.
+      map.set(oid, { orderId: oid, orderName: t.orderName || null, carrier: null, shipLabelUrl: "", note: "", items: [] });
       order.push(oid);
     }
     const g = map.get(oid);
-    // shipLabelUrl/note được ghi lặp lên mọi item cùng orderId (giống orderName)
-    // — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
+    // shipLabelUrl/note/carrier được ghi lặp lên mọi item cùng orderId (giống
+    // orderName) — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
     if(!g.shipLabelUrl && t.shipLabelUrl) g.shipLabelUrl = t.shipLabelUrl;
     if(!g.note && t.note) g.note = t.note;
+    if(!g.carrier && t.carrier) g.carrier = t.carrier;
     g.items.push(t);
   });
   return order.map(oid => map.get(oid));
@@ -704,6 +772,9 @@ function orderIdsBecomingEmpty(deletedIds){
 }
 
 // ---- Render ----
+// Trả về danh sách task theo TAB + TỪ KHÓA TÌM KIẾM — CHƯA áp dụng lọc theo
+// hãng vận chuyển (xem applyCarrierFilter()). Tách riêng để carrierBar luôn
+// tính được tổng số đúng của từng hãng, không bị chính bộ lọc của nó che mất.
 function getShown(){
   let shown;
   if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in");
@@ -723,6 +794,107 @@ function getShown(){
   return shown;
 }
 
+// Carrier hiệu lực của 1 task — "unknown" cho mọi giá trị lạ/rỗng, để luôn
+// khớp với 1 trong các key của CARRIER_LABEL (tránh sinh nhóm rác nếu dữ
+// liệu cũ/lỗi có carrier không nằm trong danh sách đã biết).
+function effectiveCarrier(t){
+  return (t.carrier && CARRIER_LABEL[t.carrier]) ? t.carrier : "unknown";
+}
+
+// Áp dụng lọc theo hãng (carrierFilter) — chỉ có tác dụng ở tab "Đã xong".
+function applyCarrierFilter(tasks){
+  if(currentTab !== "xong" || carrierFilter === "all") return tasks;
+  return tasks.filter(t => effectiveCarrier(t) === carrierFilter);
+}
+
+// Vẽ thanh chuyển chế độ xem + chip lọc theo hãng (chỉ ở tab "Đã xong").
+// baseShown = tasks theo tab+tìm kiếm, TRƯỚC khi lọc theo hãng, để đếm số
+// lượng đúng cho từng chip.
+function renderCarrierBar(baseShown){
+  const toggleBtn = document.getElementById("carrierViewToggle");
+  toggleBtn.textContent = xongViewMode === "carrier" ? "🔀 Xem theo thứ tự hoàn thành" : "🗂 Xem nhóm theo hãng";
+  toggleBtn.onclick = () => {
+    xongViewMode = xongViewMode === "carrier" ? "completion" : "carrier";
+    localStorage.setItem("xongViewMode", xongViewMode);
+    render();
+  };
+
+  const counts = new Map();
+  baseShown.forEach(t => {
+    const key = effectiveCarrier(t);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  const chipsEl = document.getElementById("carrierChips");
+  chipsEl.innerHTML = "";
+
+  const allChip = document.createElement("button");
+  allChip.type = "button";
+  allChip.className = "carrierChip" + (carrierFilter === "all" ? " active" : "");
+  allChip.innerHTML = `Tất cả <span class="n">${baseShown.length}</span>`;
+  allChip.addEventListener("click", () => { carrierFilter = "all"; render(); });
+  chipsEl.appendChild(allChip);
+
+  CARRIER_ORDER.forEach(key => {
+    const n = counts.get(key) || 0;
+    if(n === 0) return; // ẩn hãng hiện không có đơn nào để đỡ rối chip
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "carrierChip" + (carrierFilter === key ? " active" : "");
+    chip.innerHTML = `${CARRIER_LABEL[key]} <span class="n">${n}</span>`;
+    chip.addEventListener("click", () => { carrierFilter = (carrierFilter === key ? "all" : key); render(); });
+    chipsEl.appendChild(chip);
+  });
+}
+
+// Vẽ danh sách "Đã xong" theo accordion nhóm hãng — mỗi nhóm gập mặc định,
+// bấm head mới xổ ra. "unknown" (chưa rõ hãng) luôn xếp CUỐI CÙNG theo
+// CARRIER_ORDER, không tách biệt/nổi bật lên đầu. Trả về mảng group (đơn)
+// đã render, để render() dùng tính nút "Tải tất cả phiếu giao".
+function renderXongByCarrier(shownTasks){
+  const buckets = new Map();
+  shownTasks.forEach(t => {
+    const key = effectiveCarrier(t);
+    if(!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(t);
+  });
+
+  let allGroups = [];
+  CARRIER_ORDER.forEach(key => {
+    if(!buckets.has(key)) return;
+    const tasks = buckets.get(key);
+    const groups = groupShown(tasks);
+    allGroups = allGroups.concat(groups);
+
+    const isExpanded = expandedCarrierGroups.has(key);
+    const wrap = document.createElement("div");
+    wrap.className = "carrierGroup";
+
+    const head = document.createElement("div");
+    head.className = "carrierGroupHead";
+    head.addEventListener("click", () => {
+      if(isExpanded) expandedCarrierGroups.delete(key); else expandedCarrierGroups.add(key);
+      render();
+    });
+    const left = document.createElement("span");
+    left.textContent = CARRIER_LABEL[key] || key;
+    const right = document.createElement("span");
+    right.innerHTML = `<span class="carrierGroupCount">${groups.length} đơn</span><span class="expand-arrow">${isExpanded ? "▾" : "▸"}</span>`;
+    head.appendChild(left);
+    head.appendChild(right);
+    wrap.appendChild(head);
+
+    if(isExpanded){
+      const body = document.createElement("div");
+      body.className = "carrierGroupBody";
+      groups.forEach(g => body.appendChild(renderOrderBox(g)));
+      wrap.appendChild(body);
+    }
+    list.appendChild(wrap);
+  });
+  return allGroups;
+}
+
 function updateSelectAllBox(shown){
   const n = shown.length;
   const nSel = shown.filter(t => selected.has(t.id)).length;
@@ -738,22 +910,37 @@ function render(){
   document.getElementById("badge-dong_goi").textContent = badgeDG;
   document.getElementById("badge-xong").textContent = badgeXong;
 
-  const shown = getShown();
+  const baseShown = getShown(); // theo tab + tìm kiếm, CHƯA lọc theo hãng
+  const shown = applyCarrierFilter(baseShown);
   updateSelectAllBox(shown);
 
   list.innerHTML = "";
+
+  const carrierBar = document.getElementById("carrierBar");
+  if(currentTab === "xong" && baseShown.length > 0){
+    carrierBar.style.display = "flex";
+    renderCarrierBar(baseShown);
+  } else {
+    carrierBar.style.display = "none";
+  }
+
   if(shown.length === 0){
     const emptyMsg = searchTerm ? "Không tìm thấy việc nào khớp."
       : currentTab === "in" ? "Chưa có việc nào. Thêm sản phẩm ở ô trên."
       : currentTab === "dong_goi" ? "Chưa có sản phẩm nào chờ đóng gói."
+      : carrierFilter !== "all" ? "Không có đơn nào thuộc hãng này."
       : "Chưa có sản phẩm nào hoàn tất.";
     list.innerHTML = `<div class="empty">${emptyMsg}</div>`;
     downloadAllWrap.style.display = "none";
     return;
   }
 
-  const groups = groupShown(shown);
-  groups.forEach(g => list.appendChild(renderOrderBox(g)));
+  const groups = (currentTab === "xong" && xongViewMode === "carrier")
+    ? renderXongByCarrier(shown)
+    : groupShown(shown);
+  if(!(currentTab === "xong" && xongViewMode === "carrier")){
+    groups.forEach(g => list.appendChild(renderOrderBox(g)));
+  }
 
   // Nút "Tải tất cả phiếu giao" chỉ hiện khi trong danh sách đang xem (theo
   // tab + từ khóa tìm kiếm hiện tại) có ít nhất 1 đơn đã đính kèm phiếu giao.
@@ -807,6 +994,12 @@ function renderOrderBox(g){
     dot.textContent = "📎";
     rightWrap.appendChild(dot);
   }
+  if(g.carrier){
+    const chip = document.createElement("span");
+    chip.className = "carrier-chip";
+    chip.textContent = CARRIER_LABEL[g.carrier] || g.carrier;
+    rightWrap.appendChild(chip);
+  }
   if(g.note){
     const dot = document.createElement("span");
     dot.className = "header-dot";
@@ -851,7 +1044,7 @@ function renderOrderBox(g){
     const input = document.createElement("input");
     input.type = "text";
     input.className = "order-title-input";
-    input.value = g.orderName;
+    input.value = g.orderName || "";
     const saveBtn = document.createElement("button");
     saveBtn.className = "save-icon";
     saveBtn.textContent = "Lưu";
@@ -868,7 +1061,7 @@ function renderOrderBox(g){
     const valueWrap = document.createElement("span");
     valueWrap.className = "code-value";
     const valueText = document.createElement("span");
-    valueText.textContent = g.orderName;
+    valueText.innerHTML = renderOrderName(g.orderName);
     const editBtn = document.createElement("button");
     editBtn.className = "edit-icon-btn";
     editBtn.textContent = "✏️";
@@ -1237,6 +1430,20 @@ async function extractPdfText(file){
   return text;
 }
 
+// Nhận diện hãng vận chuyển từ text layer của PDF. Dùng CHUNG text đã đọc
+// sẵn cho detectTrackingFromText (không đọc thêm PDF/QR nào) — chạy độc lập
+// với việc QR có đọc được mã vận đơn hay không, vì thông tin hãng nằm ở phần
+// header/khuyến mãi của phiếu chứ không nằm trong mã QR. Trả về 1 trong các
+// key của CARRIER_LABEL ("jt"/"spx"/"ghn"), hoặc null nếu không khớp mẫu nào
+// (mẫu lạ hoặc PDF ảnh scan không có text layer) — null sẽ được coi là
+// "unknown" ở nơi gọi.
+function detectCarrierFromText(text){
+  if(/J\s*&\s*T/i.test(text)) return "jt";
+  if(/SPX/i.test(text)) return "spx";
+  if(/Giao\s*H[àa]ng\s*Nhanh|\bGHN\b/i.test(text)) return "ghn";
+  return null;
+}
+
 // Dự phòng khi không đọc được mã QR nào — dò trong lớp text. Trả về CHUỖI mã
 // vận đơn hoặc null (không còn phân biệt hãng).
 function detectTrackingFromText(text){
@@ -1259,20 +1466,25 @@ function detectTrackingFromText(text){
   return m ? m[1] : null;
 }
 
-async function extractTrackingFromPdf(file){
+// Trả về { trackingCode, carrier } — gộp chung 1 lượt đọc PDF cho cả 2 việc,
+// vì text layer (dùng để suy ra carrier) vốn dĩ đã phải đọc song song với QR
+// làm phương án dự phòng cho trackingCode; không tách thành 1 nút/1 lượt quét
+// riêng để tránh đọc PDF 2 lần và tránh lệch dữ liệu giữa 2 lần quét.
+async function extractShipLabelInfo(file){
   // Không "nuốt" lỗi ở đây nữa — để lỗi văng ra ngoài cho nơi gọi phân biệt
   // được 2 trường hợp: "đọc PDF lỗi" (do thư viện/mạng) vs "đọc được nhưng
   // không khớp mẫu nào" (PDF ảnh scan hoặc mẫu hãng lạ).
 
-  // Đọc song song cả 2 cách; ưu tiên QR, chỉ dùng text khi QR không ra gì.
+  // Đọc song song cả 2 cách; ưu tiên QR cho trackingCode, chỉ dùng text khi
+  // QR không ra gì. Carrier LUÔN suy từ text (QR chỉ chứa mã vận đơn thuần).
   const [qrCode, text] = await Promise.all([
     extractQrFromPdf(file).catch(() => null),
     extractPdfText(file)
   ]);
 
-  if(qrCode) return qrCode;
-
-  return detectTrackingFromText(text);
+  const trackingCode = qrCode || detectTrackingFromText(text);
+  const carrier = detectCarrierFromText(text);
+  return { trackingCode, carrier };
 }
 
 // Tải file PDF lên Cloudinary (unsigned upload preset) rồi ghi URL vào mọi
@@ -1299,18 +1511,28 @@ async function uploadShipLabel(orderId, file){
     const currentName = (currentItem && currentItem.orderName) || "";
     let uploadFile = file;
     let trackingCode = null;
+    let carrier = null;
     let readErrorMsg = null;
     try{
-      trackingCode = await extractTrackingFromPdf(file);
+      ({ trackingCode, carrier } = await extractShipLabelInfo(file));
     }catch(e){
       readErrorMsg = (e && e.message) ? e.message : String(e);
+    }
+    // Carrier ghi nhận độc lập với việc có đọc được trackingCode hay không —
+    // 1 phiếu vẫn có thể nhận ra hãng (qua header/khuyến mãi trong text layer)
+    // dù QR/mã vận đơn không đọc được. Chỉ bỏ qua khi đọc PDF LỖI THẬT SỰ
+    // (readErrorMsg) — còn "đọc được nhưng không khớp mẫu nào" vẫn ghi nhận
+    // là "unknown" (khác với "chưa từng thử đọc").
+    if(!readErrorMsg){
+      await setOrderCarrier(orderId, carrier || "unknown");
     }
     if(trackingCode){
       const safeCode = trackingCode.replace(/[^A-Za-z0-9]/g, "");
       uploadFile = new File([file], `${safeCode}.pdf`, { type: file.type });
       const newTitle = trackingCode;
-      const isAutoName = /^#[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{9}$/.test(currentName);
-      const shouldRename = isAutoName ||
+      // Đơn chưa có tên (trước đây là kiểu "#ABC123XYZ" tự sinh, giờ là
+      // trống hẳn) thì tự đổi tên luôn, không cần hỏi lại.
+      const shouldRename = isBlankOrderName(currentName) ||
         confirm(`Đơn đang có tên "${currentName}".\nĐổi tên đơn thành "${newTitle}"?`);
       if(shouldRename) await renameOrder(orderId, newTitle);
     } else {
@@ -1395,7 +1617,10 @@ async function downloadShipLabel(url, orderName){
 // HIỂN THỊ trong danh sách hiện tại (theo tab + tìm kiếm) — tránh trình
 // duyệt chặn khi kích hoạt quá nhiều tải xuống cùng lúc.
 async function downloadAllShipLabels(){
-  const groups = groupShown(getShown()).filter(g => g.shipLabelUrl);
+  // Dùng applyCarrierFilter() giống render() — để "Tải tất cả" luôn khớp
+  // đúng những gì đang hiển thị trên màn hình (nếu đang lọc theo 1 hãng cụ
+  // thể ở tab "Đã xong" thì chỉ tải phiếu của hãng đó, không tải hết).
+  const groups = groupShown(applyCarrierFilter(getShown())).filter(g => g.shipLabelUrl);
   if(groups.length === 0){
     showError("Không có phiếu giao nào trong danh sách đang xem để tải.");
     return;
@@ -1413,7 +1638,9 @@ async function downloadAllShipLabels(){
 downloadAllBtn.addEventListener("click", downloadAllShipLabels);
 
 async function renameOrder(orderId, newName){
-  const n = (newName || "").trim() || newOrderName();
+  // Để trống là hợp lệ — không còn ép về mã tự sinh nữa, đơn trống tên sẽ
+  // hiện placeholder "┈┈┈┈┈┈┈┈┈" (xem renderOrderName()).
+  const n = (newName || "").trim() || null;
   const items = allTasks.filter(t => t.orderId === orderId);
   try{
     for(const it of items){
@@ -1422,6 +1649,20 @@ async function renameOrder(orderId, newName){
     editingOrderIds.delete(orderId);
     render();
   }catch(e){ showError("Không đổi được tên đơn: " + e.message); }
+}
+
+// Ghi carrier lên mọi item cùng orderId — cùng cơ chế denormalized với
+// renameOrder() ở trên. Dùng khi tự nhận diện được hãng lúc tải phiếu giao
+// lên (uploadShipLabel), và có thể tái dùng sau này nếu cần sửa tay khi
+// nhận sai hãng.
+async function setOrderCarrier(orderId, carrier){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { carrier: carrier || null, updatedAt: serverTimestamp() });
+    }
+    render();
+  }catch(e){ showError("Không ghi được đơn vị vận chuyển: " + e.message); }
 }
 
 // ---- Batch actions ----
