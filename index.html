@@ -232,10 +232,6 @@
      CSS quyết định, không phụ thuộc số ký tự của mã thật (mỗi hãng dài ngắn
      khác nhau: GHN ~8 ký tự, SPX ~18 ký tự...). */
   .order-name-placeholder{color:var(--border);font-weight:400;letter-spacing:1px;}
-  .order-code-row .copy-btn{
-    border:none;background:none;color:var(--blue);font-size:12px;font-weight:700;
-    cursor:pointer;padding:2px 4px;
-  }
 
   .order-status-line{font-size:11.5px;text-align:center;padding:6px 12px;color:var(--muted);border-bottom:1px solid var(--border);}
   .order-status-line.warn{color:var(--amber);font-weight:600;}
@@ -255,10 +251,6 @@
   .order-header-right{display:flex;align-items:center;gap:6px;}
   .header-dot{font-size:12px;line-height:1;}
   .expand-arrow{font-size:10px;color:var(--muted);margin-left:2px;}
-  .carrier-chip{
-    font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-bg);
-    border-radius:8px;padding:2px 7px;line-height:1.4;
-  }
 
   /* ---- Tab "Đã xong": thanh chuyển chế độ xem + chip lọc theo hãng ---- */
   .carrierBar{
@@ -431,7 +423,7 @@
 </div>
 
 <div class="searchbar">
-  <input type="text" id="searchTask" placeholder="🔍 Tìm việc theo tên hoặc tên đơn...">
+  <input type="text" id="searchTask" placeholder="🔍 Tìm việc theo tên, tên đơn hoặc ghi chú...">
 </div>
 
 <main>
@@ -533,6 +525,7 @@ const errArea = document.getElementById("errArea");
 const selectAllBox = document.getElementById("selectAllBox");
 const clearAllBtn = document.getElementById("clearAllBtn");
 const totalQtyInfo = document.getElementById("totalQtyInfo");
+const listToolbar = document.getElementById("listToolbar");
 const downloadAllWrap = document.getElementById("downloadAllWrap");
 const downloadAllBtn = document.getElementById("downloadAllBtn");
 
@@ -628,7 +621,10 @@ async function addTask(){
   const nameEl = document.getElementById("newName");
   const qtyEl = document.getElementById("newQty");
   const name = nameEl.value.trim();
-  const qty = parseInt(qtyEl.value) || 1;
+  // Chặn số lượng âm/0/thập phân gõ tay (thuộc tính min="1" trên input chỉ
+  // là gợi ý UI, không chặn được người dùng gõ số âm bằng bàn phím) — ép về
+  // tối thiểu 1 nếu giá trị không hợp lệ hoặc nhỏ hơn 1.
+  const qty = Math.max(1, parseInt(qtyEl.value) || 1);
   if(!name) return;
   try{
     await addDoc(tasksCol, {
@@ -802,7 +798,8 @@ function getShown(){
   if(searchTerm){
     shown = shown.filter(t =>
       (t.name || "").toLowerCase().includes(searchTerm) ||
-      (t.orderName || "").toLowerCase().includes(searchTerm)
+      (t.orderName || "").toLowerCase().includes(searchTerm) ||
+      (t.note || "").toLowerCase().includes(searchTerm)
     );
   }
   return shown;
@@ -944,6 +941,9 @@ function render(){
   // tab, giờ chuyển xuống đây; số cạnh tên tab đổi thành số kiện hàng.
   const totalQtyShown = shown.reduce((s, t) => s + (t.qty || 1), 0);
   totalQtyInfo.innerHTML = `Số lượng: <b>${totalQtyShown}</b>`;
+  // Ẩn hẳn hàng "Chọn tất cả" + "Số lượng" khi danh sách đang hiển thị rỗng —
+  // đỡ rối vì lúc đó chọn/số lượng đều vô nghĩa (0).
+  listToolbar.style.display = shown.length === 0 ? "none" : "flex";
 
   list.innerHTML = "";
 
@@ -1090,6 +1090,7 @@ function renderOrderBox(g){
     select.addEventListener("change", commit);
     carrierRow.appendChild(select);
     carrierRow.appendChild(saveBtn);
+    setTimeout(() => select.focus(), 0);
   } else {
     const carrierLabelSpan = document.createElement("span");
     carrierLabelSpan.className = "code-label";
@@ -1415,12 +1416,6 @@ async function revertStatus(t){
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
 }
 
-async function toggleShipped(t){
-  try{
-    await updateDoc(doc(db, "tasks", t.id), { shipped: !t.shipped, updatedAt: serverTimestamp() });
-  }catch(e){ showError("Không cập nhật được trạng thái đã giao: " + e.message); }
-}
-
 async function markShipped(id, value){
   try{
     await updateDoc(doc(db, "tasks", id), { shipped: value, updatedAt: serverTimestamp() });
@@ -1563,21 +1558,34 @@ function detectTrackingFromText(text){
 // làm phương án dự phòng cho trackingCode; không tách thành 1 nút/1 lượt quét
 // riêng để tránh đọc PDF 2 lần và tránh lệch dữ liệu giữa 2 lần quét.
 async function extractShipLabelInfo(file){
-  // Không "nuốt" lỗi ở đây nữa — để lỗi văng ra ngoài cho nơi gọi phân biệt
-  // được 2 trường hợp: "đọc PDF lỗi" (do thư viện/mạng) vs "đọc được nhưng
-  // không khớp mẫu nào" (PDF ảnh scan hoặc mẫu hãng lạ).
+  // Không "nuốt" lỗi hoàn toàn ở đây — chỉ ném lỗi ra ngoài cho nơi gọi (để
+  // phân biệt "đọc PDF lỗi thật sự" vs "đọc được nhưng không khớp mẫu nào")
+  // khi KHÔNG lấy được trackingCode từ bất kỳ nguồn nào cả (xem điều kiện ở
+  // cuối hàm) — còn nếu QR đã đọc được mã vận đơn thì luôn coi là thành công,
+  // dù việc đọc text layer (chỉ dùng suy carrier) có lỗi hay không.
 
   // Đọc song song cả 2 cách; ưu tiên QR cho trackingCode, chỉ dùng text khi
   // QR không ra gì. Carrier LUÔN suy từ text (QR chỉ chứa mã vận đơn thuần).
+  // extractQrFromPdf tự bắt lỗi riêng (trả null nếu lỗi). Với extractPdfText,
+  // GIỮ LẠI lỗi (textError) thay vì để nó làm Promise.all reject toàn bộ —
+  // nếu không, lỗi đọc text layer sẽ "cuốn trôi" luôn kết quả QR đã đọc
+  // thành công ở nhánh kia (bug cũ). textError chỉ được ném ra ở điều kiện
+  // cuối hàm, khi thực sự không còn gì để dùng.
+  let textError = null;
   const [qrCode, text] = await Promise.all([
     extractQrFromPdf(file).catch(() => null),
-    extractPdfText(file)
+    extractPdfText(file).catch(e => { textError = e; return ""; })
   ]);
 
   const trackingCode = qrCode || detectTrackingFromText(text);
   // Ưu tiên nhận diện qua text layer (đáng tin hơn); chỉ khi không khớp mẫu
   // nào mới suy đoán tiếp từ chính mã vận đơn (xem detectCarrierFromCode()).
   const carrier = detectCarrierFromText(text) || detectCarrierFromCode(trackingCode);
+
+  // Chỉ coi là "lỗi đọc PDF thật sự" khi KHÔNG lấy được trackingCode từ bất kỳ
+  // nguồn nào (kể cả QR) VÀ việc đọc text layer có lỗi thật.
+  if(!trackingCode && textError) throw textError;
+
   return { trackingCode, carrier };
 }
 
