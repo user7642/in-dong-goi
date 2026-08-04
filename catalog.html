@@ -322,19 +322,13 @@ function showError(msg){
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
 }
 
-function randCode(len){
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
-  return s;
-}
 function newOrderId(){ return "o_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-// Mã tự sinh cho đơn không đặt tên — dài ~10 ký tự để giống độ dài mã vận đơn
-// thật, nhưng luôn bắt đầu bằng "#": ký tự này KHÔNG BAO GIỜ xuất hiện trong
-// mã vận đơn thật (mã thật chỉ toàn chữ/số, xem detectTrackingFromText và
-// extractTrackingFromPdf ở index.html) — nên chỉ cần nhìn ký tự đầu là phân
-// biệt được ngay đây là mã giả tự sinh, không phải mã quét từ vận đơn thật.
-function newOrderName(){ return "#" + randCode(9); }
+// Không còn sinh "tên tự động" giả (kiểu "#ABC123XYZ") cho đơn chưa đặt tên
+// nữa — orderName để trống (null) cho tới khi quét được mã vận đơn thật từ
+// PDF phiếu giao (xem extractTrackingFromPdf ở index.html). Bên hiển thị,
+// orderName trống sẽ được render bằng placeholder "┈┈┈┈┈┈┈┈┈" (CSS), không
+// còn dùng chuỗi ký tự giả để lấp chỗ trống nữa — tránh gây hiểu lầm với mã
+// vận đơn thật.
 
 // ---- Chuyển chế độ ----
 document.querySelectorAll(".tab").forEach(t => {
@@ -1041,10 +1035,10 @@ function updateTaskBar(){
 function getOrderLabel(orderId){
   if(gomMode && orderId === currentGroupId){
     const nm = groupNameInput.value.trim();
-    return (nm || "mã tự sinh") + " (đang gom)";
+    return (nm || "chưa đặt tên") + " (đang gom)";
   }
   if(groupNames.has(orderId)){
-    return groupNames.get(orderId) || "Đơn gộp (mã tự sinh)";
+    return groupNames.get(orderId) || "Đơn gộp (chưa đặt tên)";
   }
   return "Sản phẩm lẻ";
 }
@@ -1108,7 +1102,7 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
       } else if(groupNames.has(e.orderId)){
         nm = groupNames.get(e.orderId);
       }
-      orderNames.set(e.orderId, nm || newOrderName());
+      orderNames.set(e.orderId, nm); // null nếu chưa đặt tên — sẽ hiện placeholder ┈┈┈
     }
   });
 
