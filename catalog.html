@@ -379,6 +379,16 @@ function updateGomStatusLine(){
 // lúc mới nhập danh sách hoặc thỉnh thoảng dọn lại thứ tự sau này). ----
 let sortMode = false;
 
+// ---- Chế độ xem: 'list' (mặc định, đầy đủ nút chức năng — gán ảnh/link,
+// ảnh riêng theo phân loại...) hoặc 'grid' (lưới, chỉ để chọn nhanh, KHÔNG
+// có các nút chức năng — chỉ dùng ở tab "Thêm việc"). Tab "Quản lý danh mục"
+// luôn dùng list view vì cần checkbox + nút sửa/xóa/sắp xếp cùng lúc.
+// Khai báo NGAY TẠI ĐÂY (trước applyModeUI()/updateViewToggleBtn() bên dưới)
+// — để ở cuối file từng gây lỗi "Cannot access 'viewMode' before
+// initialization" vì updateViewToggleBtn() đọc biến này sớm hơn lúc nó
+// được khai báo (temporal dead zone của let). ----
+let viewMode = "grid";
+
 function applyModeUI(){
   const isManage = mode === "manage";
   if(!isManage) sortMode = false; // rời tab quản lý thì tự thoát chế độ sắp xếp
@@ -745,12 +755,6 @@ function renderTiersSelectionHtml(p){
       </div>`;
   }).join("");
 }
-
-// ---- Chế độ xem: 'list' (mặc định, đầy đủ nút chức năng — gán ảnh/link,
-// ảnh riêng theo phân loại...) hoặc 'grid' (lưới, chỉ để chọn nhanh, KHÔNG
-// có các nút chức năng — chỉ dùng ở tab "Thêm việc"). Tab "Quản lý danh mục"
-// luôn dùng list view vì cần checkbox + nút sửa/xóa/sắp xếp cùng lúc. ----
-let viewMode = "grid";
 
 function updateViewToggleBtn(){
   const btn = document.getElementById("viewToggleBtn");
