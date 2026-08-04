@@ -102,6 +102,11 @@
     margin-left:4px;font-weight:700;opacity:.85;cursor:pointer;padding:2px 6px;border-radius:8px;
   }
   .vchip.selected .chipminus,.vchip.selected .chipx{background:rgba(255,255,255,.18);}
+  .orderNumTag{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.35);
+    color:#fff;font-size:10px;font-weight:700;margin-right:4px;flex-shrink:0;
+  }
 
   /* ---- Chế độ xem LƯỚI (chỉ ở tab Thêm việc) ----
      Masonry bằng CSS columns: mỗi thẻ cao theo đúng nội dung của nó, không
@@ -376,6 +381,31 @@ let mode = "task";
 let gomMode = false;
 let currentGroupId = null;
 let groupNames = new Map(); // orderId đã "Xong" -> tên đơn (hoặc null = tự sinh mã)
+
+// Mỗi đơn đã gộp/đặt tên (có mặt trong groupNames) được gán 1 màu riêng để
+// các sản phẩm cùng đơn luôn tô cùng 1 màu dù nằm rải rác ở đâu trong danh
+// sách/lưới/ảnh — giúp nhận ra ngay "mấy cái này chung 1 đơn" dù đã bấm
+// "Xong" (không còn ở chế độ gom nữa) chứ không chỉ lúc đang gom dở.
+const ORDER_COLORS = ["#2563eb","#dc2626","#15803d","#b45309","#7c3aed","#0f766e","#db2777","#4338ca"];
+let orderColorAssign = new Map(); // orderId -> index vào ORDER_COLORS
+
+// Trả về {color, num} cho 1 đơn đã gộp. num = số thứ tự đơn (theo đúng thứ
+// tự bấm "Xong"), color = màu chưa bị đơn nào KHÁC đang tồn tại dùng — nhờ
+// đó 2 đơn đang hiển thị cùng lúc không bao giờ trùng màu (trừ khi có nhiều
+// hơn 8 đơn cùng lúc, vượt quá bảng màu — khi đó vẫn phân biệt được nhờ số).
+function getOrderColor(orderId){
+  if(!orderColorAssign.has(orderId)){
+    const usedIdx = new Set();
+    for(const oid of groupNames.keys()){
+      if(oid !== orderId && orderColorAssign.has(oid)) usedIdx.add(orderColorAssign.get(oid));
+    }
+    let idx = 0;
+    while(usedIdx.has(idx) && idx < ORDER_COLORS.length - 1) idx++;
+    orderColorAssign.set(orderId, idx);
+  }
+  const num = Array.from(groupNames.keys()).indexOf(orderId) + 1;
+  return { color: ORDER_COLORS[orderColorAssign.get(orderId)], num };
+}
 
 const errArea = document.getElementById("errArea");
 function showError(msg){
@@ -768,17 +798,7 @@ function renderTiersSelectionHtml(p){
     const groupKey = p.id + "__" + label;
     const hasImg = !!(p.variantImages && p.variantImages[label]);
     const editingGroup = editingGroupImageIds.has(groupKey);
-    const chips = lastTier.map(v => {
-      const variant = label + ": " + v;
-      const key = p.id + "__" + variant;
-      const active = isChipActive(key);
-      const cur = taskSelections.get(key);
-      const qty = cur ? cur.qty : 0;
-      return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-        </button>`;
-    }).join("");
+    const chips = lastTier.map(v => chipHtml(p, label + ": " + v, v)).join("");
     return `<div class="groupRow">
         <div class="groupName">${escapeHtml(label)} :
           <button type="button" class="groupImgBtn" data-groupkey="${escapeHtml(groupKey)}" title="${hasImg ? "Đã có ảnh riêng cho phân loại này — bấm để sửa" : "Gán ảnh riêng cho phân loại này"}">${hasImg ? "🖼" : "➕"}</button>
@@ -818,12 +838,21 @@ document.querySelectorAll(".vswBtn").forEach(b => {
 // nơi, không phải viết/khớp tay 2 lần.
 function chipHtml(p, variant, displayText){
   const key = variant ? (p.id + "__" + variant) : p.id;
-  const active = isChipActive(key);
+  const activePinned = isChipActive(key); // đang ghim / đang gom dở (logic gốc)
   const cur = taskSelections.get(key);
+  const isGrouped = !!(cur && groupNames.has(cur.orderId)); // thuộc 1 đơn đã "Xong" (gộp hoặc đặt tên)
+  const showSelected = activePinned || isGrouped; // đơn đã gộp thì KHÔNG ẩn sau khi bấm Xong
   const qty = cur ? cur.qty : 0;
-  return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-      <span class="vlabel" data-act="add">${escapeHtml(displayText)}</span>
-      ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
+  let colorAttr = "";
+  let orderBadge = "";
+  if(isGrouped){
+    const c = getOrderColor(cur.orderId);
+    colorAttr = ` style="background:${c.color};color:#fff;"`;
+    orderBadge = `<span class="orderNumTag" title="Cùng đơn #${c.num}">${c.num}</span>`;
+  }
+  return `<button type="button" class="vchip${showSelected ? " selected" : ""}" data-key="${escapeHtml(key)}"${colorAttr}>
+      ${orderBadge}<span class="vlabel" data-act="add">${escapeHtml(displayText)}</span>
+      ${showSelected ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
     </button>`;
 }
 
@@ -983,29 +1012,12 @@ function renderList(){
     if(hasTiers){
       variantsHtml = isManage ? renderTiersStaticHtml(p) : renderTiersSelectionHtml(p);
     } else if(hasFlat){
-      variantsHtml = p.variants.map(v => {
-        if(isManage){
-          return `<span class="vchip static">${escapeHtml(v)}</span>`;
-        }
-        const key = p.id + "__" + v;
-        const active = isChipActive(key);
-        const cur = taskSelections.get(key);
-        const qty = cur ? cur.qty : 0;
-        return `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-            <span class="vlabel" data-act="add">${escapeHtml(v)}</span>
-            ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-          </button>`;
-      }).join("");
+      variantsHtml = isManage
+        ? p.variants.map(v => `<span class="vchip static">${escapeHtml(v)}</span>`).join("")
+        : p.variants.map(v => chipHtml(p, v, v)).join("");
     } else if(!isManage){
       // Sản phẩm không có phân loại — hiện 1 nút để chọn cả sản phẩm
-      const key = p.id;
-      const active = isChipActive(key);
-      const cur = taskSelections.get(key);
-      const qty = cur ? cur.qty : 0;
-      variantsHtml = `<button type="button" class="vchip${active ? " selected" : ""}" data-key="${escapeHtml(key)}">
-          <span class="vlabel" data-act="add">${active ? "Đã chọn" : "➕ Chọn sản phẩm này"}</span>
-          ${active ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
-        </button>`;
+      variantsHtml = chipHtml(p, "", isChipActive(p.id) ? "Đã chọn" : "➕ Chọn sản phẩm này");
     }
     div.innerHTML = `
       ${(isManage && !isSortMode) ? `<input type="checkbox" class="rowCheck" ${selected.has(p.id) ? "checked" : ""}>` : ""}
@@ -1299,7 +1311,8 @@ function renderSelectedModal(){
   let html = "";
   for(const items of groups.values()){
     const orderId = items[0].orderId;
-    html += `<div class="selgroup"><div class="selgroup-title">${escapeHtml(getOrderLabel(orderId))} — ${items.length} phân loại</div>`;
+    const dot = groupNames.has(orderId) ? `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${getOrderColor(orderId).color};margin-right:6px;vertical-align:middle;"></span>` : "";
+    html += `<div class="selgroup"><div class="selgroup-title">${dot}${escapeHtml(getOrderLabel(orderId))} — ${items.length} phân loại</div>`;
     items.forEach(it => {
       html += `<div class="selrow">
         <span class="selname">${escapeHtml(it.productName)}${it.variant ? " — " + escapeHtml(it.variant) : ""} ×${it.qty}</span>
@@ -1375,6 +1388,7 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
     }
     taskSelections.clear();
     groupNames.clear();
+    orderColorAssign.clear();
     pinnedKey = null;
     exitGomMode();
     renderList();
