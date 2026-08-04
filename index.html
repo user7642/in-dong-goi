@@ -330,6 +330,10 @@
     border:none;background:var(--blue);color:#fff;border-radius:6px;
     padding:6px 9px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0;
   }
+  select.order-carrier-select{
+    font-size:13px;font-weight:700;border:1px solid var(--blue);border-radius:6px;
+    padding:6px 8px;flex:1;min-width:0;background:#fff;color:var(--text);
+  }
 
   .note-box{padding:0 12px 10px;}
   .note-box textarea{
@@ -504,6 +508,9 @@ let expandedCarrierGroups = new Set();
 
 // UI-only ephemeral state (reset on re-render is fine; kept across snapshots via Sets keyed by id)
 let editingOrderIds = new Set();
+// orderId đang mở ô chỉnh sửa hãng vận chuyển (dòng "Đơn vị VC:") — tách
+// riêng Set với editingOrderIds vì đây là 1 dòng khác (select thay vì input text).
+let editingCarrierIds = new Set();
 // orderId đang trong lúc tải lên phiếu giao (để hiện trạng thái "Đang tải lên...")
 let uploadingShipLabelIds = new Set();
 // orderId đang mở khu vực mở rộng (phiếu giao + ghi chú) ngay trên thẻ tóm tắt
@@ -994,12 +1001,8 @@ function renderOrderBox(g){
     dot.textContent = "📎";
     rightWrap.appendChild(dot);
   }
-  if(g.carrier){
-    const chip = document.createElement("span");
-    chip.className = "carrier-chip";
-    chip.textContent = CARRIER_LABEL[g.carrier] || g.carrier;
-    rightWrap.appendChild(chip);
-  }
+  // Chip hãng vận chuyển ở header đã được thay bằng dòng "Đơn vị VC:" riêng
+  // (đặt ngay trước dòng "Mã đơn hàng", có thể bấm ✏️ để sửa tay) — xem bên dưới.
   if(g.note){
     const dot = document.createElement("span");
     dot.className = "header-dot";
@@ -1035,6 +1038,53 @@ function renderOrderBox(g){
   footer.className = "order-summary-footer";
   footer.innerHTML = `<span>${g.items.length} sản phẩm</span><span>Tổng số lượng: <b>${totalQty}</b></span>`;
   box.appendChild(footer);
+
+  // Đơn vị VC (hãng vận chuyển) — đặt ngay trước dòng "Mã đơn hàng", cùng
+  // kiểu dòng (label bên trái, giá trị + nút bút chì bên phải) để sửa tay khi
+  // tự nhận diện sai hãng. Dùng <select> thay vì input text vì hãng là tập
+  // giá trị cố định (jt/spx/ghn/unknown).
+  const carrierRow = document.createElement("div");
+  carrierRow.className = "order-code-row";
+  if(editingCarrierIds.has(g.orderId)){
+    const select = document.createElement("select");
+    select.className = "order-carrier-select";
+    Object.keys(CARRIER_LABEL).forEach(key => {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = CARRIER_LABEL[key];
+      if((g.carrier || "unknown") === key) opt.selected = true;
+      select.appendChild(opt);
+    });
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "save-icon";
+    saveBtn.textContent = "Lưu";
+    const commit = attachClickAwayCommit(carrierRow, () => {
+      editingCarrierIds.delete(g.orderId);
+      setOrderCarrier(g.orderId, select.value);
+    });
+    saveBtn.addEventListener("click", commit);
+    select.addEventListener("change", commit);
+    carrierRow.appendChild(select);
+    carrierRow.appendChild(saveBtn);
+  } else {
+    const carrierLabelSpan = document.createElement("span");
+    carrierLabelSpan.className = "code-label";
+    carrierLabelSpan.textContent = "Đơn vị VC";
+    const carrierValueWrap = document.createElement("span");
+    carrierValueWrap.className = "code-value";
+    const carrierValueText = document.createElement("span");
+    carrierValueText.textContent = CARRIER_LABEL[g.carrier] || CARRIER_LABEL.unknown;
+    const carrierEditBtn = document.createElement("button");
+    carrierEditBtn.className = "edit-icon-btn";
+    carrierEditBtn.textContent = "✏️";
+    carrierEditBtn.title = "Đổi hãng vận chuyển";
+    carrierEditBtn.addEventListener("click", () => { editingCarrierIds.add(g.orderId); render(); });
+    carrierValueWrap.appendChild(carrierValueText);
+    carrierValueWrap.appendChild(carrierEditBtn);
+    carrierRow.appendChild(carrierLabelSpan);
+    carrierRow.appendChild(carrierValueWrap);
+  }
+  box.appendChild(carrierRow);
 
   // Mã đơn hàng — không còn nút "Sao chép"; mã dịch sang phải lấp chỗ trống,
   // vẫn giữ nút bút chì nhỏ để đổi tên đơn khi cần.
@@ -1444,6 +1494,23 @@ function detectCarrierFromText(text){
   return null;
 }
 
+// Dự phòng khi text layer không khớp mẫu nào (ví dụ phiếu GHN không in rõ
+// chữ "Giao Hàng Nhanh"/"GHN" ở phần đọc được) — suy hãng từ chính MÃ VẬN
+// ĐƠN đã đọc được (QR hoặc text):
+//  - SPX: mã luôn có tiền tố "SPX" ngay đầu (vd "SPXVN0123456789") — dò
+//    thẳng trong mã, không phụ thuộc text layer có ghi rõ tên hãng hay không.
+//  - GHN: mã thường NGẮN hơn hẳn mã SPX (mã SPX quan sát được dài, kiểu
+//    "GYA8MTK8" trở lên — 8+ ký tự); mã GHN quan sát được ngắn hơn mốc đó.
+//    Đây chỉ là suy đoán may rủi (heuristic độ dài), dùng SAU CÙNG khi không
+//    còn cách nào khác — nếu sau này thấy sai nhiều thì nên thay bằng mẫu
+//    chữ/số cụ thể của GHN thay vì dựa độ dài.
+function detectCarrierFromCode(code){
+  if(!code) return null;
+  if(/^SPX/i.test(code)) return "spx";
+  if(code.length < 8) return "ghn";
+  return null;
+}
+
 // Dự phòng khi không đọc được mã QR nào — dò trong lớp text. Trả về CHUỖI mã
 // vận đơn hoặc null (không còn phân biệt hãng).
 function detectTrackingFromText(text){
@@ -1483,7 +1550,9 @@ async function extractShipLabelInfo(file){
   ]);
 
   const trackingCode = qrCode || detectTrackingFromText(text);
-  const carrier = detectCarrierFromText(text);
+  // Ưu tiên nhận diện qua text layer (đáng tin hơn); chỉ khi không khớp mẫu
+  // nào mới suy đoán tiếp từ chính mã vận đơn (xem detectCarrierFromCode()).
+  const carrier = detectCarrierFromText(text) || detectCarrierFromCode(trackingCode);
   return { trackingCode, carrier };
 }
 
