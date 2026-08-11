@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -43,7 +45,20 @@
     max-width:var(--maxw);
     margin:0 auto;
   }
-  h1{font-size:18px;margin:0 0 12px 0;font-weight:600;}
+  h1{font-size:18px;margin:0;font-weight:600;}
+  .header-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+  /* Icon xin quyền thông báo trình duyệt — icon-only, đặt cùng hàng với tiêu
+     đề, canh phải. Đây là nơi DUY NHẤT gọi Notification.requestPermission()
+     (cần đúng 1 cú click thật của người dùng) + mở khóa AudioContext để phát
+     tiếng bíp về sau. Nút chuông trên từng đơn (tab "In") chỉ toggle cờ, giả
+     định quyền đã được xin qua đây trước đó. */
+  .header-notify-btn{
+    flex:none;width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;
+    font-size:16px;display:flex;align-items:center;justify-content:center;
+    background:var(--gray-bg);color:var(--text);
+  }
+  .header-notify-btn.granted{background:var(--amber-bg);color:var(--amber);}
+  .header-notify-btn[disabled]{opacity:.6;cursor:default;}
   .tabs{display:flex;gap:6px;}
   .tab{
     flex:1;
@@ -446,7 +461,10 @@
 <body>
 
 <header>
-  <h1>Quản lý In &amp; Đóng gói</h1>
+  <div class="header-top">
+    <h1>Quản lý In &amp; Đóng gói</h1>
+    <button id="enableNotifBtn" class="header-notify-btn" type="button">🔕</button>
+  </div>
   <div class="tabs">
     <div class="tab active" data-tab="in">In <span class="count-badge" id="badge-in">0</span></div>
     <div class="tab" data-tab="dong_goi">Đóng gói <span class="count-badge" id="badge-dong_goi">0</span></div>
@@ -599,42 +617,49 @@ function showError(msg){
 
 // ---- Xin quyền thông báo trình duyệt + mở khóa âm thanh ----
 // Notification.requestPermission() CHỈ chạy được khi có user gesture thật
-// (không thể tự xin quyền lúc trang load). Gộp chung vào đúng nút chuông
-// 🔕/🔔 trên từng đơn (tab "In") — KHÔNG cần nút riêng: lần bấm 🔕→🔔 ĐẦU
-// TIÊN của người dùng (bất kể ở đơn nào) chính là cú click thật đó, và cũng
-// tiện thể tạo AudioContext ngay trong cú click này để "mở khóa" quyền tự
-// phát âm thanh cho phần còn lại của phiên làm việc (tới khi reload trang) —
-// nếu không làm ở đây, playBeep() gọi từ setInterval() sau này sẽ bị trình
-// duyệt chặn vì không phải trực tiếp từ 1 hành động của người dùng. Các lần
-// bấm sau đó (đơn khác) Notification.permission đã "granted" nên không hỏi
-// lại nữa — trình duyệt tự nhớ theo origin.
+// (không thể tự xin quyền lúc trang load) — icon 🔕 cạnh tiêu đề (canh phải,
+// cùng hàng "Quản lý In & Đóng gói") là nơi DUY NHẤT gọi nó. Cùng lúc đó, tạo
+// AudioContext ngay trong cú click này để "mở khóa" quyền tự phát âm thanh
+// cho phần còn lại của phiên làm việc (tới khi reload trang) — nếu không làm
+// ở đây, playBeep() gọi từ setInterval() sau này sẽ bị trình duyệt chặn vì
+// không phải trực tiếp từ 1 hành động của người dùng. Nút chuông 🔕/🔔 trên
+// từng đơn (tab "In") chỉ toggle cờ, giả định quyền đã được xin qua đây.
+const enableNotifBtn = document.getElementById("enableNotifBtn");
 function unlockAudio(){
   if(!audioCtx){
     try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
   }
   if(audioCtx && audioCtx.state === "suspended") audioCtx.resume();
 }
-// Gọi ngay khi người dùng bấm bật (🔕→🔔) cho 1 đơn ở tab "In". Trả về false
-// nếu không xin được quyền (bị từ chối / trình duyệt không hỗ trợ) — trường
-// hợp đó KHÔNG bật notifyOnPrintDone, để tránh bật "khống" mà không báo được.
-async function ensureNotifyPermission(){
+function updateNotifButtonUI(){
   if(!("Notification" in window)){
-    alert("Trình duyệt này không hỗ trợ thông báo.");
-    return false;
+    enableNotifBtn.textContent = "🔕";
+    enableNotifBtn.title = "Trình duyệt này không hỗ trợ thông báo";
+    enableNotifBtn.disabled = true;
+    return;
   }
-  unlockAudio();
-  if(Notification.permission === "denied"){
-    alert("Trình duyệt đang chặn thông báo cho trang này. Vào cài đặt trình duyệt để bật lại quyền thông báo, rồi thử lại.");
-    return false;
+  if(Notification.permission === "granted"){
+    enableNotifBtn.textContent = "🔔";
+    enableNotifBtn.title = "Đã bật thông báo trình duyệt";
+    enableNotifBtn.classList.add("granted");
+  } else if(Notification.permission === "denied"){
+    enableNotifBtn.textContent = "🔕";
+    enableNotifBtn.title = "Thông báo bị chặn — vào cài đặt trình duyệt để bật lại";
+    enableNotifBtn.classList.remove("granted");
+  } else {
+    enableNotifBtn.textContent = "🔕";
+    enableNotifBtn.title = "Bật thông báo trình duyệt";
+    enableNotifBtn.classList.remove("granted");
   }
-  if(Notification.permission === "default"){
-    try{
-      const perm = await Notification.requestPermission();
-      if(perm !== "granted") return false;
-    }catch(e){ return false; }
-  }
-  return true;
 }
+enableNotifBtn.addEventListener("click", async () => {
+  unlockAudio();
+  if("Notification" in window && Notification.permission === "default"){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  updateNotifButtonUI();
+});
+updateNotifButtonUI();
 
 // Phát 1 tiếng "bíp" ngắn bằng Web Audio API (không cần file âm thanh ngoài,
 // không phụ thuộc mạng) — chỉ phát được nếu audioCtx đã được tạo từ cú click
@@ -1694,11 +1719,13 @@ function renderOrderExpandPanel(g){
           await setOrderNotifyPrintDone(g.orderId, false);
           return;
         }
-        // Lần bấm 🔕→🔔 — đây chính là cú click thật để xin quyền
-        // Notification (nếu chưa hỏi) + mở khóa âm thanh; chỉ bật cờ khi
-        // xin quyền thành công, tránh bật "khống" mà không báo được.
-        const ok = await ensureNotifyPermission();
-        if(!ok) return;
+        // Cần đã cấp quyền thông báo từ trước (bấm icon 🔔 cạnh tiêu đề ở
+        // đầu trang) thì mới bật được — icon đó mới là nơi xin quyền, tránh
+        // bật "khống" mà không báo được.
+        if("Notification" in window && Notification.permission !== "granted"){
+          alert("Vui lòng bấm nút 🔔 cạnh tiêu đề \"Quản lý In & Đóng gói\" ở đầu trang để bật thông báo trình duyệt trước.");
+          return;
+        }
         await setOrderNotifyPrintDone(g.orderId, true);
       }
     );
