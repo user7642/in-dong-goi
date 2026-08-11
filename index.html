@@ -156,23 +156,6 @@
     margin-bottom:10px;
   }
 
-  /* ---- Bật thông báo trình duyệt (1 lần, theo origin) — đồng thời "mở
-     khóa" phát âm thanh (AudioContext) cho phiên làm việc hiện tại, xem
-     unlockAudio() trong script. Không đặt trong <header> để tránh phải tính
-     lại các offset top: sticky (53px/106px) của addbar/searchbar. ---- */
-  .notifySetupBar{
-    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-    padding:10px 12px;margin-bottom:10px;
-    background:var(--blue-bg);border:1px solid var(--blue);border-radius:10px;
-  }
-  .notifySetupBar button{
-    border:none;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;
-    background:var(--blue);color:#fff;
-  }
-  .notifySetupBar button.granted{background:var(--green);}
-  .notifySetupBar button[disabled]{opacity:.7;cursor:default;}
-  .notifySetupBar span.hint{font-size:12px;color:var(--muted);}
-
   /* ---- Order box (grouping) — thẻ tóm tắt kiểu Shopee ---- */
   .order-box{
     border:1px solid var(--border);
@@ -302,28 +285,6 @@
   .carrierGroupHead .expand-arrow{margin-left:2px;}
   .carrierGroupBody{padding-top:10px;}
 
-  /* ---- Nút "Lưu kho": chốt lô theo thời điểm bấm, áp dụng đúng phạm vi
-     đang hiển thị (đã lọc theo hãng nếu có) trong tab "Đã xong". ---- */
-  .lotSaveRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .lotSaveBtn{
-    border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;
-    background:var(--green);color:#fff;cursor:pointer;white-space:nowrap;
-  }
-  .lotSaveBtn:disabled{background:var(--gray-bg);color:var(--muted);cursor:not-allowed;}
-  .lotSaveHint{font-size:12px;color:var(--muted);}
-
-  /* ---- Accordion theo NGÀY (dd/mm): đơn "chưa lưu kho" hiện flat (không
-     accordion) ở trên cùng; các lô đã lưu gộp thẳng theo ngày, mỗi ngày 1
-     accordion, gập mặc định, tiêu đề là ngày bấm "Lưu kho". ---- */
-  .dayGroup{margin-top:10px;}
-  .dayGroupHead{
-    display:flex;justify-content:space-between;align-items:center;
-    background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 14px;
-    cursor:pointer;user-select:none;font-weight:600;font-size:13px;
-  }
-  .dayGroupHead .expand-arrow{margin-left:2px;}
-  .dayGroupBody{padding-top:8px;}
-
   /* ---- Chế độ "Đối soát bàn giao" (bật riêng theo từng nhóm hãng, chỉ tồn
      tại trong bộ nhớ, KHÔNG lưu vào dữ liệu thật) — dùng tông màu amber để
      tách biệt hẳn với xanh dương (chọn hàng loạt) / xanh lá (đã giao). ---- */
@@ -383,11 +344,8 @@
   .icon-btn.remove-btn{background:#fde8e8;color:var(--red);}
   .icon-btn.note-btn{background:var(--gray-bg);color:var(--text);}
   .icon-btn.note-btn.has-note{background:var(--blue-bg);color:var(--blue);}
-  /* Icon 🔔 "Báo khi in xong" — chỉ hiện ở tab "In" (renderOrderExpandPanel).
-     Màu amber khi đang bật để tách biệt hẳn với 📎 (xanh dương)/📝 (xanh dương)
-     đã có, tránh nhầm với 2 trạng thái đó. */
   .icon-btn.notify-btn{background:var(--gray-bg);color:var(--text);}
-  .icon-btn.notify-btn.active{background:var(--amber-bg);color:var(--amber);}
+  .icon-btn.notify-btn.active{background:#fff3cd;color:#b8860b;}
   .icon-btn[disabled]{opacity:.6;cursor:default;}
 
   .edit-icon-btn{
@@ -506,11 +464,7 @@
 </div>
 
 <main>
-  <div class="quicklink"><a href="catalog.html">+ Thêm danh sách công việc</a></div>
-  <div class="notifySetupBar">
-    <button id="enableNotifBtn" type="button">🔔 Bật thông báo trình duyệt</button>
-    <span class="hint">Bấm 1 lần để nhận cảnh báo khi đơn in xong (chuông lặp mỗi 5s tới khi xác nhận)</span>
-  </div>
+  <div class="quicklink"><a href='/catalog'>+ Thêm danh sách công việc</a></div>
   <div class="download-all-wrap" id="downloadAllWrap" style="display:none;padding-top:8px;">
     <button class="download-all-btn" id="downloadAllBtn">⬇️ Tải tất cả phiếu giao</button>
   </div>
@@ -523,10 +477,6 @@
     </div>
   </div>
   <div class="carrierBar" id="carrierBar" style="display:none;">
-    <div class="lotSaveRow">
-      <button class="lotSaveBtn" id="lotSaveBtn" type="button">💾 Lưu kho</button>
-      <span class="lotSaveHint" id="lotSaveHint"></span>
-    </div>
     <button class="carrierViewToggle" id="carrierViewToggle" type="button"></button>
     <div class="carrierChips" id="carrierChips"></div>
   </div>
@@ -589,9 +539,6 @@ let xongViewMode = localStorage.getItem("xongViewMode") || "carrier";
 let carrierFilter = "all";
 // Các nhóm hãng đang mở (accordion) — mặc định TẤT CẢ đều gập.
 let expandedCarrierGroups = new Set();
-// Các nhóm NGÀY (dd/mm) — gộp thẳng các lô cùng ngày, không còn tầng lô
-// riêng — mặc định TẤT CẢ đều gập, key dạng "<lotKeyPrefix>::day::<dd/mm>".
-let expandedDayGroups = new Set();
 
 // ---- Tab "Đã xong": chế độ "🤝 Đối soát bàn giao" (bật riêng theo từng
 // nhóm hãng). Đây là trạng thái TẠM, chỉ tồn tại trong bộ nhớ — KHÔNG lưu
@@ -621,14 +568,12 @@ let uploadingShipLabelIds = new Set();
 let expandedOrderIds = new Set();
 // orderId đang mở ô nhập ghi chú (nằm trong khu vực mở rộng ở trên).
 let openOrderNoteIds = new Set();
-
-// ---- Cảnh báo "Đơn đã in xong" (chuông lặp mỗi 5s tới khi xác nhận) ----
-// orderId -> intervalId đang chạy — 1 đơn chỉ có tối đa 1 interval, dừng ngay
-// khi đơn được xác nhận (printDoneAcked=true) hoặc không còn pending nữa.
-let printAlertIntervals = new Map();
-// AudioContext dùng chung, chỉ tạo được sau 1 cú click thật của người dùng
-// (autoplay policy của trình duyệt) — xem unlockAudio(), gọi từ enableNotifBtn.
-let audioCtx = null;
+// orderId đã BẬT "nhắc đóng gói": khi đơn đó chuyển từ tab "In" sang tab
+// "Đóng gói", trình duyệt sẽ lặp lại thông báo (Notification) mỗi 5 giây cho
+// tới khi bấm nút này lần nữa để tắt. Chỉ lưu ở bộ nhớ phiên (không ghi
+// Firestore) — tắt/mất khi tải lại trang, vì thông báo chỉ có ý nghĩa cho
+// đúng trình duyệt/tab đang mở tại chỗ.
+let notifyPackIds = new Set();
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -645,155 +590,6 @@ const downloadAllBtn = document.getElementById("downloadAllBtn");
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
-}
-
-// ---- Bật thông báo trình duyệt (1 lần theo origin) + mở khóa âm thanh ----
-// Notification.requestPermission() CHỈ chạy được khi có user gesture thật
-// (không thể tự xin quyền lúc trang load) — nút này là nơi duy nhất gọi nó.
-// Cùng lúc đó, tạo AudioContext ngay trong cú click này để "mở khóa" quyền
-// tự phát âm thanh cho phần còn lại của phiên làm việc (tới khi reload trang) —
-// nếu không làm ở đây, playBeep() gọi từ setInterval() sau này sẽ bị trình
-// duyệt chặn vì không phải trực tiếp từ 1 hành động của người dùng.
-const enableNotifBtn = document.getElementById("enableNotifBtn");
-function unlockAudio(){
-  if(!audioCtx){
-    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
-  }
-  if(audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-}
-function updateNotifButtonUI(){
-  if(!("Notification" in window)){
-    enableNotifBtn.textContent = "🔕 Trình duyệt này không hỗ trợ thông báo";
-    enableNotifBtn.disabled = true;
-    return;
-  }
-  if(Notification.permission === "granted"){
-    enableNotifBtn.textContent = "🔔 Đã bật thông báo";
-    enableNotifBtn.classList.add("granted");
-  } else if(Notification.permission === "denied"){
-    enableNotifBtn.textContent = "🔕 Thông báo bị chặn — vào cài đặt trình duyệt để bật lại";
-    enableNotifBtn.classList.remove("granted");
-  } else {
-    enableNotifBtn.textContent = "🔔 Bật thông báo trình duyệt";
-    enableNotifBtn.classList.remove("granted");
-  }
-}
-enableNotifBtn.addEventListener("click", async () => {
-  unlockAudio();
-  if("Notification" in window && Notification.permission === "default"){
-    try{ await Notification.requestPermission(); }catch(e){}
-  }
-  updateNotifButtonUI();
-});
-updateNotifButtonUI();
-
-// Phát 1 tiếng "bíp" ngắn bằng Web Audio API (không cần file âm thanh ngoài,
-// không phụ thuộc mạng) — chỉ phát được nếu audioCtx đã được tạo từ cú click
-// ở enableNotifBtn (xem unlockAudio() ở trên).
-function playBeep(){
-  if(!audioCtx) return;
-  try{
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    g.gain.value = 0.15;
-    o.connect(g);
-    g.connect(audioCtx.destination);
-    o.start();
-    setTimeout(() => { try{ o.stop(); }catch(e){} }, 300);
-  }catch(e){}
-}
-
-// Bắn 1 lần cảnh báo cho 1 đơn: tiếng bíp + Notification hệ điều hành. Dùng
-// tag cố định theo orderId + renotify:true để lần bắn sau THAY THẾ notification
-// cũ (không dồn cửa sổ cũ chưa đóng), tránh spam nhiều notification riêng biệt
-// mỗi 5 giây trên màn hình.
-function fireAlert(orderId, orderName){
-  playBeep();
-  if("Notification" in window && Notification.permission === "granted"){
-    try{
-      const n = new Notification("📦 Đơn in xong — cần tạo vận đơn", {
-        body: (orderName ? `Đơn: ${orderName}` : "Đơn chưa đặt tên") + " — bấm vào đây để xác nhận đã thấy.",
-        tag: "print-done-" + orderId,
-        renotify: true
-      });
-      n.onclick = () => { window.focus(); ackPrintDoneAlert(orderId); n.close(); };
-    }catch(e){}
-  }
-}
-
-// Xác nhận đã thấy — dừng chuông cho đơn này (bấm vào Notification hoặc nút
-// "✔ Đã thấy" trên banner trong app đều gọi hàm này).
-async function ackPrintDoneAlert(orderId){
-  const items = allTasks.filter(t => t.orderId === orderId);
-  try{
-    for(const it of items){
-      await updateDoc(doc(db, "tasks", it.id), { printDoneAcked: true, updatedAt: serverTimestamp() });
-    }
-  }catch(e){ showError("Không xác nhận được thông báo: " + e.message); }
-}
-
-// Đồng bộ danh sách interval đang chạy theo dữ liệu allTasks hiện tại — gọi
-// mỗi lần render() (tức mỗi lần có thay đổi từ Firestore). Đơn nào có
-// printDoneAcked===false thì phải có 1 interval 5s đang chạy; đơn nào không
-// còn pending (đã ack, hoặc bị xóa/lùi lại) thì dừng interval ngay.
-function syncPrintDoneAlerts(){
-  const pending = new Map(); // orderId -> orderName
-  allTasks.forEach(t => {
-    if(t.printDoneAcked === false){
-      const oid = t.orderId || t.id;
-      if(!pending.has(oid)) pending.set(oid, t.orderName || "");
-    }
-  });
-  for(const [oid, intervalId] of printAlertIntervals){
-    if(!pending.has(oid)){
-      clearInterval(intervalId);
-      printAlertIntervals.delete(oid);
-    }
-  }
-  pending.forEach((orderName, oid) => {
-    if(!printAlertIntervals.has(oid)){
-      fireAlert(oid, orderName); // bắn ngay lần đầu, không chờ 5s
-      printAlertIntervals.set(oid, setInterval(() => fireAlert(oid, orderName), 5000));
-    }
-  });
-}
-
-// Kiểm tra và (nếu đủ điều kiện) kích hoạt cảnh báo cho 1 đơn ngay sau khi
-// đơn đó chuyển hẳn ra khỏi trạng thái "chờ in" — gọi từ advanceOrderItems()
-// (nút "✅ Đã in xong" theo đơn) và từ batchDone (xử lý theo lô, có thể chỉ
-// chọn 1 phần sản phẩm của đơn). advancedIds = id các item VỪA được advance
-// trong lượt gọi này — dùng để loại trừ khỏi kiểm tra "còn sản phẩm nào đang
-// chờ in không", vì allTasks cục bộ có thể chưa kịp cập nhật qua onSnapshot.
-async function maybeTriggerPrintDoneAlert(orderId, advancedIds){
-  const advancedSet = new Set(advancedIds);
-  const items = allTasks.filter(t => t.orderId === orderId);
-  if(items.length === 0) return;
-  const stillPrinting = items.some(t => t.status === "cho_in" && !advancedSet.has(t.id));
-  const wantsAlert = items.some(t => t.notifyOnPrintDone);
-  if(stillPrinting || !wantsAlert) return;
-  try{
-    for(const it of items){
-      await updateDoc(doc(db, "tasks", it.id), {
-        printDoneAlertAt: serverTimestamp(),
-        printDoneAcked: false,
-        notifyOnPrintDone: false, // tự tắt lại — lần "in xong" kế tiếp phải tick lại chủ động
-        updatedAt: serverTimestamp()
-      });
-    }
-  }catch(e){ showError("Không ghi được thông báo in xong: " + e.message); }
-}
-
-// Ghi/gỡ cờ "Báo khi in xong" cho 1 đơn — ghi lặp lên mọi item cùng orderId,
-// giống cơ chế orderName/carrier/note đã có.
-async function setOrderNotifyPrintDone(orderId, value){
-  const items = allTasks.filter(t => t.orderId === orderId);
-  try{
-    for(const it of items){
-      await updateDoc(doc(db, "tasks", it.id), { notifyOnPrintDone: value, updatedAt: serverTimestamp() });
-    }
-  }catch(e){ showError("Không đổi được trạng thái báo in xong: " + e.message); }
 }
 
 // ---- Helper: commit an edit (save) either on explicit click or on click-away ----
@@ -917,6 +713,32 @@ onSnapshot(q, snap => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
 
+// ---- Nhắc đóng gói (mỗi 5 giây) ----
+// Với mỗi orderId đang bật trong notifyPackIds: nếu đơn đó hiện đã ở trạng
+// thái "cho_dong_goi" (đã in xong, chuyển sang chờ đóng gói) thì bắn 1
+// Notification trình duyệt. Dùng cùng "tag" cho mỗi đơn để trình duyệt tự
+// thay thông báo cũ bằng thông báo mới thay vì chồng chất nhiều thông báo.
+// Nếu đơn đã rời khỏi trạng thái chờ đóng gói (đã đóng gói xong / bị xóa)
+// thì tự tắt nhắc cho đơn đó luôn.
+setInterval(() => {
+  if(notifyPackIds.size === 0) return;
+  if(!("Notification" in window) || Notification.permission !== "granted") return;
+  let changed = false;
+  notifyPackIds.forEach(orderId => {
+    const task = allTasks.find(t => t.orderId === orderId);
+    if(!task || task.status !== "cho_dong_goi"){
+      notifyPackIds.delete(orderId);
+      changed = true;
+      return;
+    }
+    new Notification("📦 Đơn cần đóng gói", {
+      body: "Đơn " + formatDT(task.createdAt) + " đã in xong, sẵn sàng đóng gói.",
+      tag: "pack-reminder-" + orderId
+    });
+  });
+  if(changed) render();
+}, 5000);
+
 // Lưu ý: từ khi chuyển phiếu giao sang lưu ở Cloudinary, việc xóa file PDF
 // không còn thực hiện được an toàn từ trình duyệt nữa (Cloudinary yêu cầu ký
 // bằng API Secret để xóa, không thể nhúng secret đó vào code public trên
@@ -991,16 +813,15 @@ function groupShown(shown){
       // "┈┈┈┈┈┈┈┈┈" (renderOrderName()) chứ không phải tên sản phẩm — trước
       // đây fallback này vô hại vì orderName luôn có giá trị (mã "#..." tự
       // sinh), giờ orderName có thể thật sự rỗng nên phải bỏ fallback.
-      map.set(oid, { orderId: oid, orderName: t.orderName || null, carrier: null, shipLabelUrl: "", note: "", lotId: null, lotAt: null, items: [] });
+      map.set(oid, { orderId: oid, orderName: t.orderName || null, carrier: null, shipLabelUrl: "", note: "", items: [] });
       order.push(oid);
     }
     const g = map.get(oid);
-    // shipLabelUrl/note/carrier/lotId được ghi lặp lên mọi item cùng orderId
-    // (giống orderName) — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
+    // shipLabelUrl/note/carrier được ghi lặp lên mọi item cùng orderId (giống
+    // orderName) — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
     if(!g.shipLabelUrl && t.shipLabelUrl) g.shipLabelUrl = t.shipLabelUrl;
     if(!g.note && t.note) g.note = t.note;
     if(!g.carrier && t.carrier) g.carrier = t.carrier;
-    if(!g.lotId && t.lotId){ g.lotId = t.lotId; g.lotAt = t.lotAt; }
     g.items.push(t);
   });
   return order.map(oid => map.get(oid));
@@ -1138,86 +959,6 @@ function renderCarrierBar(baseShown){
 // lập tức cả hãng đó nhảy về lại đúng vị trí bình thường theo CARRIER_ORDER
 // (không còn bị đẩy xuống cuối nữa). Trả về mảng group (đơn) đã render, để
 // render() dùng tính nút "Tải tất cả phiếu giao".
-// Vẽ phần "chưa lưu kho" (flat, không accordion, luôn ở TRÊN CÙNG — giữ
-// nguyên như bình thường) + các lô đã lưu, GỘP THẲNG THEO NGÀY (dd/mm) — mỗi
-// ngày 1 accordion duy nhất (không còn tầng "Lô" riêng bên trong), gộp mọi
-// đơn của mọi lô trong ngày đó, lô lưu gần nhất lên trên. Ngày mới nhất luôn
-// lên trên. Áp dụng ĐỒNG NHẤT, không phân biệt hãng hay chế độ xem — dùng
-// chung cho cả 2 chế độ xem của tab "Đã xong":
-// - "🗂 Nhóm theo hãng": gọi 1 lần cho MỖI nhóm hãng (bodyGroups đã lọc theo
-//   hãng đó), lotKeyPrefix = key của hãng — nên ngày tách riêng theo hãng.
-// - "🔀 Thứ tự hoàn thành": gọi 1 lần DUY NHẤT cho toàn bộ danh sách đang
-//   hiển thị (không tách hãng), lotKeyPrefix cố định "completion".
-function renderLotSections(container, bodyGroups, lotKeyPrefix, isReconciling){
-  const unlotted = bodyGroups.filter(g => !g.lotId);
-  const lotBuckets = new Map();
-  bodyGroups.forEach(g => {
-    if(!g.lotId) return;
-    if(!lotBuckets.has(g.lotId)) lotBuckets.set(g.lotId, { lotId: g.lotId, lotAt: g.lotAt, groups: [] });
-    lotBuckets.get(g.lotId).groups.push(g);
-  });
-  const lots = Array.from(lotBuckets.values());
-
-  unlotted.forEach(g => container.appendChild(renderOrderBox(g, isReconciling)));
-
-  // Nhóm các lô theo ngày (dd/mm) — lấy từ lotAt nếu có, fallback về lotId
-  // (mốc thời gian bấm nút) lúc lotAt chưa kịp đồng bộ từ server.
-  const dayBuckets = new Map();
-  lots.forEach(lot => {
-    const d = (lot.lotAt && typeof lot.lotAt.toDate === "function") ? lot.lotAt.toDate() : new Date(Number(lot.lotId) || Date.now());
-    const dayKey = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    if(!dayBuckets.has(dayKey)) dayBuckets.set(dayKey, { dayKey, dayStart, lots: [] });
-    dayBuckets.get(dayKey).lots.push(lot);
-  });
-  const days = Array.from(dayBuckets.values()).sort((a, b) => b.dayStart - a.dayStart);
-
-  days.forEach(day => {
-    const dayKeyFull = lotKeyPrefix + "::day::" + day.dayKey;
-    const dayExpanded = expandedDayGroups.has(dayKeyFull);
-    const dayWrap = document.createElement("div");
-    dayWrap.className = "dayGroup";
-
-    const dayHead = document.createElement("div");
-    dayHead.className = "dayGroupHead";
-    dayHead.addEventListener("click", () => {
-      if(dayExpanded) expandedDayGroups.delete(dayKeyFull); else expandedDayGroups.add(dayKeyFull);
-      render();
-    });
-    const dayLeft = document.createElement("span");
-    dayLeft.textContent = "📅 " + day.dayKey;
-    const dayRight = document.createElement("span");
-    dayRight.className = "carrierGroupHeadRight";
-    const dayOrderCount = day.lots.reduce((s, l) => s + l.groups.length, 0);
-    const dayCount = document.createElement("span");
-    dayCount.className = "carrierGroupCount";
-    dayCount.textContent = `${dayOrderCount} đơn`;
-    dayRight.appendChild(dayCount);
-    const dayArrow = document.createElement("span");
-    dayArrow.className = "expand-arrow";
-    dayArrow.textContent = dayExpanded ? "▾" : "▸";
-    dayRight.appendChild(dayArrow);
-    dayHead.appendChild(dayLeft);
-    dayHead.appendChild(dayRight);
-    dayWrap.appendChild(dayHead);
-
-    if(dayExpanded){
-      const dayBody = document.createElement("div");
-      dayBody.className = "dayGroupBody";
-      // Bỏ tầng accordion "Lô" — các lô trong cùng 1 ngày gộp thẳng thành
-      // danh sách đơn, lô lưu gần nhất (giờ:phút lớn hơn) lên trên.
-      const sortedLots = day.lots.slice().sort((a, b) => {
-        const ta = (a.lotAt && typeof a.lotAt.toMillis === "function") ? a.lotAt.toMillis() : Number(a.lotId) || 0;
-        const tb = (b.lotAt && typeof b.lotAt.toMillis === "function") ? b.lotAt.toMillis() : Number(b.lotId) || 0;
-        return tb - ta;
-      });
-      sortedLots.forEach(lot => lot.groups.forEach(g => dayBody.appendChild(renderOrderBox(g, isReconciling))));
-      dayWrap.appendChild(dayBody);
-    }
-    container.appendChild(dayWrap);
-  });
-}
-
 function renderXongByCarrier(shownTasks){
   const buckets = new Map();
   shownTasks.forEach(t => {
@@ -1316,8 +1057,7 @@ function renderXongByCarrier(shownTasks){
       const bodyGroups = (isReconciling && reconcileFilterUnconfirmed.has(key))
         ? groups.filter(g => !reconcileConfirmed.has(g.orderId))
         : groups;
-
-      renderLotSections(body, bodyGroups, key, isReconciling);
+      bodyGroups.forEach(g => body.appendChild(renderOrderBox(g, isReconciling)));
       wrap.appendChild(body);
     }
     list.appendChild(wrap);
@@ -1343,12 +1083,6 @@ function countOrdersByStatus(status){
 }
 
 function render(){
-  // Đồng bộ chuông "đơn in xong" — không phụ thuộc tab đang xem, vì người
-  // quản lý có thể đang ở tab khác lúc đơn được đánh dấu in xong. Xác nhận
-  // đã thấy giờ làm ngay trên icon chuông của từng đơn (xem
-  // renderOrderExpandPanel), không còn banner riêng.
-  syncPrintDoneAlerts();
-
   const badgeIn = countOrdersByStatus("cho_in");
   const badgeDG = countOrdersByStatus("cho_dong_goi");
   const badgeXong = countOrdersByStatus("xong");
@@ -1376,12 +1110,6 @@ function render(){
   if(currentTab === "xong" && baseShown.length > 0){
     carrierBar.style.display = "flex";
     renderCarrierBar(baseShown);
-    const lotOrderCount = groupShown(shown).length;
-    document.getElementById("lotSaveHint").textContent =
-      lotOrderCount > 0 ? `${lotOrderCount} đơn đang hiển thị` : "Không có đơn nào để lưu";
-    const lotSaveBtn = document.getElementById("lotSaveBtn");
-    lotSaveBtn.disabled = lotOrderCount === 0;
-    lotSaveBtn.onclick = () => saveLot(shown);
   } else {
     carrierBar.style.display = "none";
   }
@@ -1400,12 +1128,7 @@ function render(){
   const groups = (currentTab === "xong" && xongViewMode === "carrier")
     ? renderXongByCarrier(shown)
     : groupShown(shown);
-  if(currentTab === "xong" && xongViewMode === "completion"){
-    // "Thứ tự hoàn thành": vẫn giữ đúng ranh giới lô (đơn "vừa xong" sau khi
-    // lưu kho không tự nhảy vào lô cũ) — chỉ khác là gộp chung mọi hãng vào
-    // 1 accordion mỗi lô, không tách theo hãng như chế độ "Nhóm theo hãng".
-    renderLotSections(list, groups, "completion", false);
-  } else if(!(currentTab === "xong" && xongViewMode === "carrier")){
+  if(!(currentTab === "xong" && xongViewMode === "carrier")){
     groups.forEach(g => list.appendChild(renderOrderBox(g)));
   }
 
@@ -1757,12 +1480,6 @@ function renderItemSummary(t){
 // dùng cho nút hành động chính trên thẻ tóm tắt ở tab "In".
 async function advanceOrderItems(items){
   for(const t of items) await advanceStatus(t);
-  // Sau khi advance (chỉ có ý nghĩa khi đơn đang rời khỏi "chờ in"), kiểm tra
-  // xem đơn này có đang bật "Báo khi in xong" không — nếu có thì kích hoạt
-  // cảnh báo ngay (maybeTriggerPrintDoneAlert tự bỏ qua nếu không phải tab in
-  // hoặc đơn chưa in xong hoàn toàn).
-  const oid = items[0] && (items[0].orderId || items[0].id);
-  if(oid) await maybeTriggerPrintDoneAlert(oid, items.map(t => t.id));
 }
 
 // Lùi cả đơn (mọi sản phẩm đang hiện ở tab hiện tại) về 1 bước trước — dùng
@@ -1819,34 +1536,38 @@ function renderOrderExpandPanel(g){
     rowEl.appendChild(mkIconBtn("⬆️", "attach-btn", "Tải lên phiếu giao", () => fileInput.click()));
   }
 
-  // Icon chuông — dùng CHUNG 1 icon cho cả 2 việc, đổi ý nghĩa theo tab:
-  //  - Tab "In": TOGGLE ý định báo (notifyOnPrintDone), mặc định TẮT (🔕).
-  //    Bấm để bật (🔔) — báo hiệu "khi đơn này in xong, hãy báo cho tôi".
-  //  - Các tab khác (Đóng gói/Đã xong): KHÔNG còn là toggle chủ động nữa —
-  //    tự động hiện ON (🔔) khi đơn vừa rời tab "In" và cảnh báo đang chờ
-  //    xác nhận (printDoneAcked=false, đang kêu chuông mỗi 5s). Bấm 1 lần
-  //    vào đây = XÁC NHẬN ĐÃ THẤY, tắt chuông ngay — thay hẳn cho banner +
-  //    nút "Đã thấy" riêng trước đây.
-  if(currentTab === "in"){
-    const isOn = !!g.notifyOnPrintDone;
-    const notifyBtn = mkIconBtn(
-      isOn ? "🔔" : "🔕",
-      "notify-btn" + (isOn ? " active" : ""),
-      isOn ? "Đang bật báo khi in xong — bấm để tắt" : "Bật báo cho tôi khi đơn này in xong",
-      () => setOrderNotifyPrintDone(g.orderId, !isOn)
-    );
-    rowEl.appendChild(notifyBtn);
-  } else {
-    const hasPendingAlert = g.items.some(t => t.printDoneAcked === false);
-    const notifyBtn = mkIconBtn(
-      hasPendingAlert ? "🔔" : "🔕",
-      "notify-btn" + (hasPendingAlert ? " active" : ""),
-      hasPendingAlert ? "Đang chờ xác nhận — bấm để tắt chuông" : "Không có cảnh báo nào đang chờ",
-      () => { if(hasPendingAlert) ackPrintDoneAlert(g.orderId); }
-    );
-    if(!hasPendingAlert) notifyBtn.disabled = true;
-    rowEl.appendChild(notifyBtn);
-  }
+  // Nút "nhắc đóng gói" — bấm lần đầu: xin quyền Notification của trình
+  // duyệt (nếu chưa hỏi) rồi bật nhắc cho đơn này; bấm lần nữa: tắt nhắc.
+  // Việc bắn thông báo lặp lại mỗi 5 giây khi đơn chuyển sang tab "Đóng gói"
+  // nằm ở setInterval phía trên (gần onSnapshot).
+  const notifyOn = notifyPackIds.has(g.orderId);
+  const notifyBtn = mkIconBtn(
+    notifyOn ? "🔔" : "🔕",
+    "notify-btn" + (notifyOn ? " active" : ""),
+    notifyOn ? "Đang bật nhắc đóng gói — bấm để tắt" : "Bật nhắc khi đơn chuyển sang đóng gói",
+    async () => {
+      if(notifyPackIds.has(g.orderId)){
+        notifyPackIds.delete(g.orderId);
+        render();
+        return;
+      }
+      if(!("Notification" in window)){
+        alert("Trình duyệt này không hỗ trợ thông báo.");
+        return;
+      }
+      if(Notification.permission === "denied"){
+        alert("Trình duyệt đang chặn thông báo cho trang này. Vào cài đặt trình duyệt để bật lại quyền thông báo.");
+        return;
+      }
+      if(Notification.permission === "default"){
+        const perm = await Notification.requestPermission();
+        if(perm !== "granted") return;
+      }
+      notifyPackIds.add(g.orderId);
+      render();
+    }
+  );
+  rowEl.appendChild(notifyBtn);
 
   // Nút ghi chú — luôn đặt cuối cùng trong hàng icon.
   const noteBtn = mkIconBtn("📝", "note-btn" + (g.note ? " has-note" : ""), "Ghi chú đơn hàng", () => {
@@ -1905,35 +1626,10 @@ async function revertStatus(t){
     // RỜI HẲN khỏi "xong", không phải kiểu "bỏ đã giao để sửa lại" nữa, nên
     // không nên giữ ưu tiên lên đầu cho lần "xong" kế tiếp của nó.
     patch.shippedAt = deleteField();
-  } else if(t.status === "cho_dong_goi"){
-    // Đơn đang lùi hẳn về "chờ in" — nếu đang có cảnh báo "in xong" chờ xác
-    // nhận cho đơn này, dọn luôn (không còn ý nghĩa vì đơn thật ra chưa in
-    // xong), tránh chuông tiếp tục kêu nhầm cho 1 đơn đã bị lùi lại.
-    patch.printDoneAcked = deleteField();
-    patch.printDoneAlertAt = deleteField();
   }
   try{
     await updateDoc(doc(db, "tasks", t.id), patch);
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
-}
-
-// "Lưu kho" — chốt lô theo đúng thời điểm bấm nút. `shown` = danh sách task
-// (theo tab + tìm kiếm + lọc hãng) ĐANG hiển thị lúc bấm — không phân biệt
-// đã/chưa "Đã giao". Mọi task trong đó được đóng dấu CÙNG 1 lotId + lotAt,
-// ghi lặp lên từng task (giống cách carrier/note đang ghi lặp theo orderId).
-// Đơn "vừa xong" sau đó chưa có lotId nên KHÔNG tự nhảy vào lô này — nó nằm
-// ở phần "chưa lưu kho" chờ tới lần bấm "Lưu kho" tiếp theo.
-async function saveLot(shown){
-  if(!shown || shown.length === 0) return;
-  const lotId = String(Date.now());
-  const lotSaveBtn = document.getElementById("lotSaveBtn");
-  if(lotSaveBtn) lotSaveBtn.disabled = true;
-  try{
-    for(const t of shown){
-      await updateDoc(doc(db, "tasks", t.id), { lotId, lotAt: serverTimestamp() });
-    }
-  }catch(e){ showError("Lỗi khi lưu kho: " + e.message); }
-  if(lotSaveBtn) lotSaveBtn.disabled = false;
 }
 
 async function markShipped(id, value){
@@ -2319,25 +2015,10 @@ document.getElementById("batchShip").addEventListener("click", async () => {
 
 document.getElementById("batchDone").addEventListener("click", async () => {
   const ids = Array.from(selected);
-  // Ghi nhớ trước khi advance: những orderId nào (nếu đang ở tab "in") cần
-  // kiểm tra kích hoạt cảnh báo sau đó — vì chọn theo lô có thể chỉ chọn 1
-  // phần sản phẩm của 1 đơn, maybeTriggerPrintDoneAlert() sẽ tự kiểm tra đơn
-  // đã in xong HOÀN TOÀN chưa trước khi bắn cảnh báo.
-  const wasInTab = currentTab === "in";
-  const affectedOrderIds = new Set();
-  if(wasInTab){
-    ids.forEach(id => {
-      const t = allTasks.find(x => x.id === id);
-      if(t) affectedOrderIds.add(t.orderId || t.id);
-    });
-  }
   try{
     for(const id of ids){
       const t = allTasks.find(x => x.id === id);
       if(t) await advanceStatus(t);
-    }
-    for(const oid of affectedOrderIds){
-      await maybeTriggerPrintDoneAlert(oid, ids);
     }
   }catch(e){ showError("Lỗi khi xử lý theo lô: " + e.message); }
   selected.clear();
