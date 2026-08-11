@@ -173,20 +173,6 @@
   .notifySetupBar button[disabled]{opacity:.7;cursor:default;}
   .notifySetupBar span.hint{font-size:12px;color:var(--muted);}
 
-  /* ---- Banner "Đơn đã in xong, chờ xác nhận" — hiện ở mọi tab (không chỉ
-     tab "In") vì sau khi bấm "Đã in xong" đơn đã chuyển sang tab "Đóng gói",
-     người quản lý có thể đang xem tab khác lúc chuông kêu. ---- */
-  .printAlertBanner{margin-bottom:10px;}
-  .printAlertRow{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
-    background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);
-    border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:13px;font-weight:600;
-  }
-  .printAlertAckBtn{
-    border:none;border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:700;
-    background:var(--amber);color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0;
-  }
-
   /* ---- Order box (grouping) — thẻ tóm tắt kiểu Shopee ---- */
   .order-box{
     border:1px solid var(--border);
@@ -529,7 +515,6 @@
     <button class="download-all-btn" id="downloadAllBtn">⬇️ Tải tất cả phiếu giao</button>
   </div>
   <div id="errArea"></div>
-  <div class="printAlertBanner" id="printAlertBanner"></div>
   <div class="listToolbar" id="listToolbar">
     <label class="selectAllRow"><input type="checkbox" id="selectAllBox"> Chọn tất cả</label>
     <div class="listToolbarRight">
@@ -772,33 +757,6 @@ function syncPrintDoneAlerts(){
       fireAlert(oid, orderName); // bắn ngay lần đầu, không chờ 5s
       printAlertIntervals.set(oid, setInterval(() => fireAlert(oid, orderName), 5000));
     }
-  });
-}
-
-// Banner trong app hiện danh sách đơn đang chờ xác nhận + nút "✔ Đã thấy" —
-// dự phòng cho trường hợp Notification bị chặn/đóng nhầm mà chuông vẫn kêu.
-function renderPrintAlertBanner(){
-  const banner = document.getElementById("printAlertBanner");
-  const pendingOrderIds = new Map();
-  allTasks.forEach(t => {
-    if(t.printDoneAcked === false){
-      const oid = t.orderId || t.id;
-      if(!pendingOrderIds.has(oid)) pendingOrderIds.set(oid, t.orderName || "");
-    }
-  });
-  banner.innerHTML = "";
-  pendingOrderIds.forEach((orderName, oid) => {
-    const row = document.createElement("div");
-    row.className = "printAlertRow";
-    const label = document.createElement("span");
-    label.textContent = "🔔 Đơn " + (orderName ? orderName : "chưa đặt tên") + " đã in xong — cần tạo vận đơn";
-    const btn = document.createElement("button");
-    btn.className = "printAlertAckBtn";
-    btn.textContent = "✔ Đã thấy";
-    btn.addEventListener("click", () => ackPrintDoneAlert(oid));
-    row.appendChild(label);
-    row.appendChild(btn);
-    banner.appendChild(row);
   });
 }
 
@@ -1385,10 +1343,11 @@ function countOrdersByStatus(status){
 }
 
 function render(){
-  // Đồng bộ chuông/banner "đơn in xong" TRƯỚC — không phụ thuộc tab đang xem,
-  // vì người quản lý có thể đang ở tab khác lúc đơn được đánh dấu in xong.
+  // Đồng bộ chuông "đơn in xong" — không phụ thuộc tab đang xem, vì người
+  // quản lý có thể đang ở tab khác lúc đơn được đánh dấu in xong. Xác nhận
+  // đã thấy giờ làm ngay trên icon chuông của từng đơn (xem
+  // renderOrderExpandPanel), không còn banner riêng.
   syncPrintDoneAlerts();
-  renderPrintAlertBanner();
 
   const badgeIn = countOrdersByStatus("cho_in");
   const badgeDG = countOrdersByStatus("cho_dong_goi");
@@ -1860,10 +1819,14 @@ function renderOrderExpandPanel(g){
     rowEl.appendChild(mkIconBtn("⬆️", "attach-btn", "Tải lên phiếu giao", () => fileInput.click()));
   }
 
-  // Icon "Báo khi in xong" — chỉ hiện ở tab "In", vì mục đích duy nhất là
-  // biết chính xác lúc nào đơn (thường là J&T, sợ shipper tới lấy hàng sớm)
-  // được người in đánh dấu xong, để kịp tạo vận đơn ngay. Đặt trước nút 📝
-  // ghi chú (nút ghi chú luôn ở cuối cùng theo quy ước hiện có).
+  // Icon chuông — dùng CHUNG 1 icon cho cả 2 việc, đổi ý nghĩa theo tab:
+  //  - Tab "In": TOGGLE ý định báo (notifyOnPrintDone), mặc định TẮT (🔕).
+  //    Bấm để bật (🔔) — báo hiệu "khi đơn này in xong, hãy báo cho tôi".
+  //  - Các tab khác (Đóng gói/Đã xong): KHÔNG còn là toggle chủ động nữa —
+  //    tự động hiện ON (🔔) khi đơn vừa rời tab "In" và cảnh báo đang chờ
+  //    xác nhận (printDoneAcked=false, đang kêu chuông mỗi 5s). Bấm 1 lần
+  //    vào đây = XÁC NHẬN ĐÃ THẤY, tắt chuông ngay — thay hẳn cho banner +
+  //    nút "Đã thấy" riêng trước đây.
   if(currentTab === "in"){
     const isOn = !!g.notifyOnPrintDone;
     const notifyBtn = mkIconBtn(
@@ -1872,6 +1835,16 @@ function renderOrderExpandPanel(g){
       isOn ? "Đang bật báo khi in xong — bấm để tắt" : "Bật báo cho tôi khi đơn này in xong",
       () => setOrderNotifyPrintDone(g.orderId, !isOn)
     );
+    rowEl.appendChild(notifyBtn);
+  } else {
+    const hasPendingAlert = g.items.some(t => t.printDoneAcked === false);
+    const notifyBtn = mkIconBtn(
+      hasPendingAlert ? "🔔" : "🔕",
+      "notify-btn" + (hasPendingAlert ? " active" : ""),
+      hasPendingAlert ? "Đang chờ xác nhận — bấm để tắt chuông" : "Không có cảnh báo nào đang chờ",
+      () => { if(hasPendingAlert) ackPrintDoneAlert(g.orderId); }
+    );
+    if(!hasPendingAlert) notifyBtn.disabled = true;
     rowEl.appendChild(notifyBtn);
   }
 
