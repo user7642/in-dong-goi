@@ -285,6 +285,28 @@
   .carrierGroupHead .expand-arrow{margin-left:2px;}
   .carrierGroupBody{padding-top:10px;}
 
+  /* ---- Nút "Lưu kho": chốt lô theo thời điểm bấm, áp dụng đúng phạm vi
+     đang hiển thị (đã lọc theo hãng nếu có) trong tab "Đã xong". ---- */
+  .lotSaveRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .lotSaveBtn{
+    border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;
+    background:var(--green);color:#fff;cursor:pointer;white-space:nowrap;
+  }
+  .lotSaveBtn:disabled{background:var(--gray-bg);color:var(--muted);cursor:not-allowed;}
+  .lotSaveHint{font-size:12px;color:var(--muted);}
+
+  /* ---- Accordion theo NGÀY (dd/mm): đơn "chưa lưu kho" hiện flat (không
+     accordion) ở trên cùng; các lô đã lưu gộp thẳng theo ngày, mỗi ngày 1
+     accordion, gập mặc định, tiêu đề là ngày bấm "Lưu kho". ---- */
+  .dayGroup{margin-top:10px;}
+  .dayGroupHead{
+    display:flex;justify-content:space-between;align-items:center;
+    background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 14px;
+    cursor:pointer;user-select:none;font-weight:600;font-size:13px;
+  }
+  .dayGroupHead .expand-arrow{margin-left:2px;}
+  .dayGroupBody{padding-top:8px;}
+
   /* ---- Chế độ "Đối soát bàn giao" (bật riêng theo từng nhóm hãng, chỉ tồn
      tại trong bộ nhớ, KHÔNG lưu vào dữ liệu thật) — dùng tông màu amber để
      tách biệt hẳn với xanh dương (chọn hàng loạt) / xanh lá (đã giao). ---- */
@@ -475,6 +497,10 @@
     </div>
   </div>
   <div class="carrierBar" id="carrierBar" style="display:none;">
+    <div class="lotSaveRow">
+      <button class="lotSaveBtn" id="lotSaveBtn" type="button">💾 Lưu kho</button>
+      <span class="lotSaveHint" id="lotSaveHint"></span>
+    </div>
     <button class="carrierViewToggle" id="carrierViewToggle" type="button"></button>
     <div class="carrierChips" id="carrierChips"></div>
   </div>
@@ -498,8 +524,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, onSnapshot, doc,
-  updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy,
-  Timestamp
+  updateDoc, deleteDoc, deleteField, serverTimestamp, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
@@ -538,6 +563,9 @@ let xongViewMode = localStorage.getItem("xongViewMode") || "carrier";
 let carrierFilter = "all";
 // Các nhóm hãng đang mở (accordion) — mặc định TẤT CẢ đều gập.
 let expandedCarrierGroups = new Set();
+// Các nhóm NGÀY (dd/mm) — gộp thẳng các lô cùng ngày, không còn tầng lô
+// riêng — mặc định TẤT CẢ đều gập, key dạng "<lotKeyPrefix>::day::<dd/mm>".
+let expandedDayGroups = new Set();
 
 // ---- Tab "Đã xong": chế độ "🤝 Đối soát bàn giao" (bật riêng theo từng
 // nhóm hãng). Đây là trạng thái TẠM, chỉ tồn tại trong bộ nhớ — KHÔNG lưu
@@ -702,37 +730,17 @@ onSnapshot(q, snap => {
   allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   connStatus.textContent = "";
   render();
-  purgeExpiredXong();
 }, err => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
 
-// ---- Dọn dẹp item "xong" đã quá hạn ----
 // Lưu ý: từ khi chuyển phiếu giao sang lưu ở Cloudinary, việc xóa file PDF
 // không còn thực hiện được an toàn từ trình duyệt nữa (Cloudinary yêu cầu ký
 // bằng API Secret để xóa, không thể nhúng secret đó vào code public trên
-// GitHub Pages). Nên khi 1 đơn bị xóa (thủ công hoặc do quá hạn), chỉ Firestore
-// doc bị xóa — file PDF cũ trên Cloudinary sẽ "mồ côi" (không tự dọn). Vì file
-// phiếu giao rất nhẹ và gói free Cloudinary có 25GB/tháng, việc này không đáng
-// ngại — đây là đánh đổi đã thống nhất để tránh phải khai thẻ cho Firebase Blaze.
-
-// Quét chủ động các item "xong" đã quá hạn expireAt và xóa sớm hơn TTL server
-// của Firestore (TTL có thể trễ tới 72 giờ) — giúp tab "Đã xong" luôn gọn
-// trong đúng XONG_RETENTION_DAYS ngày gần nhất thay vì đợi Google tự dọn.
-async function purgeExpiredXong(){
-  const now = Date.now();
-  const expired = allTasks.filter(t =>
-    t.status === "xong" && t.expireAt && typeof t.expireAt.toMillis === "function" && t.expireAt.toMillis() <= now
-  );
-  if(expired.length === 0) return;
-  try{
-    for(const it of expired){
-      await deleteDoc(doc(db, "tasks", it.id));
-    }
-  }catch(e){
-    // Dọn dẹp nền — không làm phiền người dùng bằng lỗi nền không quan trọng.
-  }
-}
+// GitHub Pages). Nên khi 1 đơn bị xóa (thủ công), chỉ Firestore doc bị xóa —
+// file PDF cũ trên Cloudinary sẽ "mồ côi" (không tự dọn). Vì file phiếu giao
+// rất nhẹ và gói free Cloudinary có 25GB/tháng, việc này không đáng ngại —
+// đây là đánh đổi đã thống nhất để tránh phải khai thẻ cho Firebase Blaze.
 
 function escapeHtml(s){
   return (s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -800,15 +808,16 @@ function groupShown(shown){
       // "┈┈┈┈┈┈┈┈┈" (renderOrderName()) chứ không phải tên sản phẩm — trước
       // đây fallback này vô hại vì orderName luôn có giá trị (mã "#..." tự
       // sinh), giờ orderName có thể thật sự rỗng nên phải bỏ fallback.
-      map.set(oid, { orderId: oid, orderName: t.orderName || null, carrier: null, shipLabelUrl: "", note: "", items: [] });
+      map.set(oid, { orderId: oid, orderName: t.orderName || null, carrier: null, shipLabelUrl: "", note: "", lotId: null, lotAt: null, items: [] });
       order.push(oid);
     }
     const g = map.get(oid);
-    // shipLabelUrl/note/carrier được ghi lặp lên mọi item cùng orderId (giống
-    // orderName) — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
+    // shipLabelUrl/note/carrier/lotId được ghi lặp lên mọi item cùng orderId
+    // (giống orderName) — chỉ cần lấy giá trị đầu tiên tìm thấy trong cả nhóm.
     if(!g.shipLabelUrl && t.shipLabelUrl) g.shipLabelUrl = t.shipLabelUrl;
     if(!g.note && t.note) g.note = t.note;
     if(!g.carrier && t.carrier) g.carrier = t.carrier;
+    if(!g.lotId && t.lotId){ g.lotId = t.lotId; g.lotAt = t.lotAt; }
     g.items.push(t);
   });
   return order.map(oid => map.get(oid));
@@ -868,10 +877,9 @@ function getShown(){
   let shown;
   if(currentTab === "in") shown = allTasks.filter(t => t.status === "cho_in");
   else if(currentTab === "dong_goi") shown = allTasks.filter(t => t.status === "cho_dong_goi");
-  // Không còn cần giới hạn 50 mục ở client nữa: từ khi có expireAt + Firestore
-  // TTL (xem phần "Đã xong" trong hướng dẫn), tập dữ liệu status=xong đã tự
-  // giới hạn trong khoảng 7 ngày gần nhất, không phình vô hạn. Bỏ slice() để
-  // tìm kiếm (Lỗi A) có thể quét đúng toàn bộ 7 ngày thay vì chỉ 50 mục mới nhất.
+  // Không giới hạn số mục ở client: tập dữ liệu status=xong không còn tự dọn
+  // theo thời gian nữa (đã bỏ cơ chế hết hạn 7 ngày) — người dùng tự xóa thủ
+  // công qua nút "Dọn dẹp" khi cần.
   else shown = sortXongByShipped(allTasks.filter(t => t.status === "xong").slice().reverse());
 
   if(searchTerm){
@@ -938,9 +946,95 @@ function renderCarrierBar(baseShown){
 }
 
 // Vẽ danh sách "Đã xong" theo accordion nhóm hãng — mỗi nhóm gập mặc định,
-// bấm head mới xổ ra. "unknown" (chưa rõ hãng) luôn xếp CUỐI CÙNG theo
-// CARRIER_ORDER, không tách biệt/nổi bật lên đầu. Trả về mảng group (đơn)
-// đã render, để render() dùng tính nút "Tải tất cả phiếu giao".
+// bấm head mới xổ ra. Thứ tự mặc định giữa các hãng là CARRIER_ORDER (và
+// "unknown" luôn ở cuối trong số các hãng CHƯA xong hẳn) — NHƯNG áp dụng
+// thêm 1 tầng sắp xếp tương tự sortXongByShipped() ở cấp NHÓM HÃNG: hãng nào
+// mà MỌI đơn trong đó đều đã "Đã giao" thì cả nhóm hãng đó bị đẩy xuống dưới
+// CÙNG (dưới mọi hãng khác), giống cách 1 đơn "đã giao" tự nhảy xuống cuối
+// trong phạm vi 1 hãng. Chỉ cần 1 đơn trong hãng đó bị "bỏ đã giao" là ngay
+// lập tức cả hãng đó nhảy về lại đúng vị trí bình thường theo CARRIER_ORDER
+// (không còn bị đẩy xuống cuối nữa). Trả về mảng group (đơn) đã render, để
+// render() dùng tính nút "Tải tất cả phiếu giao".
+// Vẽ phần "chưa lưu kho" (flat, không accordion, luôn ở TRÊN CÙNG — giữ
+// nguyên như bình thường) + các lô đã lưu, GỘP THẲNG THEO NGÀY (dd/mm) — mỗi
+// ngày 1 accordion duy nhất (không còn tầng "Lô" riêng bên trong), gộp mọi
+// đơn của mọi lô trong ngày đó, lô lưu gần nhất lên trên. Ngày mới nhất luôn
+// lên trên. Áp dụng ĐỒNG NHẤT, không phân biệt hãng hay chế độ xem — dùng
+// chung cho cả 2 chế độ xem của tab "Đã xong":
+// - "🗂 Nhóm theo hãng": gọi 1 lần cho MỖI nhóm hãng (bodyGroups đã lọc theo
+//   hãng đó), lotKeyPrefix = key của hãng — nên ngày tách riêng theo hãng.
+// - "🔀 Thứ tự hoàn thành": gọi 1 lần DUY NHẤT cho toàn bộ danh sách đang
+//   hiển thị (không tách hãng), lotKeyPrefix cố định "completion".
+function renderLotSections(container, bodyGroups, lotKeyPrefix, isReconciling){
+  const unlotted = bodyGroups.filter(g => !g.lotId);
+  const lotBuckets = new Map();
+  bodyGroups.forEach(g => {
+    if(!g.lotId) return;
+    if(!lotBuckets.has(g.lotId)) lotBuckets.set(g.lotId, { lotId: g.lotId, lotAt: g.lotAt, groups: [] });
+    lotBuckets.get(g.lotId).groups.push(g);
+  });
+  const lots = Array.from(lotBuckets.values());
+
+  unlotted.forEach(g => container.appendChild(renderOrderBox(g, isReconciling)));
+
+  // Nhóm các lô theo ngày (dd/mm) — lấy từ lotAt nếu có, fallback về lotId
+  // (mốc thời gian bấm nút) lúc lotAt chưa kịp đồng bộ từ server.
+  const dayBuckets = new Map();
+  lots.forEach(lot => {
+    const d = (lot.lotAt && typeof lot.lotAt.toDate === "function") ? lot.lotAt.toDate() : new Date(Number(lot.lotId) || Date.now());
+    const dayKey = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    if(!dayBuckets.has(dayKey)) dayBuckets.set(dayKey, { dayKey, dayStart, lots: [] });
+    dayBuckets.get(dayKey).lots.push(lot);
+  });
+  const days = Array.from(dayBuckets.values()).sort((a, b) => b.dayStart - a.dayStart);
+
+  days.forEach(day => {
+    const dayKeyFull = lotKeyPrefix + "::day::" + day.dayKey;
+    const dayExpanded = expandedDayGroups.has(dayKeyFull);
+    const dayWrap = document.createElement("div");
+    dayWrap.className = "dayGroup";
+
+    const dayHead = document.createElement("div");
+    dayHead.className = "dayGroupHead";
+    dayHead.addEventListener("click", () => {
+      if(dayExpanded) expandedDayGroups.delete(dayKeyFull); else expandedDayGroups.add(dayKeyFull);
+      render();
+    });
+    const dayLeft = document.createElement("span");
+    dayLeft.textContent = "📅 " + day.dayKey;
+    const dayRight = document.createElement("span");
+    dayRight.className = "carrierGroupHeadRight";
+    const dayOrderCount = day.lots.reduce((s, l) => s + l.groups.length, 0);
+    const dayCount = document.createElement("span");
+    dayCount.className = "carrierGroupCount";
+    dayCount.textContent = `${dayOrderCount} đơn`;
+    dayRight.appendChild(dayCount);
+    const dayArrow = document.createElement("span");
+    dayArrow.className = "expand-arrow";
+    dayArrow.textContent = dayExpanded ? "▾" : "▸";
+    dayRight.appendChild(dayArrow);
+    dayHead.appendChild(dayLeft);
+    dayHead.appendChild(dayRight);
+    dayWrap.appendChild(dayHead);
+
+    if(dayExpanded){
+      const dayBody = document.createElement("div");
+      dayBody.className = "dayGroupBody";
+      // Bỏ tầng accordion "Lô" — các lô trong cùng 1 ngày gộp thẳng thành
+      // danh sách đơn, lô lưu gần nhất (giờ:phút lớn hơn) lên trên.
+      const sortedLots = day.lots.slice().sort((a, b) => {
+        const ta = (a.lotAt && typeof a.lotAt.toMillis === "function") ? a.lotAt.toMillis() : Number(a.lotId) || 0;
+        const tb = (b.lotAt && typeof b.lotAt.toMillis === "function") ? b.lotAt.toMillis() : Number(b.lotId) || 0;
+        return tb - ta;
+      });
+      sortedLots.forEach(lot => lot.groups.forEach(g => dayBody.appendChild(renderOrderBox(g, isReconciling))));
+      dayWrap.appendChild(dayBody);
+    }
+    container.appendChild(dayWrap);
+  });
+}
+
 function renderXongByCarrier(shownTasks){
   const buckets = new Map();
   shownTasks.forEach(t => {
@@ -949,9 +1043,19 @@ function renderXongByCarrier(shownTasks){
     buckets.get(key).push(t);
   });
 
-  let allGroups = [];
+  // Tách các hãng đang có mặt thành 2 nhóm, mỗi nhóm giữ nguyên thứ tự tương
+  // đối theo CARRIER_ORDER: hãng chưa xong hẳn (còn ít nhất 1 đơn chưa giao)
+  // đứng trước, hãng đã xong hẳn (100% đơn đã giao) bị đẩy xuống cuối.
+  const notFullyShippedKeys = [], fullyShippedKeys = [];
   CARRIER_ORDER.forEach(key => {
     if(!buckets.has(key)) return;
+    const allShipped = buckets.get(key).every(t => t.shipped);
+    (allShipped ? fullyShippedKeys : notFullyShippedKeys).push(key);
+  });
+  const orderedKeys = notFullyShippedKeys.concat(fullyShippedKeys);
+
+  let allGroups = [];
+  orderedKeys.forEach(key => {
     const tasks = buckets.get(key);
     const groups = groupShown(tasks);
     allGroups = allGroups.concat(groups);
@@ -1029,7 +1133,8 @@ function renderXongByCarrier(shownTasks){
       const bodyGroups = (isReconciling && reconcileFilterUnconfirmed.has(key))
         ? groups.filter(g => !reconcileConfirmed.has(g.orderId))
         : groups;
-      bodyGroups.forEach(g => body.appendChild(renderOrderBox(g, isReconciling)));
+
+      renderLotSections(body, bodyGroups, key, isReconciling);
       wrap.appendChild(body);
     }
     list.appendChild(wrap);
@@ -1082,6 +1187,12 @@ function render(){
   if(currentTab === "xong" && baseShown.length > 0){
     carrierBar.style.display = "flex";
     renderCarrierBar(baseShown);
+    const lotOrderCount = groupShown(shown).length;
+    document.getElementById("lotSaveHint").textContent =
+      lotOrderCount > 0 ? `${lotOrderCount} đơn đang hiển thị` : "Không có đơn nào để lưu";
+    const lotSaveBtn = document.getElementById("lotSaveBtn");
+    lotSaveBtn.disabled = lotOrderCount === 0;
+    lotSaveBtn.onclick = () => saveLot(shown);
   } else {
     carrierBar.style.display = "none";
   }
@@ -1100,7 +1211,12 @@ function render(){
   const groups = (currentTab === "xong" && xongViewMode === "carrier")
     ? renderXongByCarrier(shown)
     : groupShown(shown);
-  if(!(currentTab === "xong" && xongViewMode === "carrier")){
+  if(currentTab === "xong" && xongViewMode === "completion"){
+    // "Thứ tự hoàn thành": vẫn giữ đúng ranh giới lô (đơn "vừa xong" sau khi
+    // lưu kho không tự nhảy vào lô cũ) — chỉ khác là gộp chung mọi hãng vào
+    // 1 accordion mỗi lô, không tách theo hãng như chế độ "Nhóm theo hãng".
+    renderLotSections(list, groups, "completion", false);
+  } else if(!(currentTab === "xong" && xongViewMode === "carrier")){
     groups.forEach(g => list.appendChild(renderOrderBox(g)));
   }
 
@@ -1544,21 +1660,9 @@ function renderOrderExpandPanel(g){
 
 // ---- Actions ----
 
-// Số ngày lưu trữ tối đa cho các item ở tab "Đã xong" trước khi Firestore TTL
-// tự xoá (xem huong-dan.html / README về cách bật TTL policy trên field expireAt).
-// Chỉnh số này nếu muốn thay đổi thời gian giữ lịch sử đối soát.
-const XONG_RETENTION_DAYS = 7;
-
-function computeExpireAt(){
-  const ms = Date.now() + XONG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  return Timestamp.fromMillis(ms);
-}
-
 async function advanceStatus(t){
   const next = t.status === "cho_in" ? "cho_dong_goi" : "xong";
   const patch = { status: next, updatedAt: serverTimestamp() };
-  // Chỉ khi thật sự VÀO "xong" mới gắn hạn tự xoá (expireAt).
-  if(next === "xong") patch.expireAt = computeExpireAt();
   try{
     await updateDoc(doc(db, "tasks", t.id), patch);
   }catch(e){ showError("Không cập nhật được trạng thái: " + e.message); }
@@ -1569,9 +1673,6 @@ async function revertStatus(t){
   if(!prev) return;
   const patch = { status: prev, updatedAt: serverTimestamp() };
   if(t.status === "xong"){
-    // Ra khỏi "xong" thì phải xoá expireAt — nếu không, item có thể bị TTL
-    // xoá nhầm dù đang là việc chờ xử lý thật (chưa quay lại "xong" lần nữa).
-    patch.expireAt = deleteField();
     // Đồng thời reset "đã giao" — nếu không, khi item hoàn tất LẠI lần sau
     // (thật sự), nhãn "🚚 Đã giao" cũ sẽ tự hiện sẵn dù chưa ai bấm, gây sai
     // lệch dữ liệu đối soát.
@@ -1586,6 +1687,25 @@ async function revertStatus(t){
   }catch(e){ showError("Không lùi được trạng thái: " + e.message); }
 }
 
+// "Lưu kho" — chốt lô theo đúng thời điểm bấm nút. `shown` = danh sách task
+// (theo tab + tìm kiếm + lọc hãng) ĐANG hiển thị lúc bấm — không phân biệt
+// đã/chưa "Đã giao". Mọi task trong đó được đóng dấu CÙNG 1 lotId + lotAt,
+// ghi lặp lên từng task (giống cách carrier/note đang ghi lặp theo orderId).
+// Đơn "vừa xong" sau đó chưa có lotId nên KHÔNG tự nhảy vào lô này — nó nằm
+// ở phần "chưa lưu kho" chờ tới lần bấm "Lưu kho" tiếp theo.
+async function saveLot(shown){
+  if(!shown || shown.length === 0) return;
+  const lotId = String(Date.now());
+  const lotSaveBtn = document.getElementById("lotSaveBtn");
+  if(lotSaveBtn) lotSaveBtn.disabled = true;
+  try{
+    for(const t of shown){
+      await updateDoc(doc(db, "tasks", t.id), { lotId, lotAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Lỗi khi lưu kho: " + e.message); }
+  if(lotSaveBtn) lotSaveBtn.disabled = false;
+}
+
 async function markShipped(id, value){
   try{
     // shippedAt ghi lại MỌI LẦN bấm (cả bật lẫn tắt) — dùng làm mốc sắp xếp
@@ -1598,7 +1718,7 @@ async function packWholeOrder(orderId){
   const items = allTasks.filter(t => t.orderId === orderId && t.status === "cho_dong_goi");
   try{
     for(const it of items){
-      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp(), expireAt: computeExpireAt() });
+      await updateDoc(doc(db, "tasks", it.id), { status: "xong", updatedAt: serverTimestamp() });
     }
   }catch(e){ showError("Không đóng gói được cả đơn: " + e.message); }
 }
