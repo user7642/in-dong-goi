@@ -126,6 +126,7 @@
   }
 
   .quicklink{padding:10px 12px 0 12px;}
+
   .quicklink a{
     display:block;
     text-align:center;
@@ -345,7 +346,7 @@
   .icon-btn.note-btn{background:var(--gray-bg);color:var(--text);}
   .icon-btn.note-btn.has-note{background:var(--blue-bg);color:var(--blue);}
   .icon-btn.notify-btn{background:var(--gray-bg);color:var(--text);}
-  .icon-btn.notify-btn.active{background:#fff3cd;color:#b8860b;}
+  .icon-btn.notify-btn.active{background:var(--amber-bg);color:var(--amber);}
   .icon-btn[disabled]{opacity:.6;cursor:default;}
 
   .edit-icon-btn{
@@ -568,12 +569,16 @@ let uploadingShipLabelIds = new Set();
 let expandedOrderIds = new Set();
 // orderId đang mở ô nhập ghi chú (nằm trong khu vực mở rộng ở trên).
 let openOrderNoteIds = new Set();
-// orderId đã BẬT "nhắc đóng gói": khi đơn đó chuyển từ tab "In" sang tab
-// "Đóng gói", trình duyệt sẽ lặp lại thông báo (Notification) mỗi 5 giây cho
-// tới khi bấm nút này lần nữa để tắt. Chỉ lưu ở bộ nhớ phiên (không ghi
-// Firestore) — tắt/mất khi tải lại trang, vì thông báo chỉ có ý nghĩa cho
-// đúng trình duyệt/tab đang mở tại chỗ.
-let notifyPackIds = new Set();
+
+// ---- Cảnh báo "Đơn đã in xong" (chuông lặp mỗi 5s tới khi xác nhận) ----
+// orderId -> intervalId đang chạy — 1 đơn chỉ có tối đa 1 interval, dừng ngay
+// khi đơn được xác nhận (printDoneAcked=true) hoặc không còn pending nữa.
+let printAlertIntervals = new Map();
+// AudioContext dùng chung, chỉ tạo được sau 1 cú click thật của người dùng
+// (autoplay policy của trình duyệt) — xem unlockAudio(), gọi ngay trong cú
+// bấm chuông 🔕→🔔 đầu tiên trên 1 đơn (xem renderOrderExpandPanel), không
+// cần nút riêng.
+let audioCtx = null;
 
 const list = document.getElementById("list");
 const connStatus = document.getElementById("connStatus");
@@ -590,6 +595,154 @@ const downloadAllBtn = document.getElementById("downloadAllBtn");
 function showError(msg){
   errArea.innerHTML = `<div class="errbox">⚠️ ${escapeHtml(msg)}</div>`;
   setTimeout(() => { errArea.innerHTML = ""; }, 6000);
+}
+
+// ---- Xin quyền thông báo trình duyệt + mở khóa âm thanh ----
+// Notification.requestPermission() CHỈ chạy được khi có user gesture thật
+// (không thể tự xin quyền lúc trang load). Gộp chung vào đúng nút chuông
+// 🔕/🔔 trên từng đơn (tab "In") — KHÔNG cần nút riêng: lần bấm 🔕→🔔 ĐẦU
+// TIÊN của người dùng (bất kể ở đơn nào) chính là cú click thật đó, và cũng
+// tiện thể tạo AudioContext ngay trong cú click này để "mở khóa" quyền tự
+// phát âm thanh cho phần còn lại của phiên làm việc (tới khi reload trang) —
+// nếu không làm ở đây, playBeep() gọi từ setInterval() sau này sẽ bị trình
+// duyệt chặn vì không phải trực tiếp từ 1 hành động của người dùng. Các lần
+// bấm sau đó (đơn khác) Notification.permission đã "granted" nên không hỏi
+// lại nữa — trình duyệt tự nhớ theo origin.
+function unlockAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+  if(audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+// Gọi ngay khi người dùng bấm bật (🔕→🔔) cho 1 đơn ở tab "In". Trả về false
+// nếu không xin được quyền (bị từ chối / trình duyệt không hỗ trợ) — trường
+// hợp đó KHÔNG bật notifyOnPrintDone, để tránh bật "khống" mà không báo được.
+async function ensureNotifyPermission(){
+  if(!("Notification" in window)){
+    alert("Trình duyệt này không hỗ trợ thông báo.");
+    return false;
+  }
+  unlockAudio();
+  if(Notification.permission === "denied"){
+    alert("Trình duyệt đang chặn thông báo cho trang này. Vào cài đặt trình duyệt để bật lại quyền thông báo, rồi thử lại.");
+    return false;
+  }
+  if(Notification.permission === "default"){
+    try{
+      const perm = await Notification.requestPermission();
+      if(perm !== "granted") return false;
+    }catch(e){ return false; }
+  }
+  return true;
+}
+
+// Phát 1 tiếng "bíp" ngắn bằng Web Audio API (không cần file âm thanh ngoài,
+// không phụ thuộc mạng) — chỉ phát được nếu audioCtx đã được tạo từ cú click
+// bật chuông đầu tiên (xem unlockAudio() ở trên).
+function playBeep(){
+  if(!audioCtx) return;
+  try{
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.value = 0.15;
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start();
+    setTimeout(() => { try{ o.stop(); }catch(e){} }, 300);
+  }catch(e){}
+}
+
+// Bắn 1 lần cảnh báo cho 1 đơn: tiếng bíp + Notification hệ điều hành. Dùng
+// tag cố định theo orderId + renotify:true để lần bắn sau THAY THẾ notification
+// cũ (không dồn cửa sổ cũ chưa đóng), tránh spam nhiều notification riêng biệt
+// mỗi 5 giây trên màn hình.
+function fireAlert(orderId, orderName){
+  playBeep();
+  if("Notification" in window && Notification.permission === "granted"){
+    try{
+      const n = new Notification("📦 Đơn in xong — cần đóng gói", {
+        body: (orderName ? `Đơn: ${orderName}` : "Đơn chưa đặt tên") + " — bấm vào đây để xác nhận đã thấy.",
+        tag: "print-done-" + orderId,
+        renotify: true
+      });
+      n.onclick = () => { window.focus(); ackPrintDoneAlert(orderId); n.close(); };
+    }catch(e){}
+  }
+}
+
+// Xác nhận đã thấy — dừng chuông cho đơn này (bấm vào Notification hoặc nút
+// chuông 🔔 ngay trên panel mở rộng của đơn đều gọi hàm này).
+async function ackPrintDoneAlert(orderId){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { printDoneAcked: true, updatedAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Không xác nhận được thông báo: " + e.message); }
+}
+
+// Đồng bộ danh sách interval đang chạy theo dữ liệu allTasks hiện tại — gọi
+// mỗi lần render() (tức mỗi lần có thay đổi từ Firestore). Đơn nào có
+// printDoneAcked===false thì phải có 1 interval 5s đang chạy; đơn nào không
+// còn pending (đã ack, hoặc bị xóa/lùi lại) thì dừng interval ngay.
+function syncPrintDoneAlerts(){
+  const pending = new Map(); // orderId -> orderName
+  allTasks.forEach(t => {
+    if(t.printDoneAcked === false){
+      const oid = t.orderId || t.id;
+      if(!pending.has(oid)) pending.set(oid, t.orderName || "");
+    }
+  });
+  for(const [oid, intervalId] of printAlertIntervals){
+    if(!pending.has(oid)){
+      clearInterval(intervalId);
+      printAlertIntervals.delete(oid);
+    }
+  }
+  pending.forEach((orderName, oid) => {
+    if(!printAlertIntervals.has(oid)){
+      fireAlert(oid, orderName); // bắn ngay lần đầu, không chờ 5s
+      printAlertIntervals.set(oid, setInterval(() => fireAlert(oid, orderName), 5000));
+    }
+  });
+}
+
+// Kiểm tra và (nếu đủ điều kiện) kích hoạt cảnh báo cho 1 đơn ngay sau khi
+// đơn đó chuyển hẳn ra khỏi trạng thái "chờ in" — gọi từ advanceOrderItems()
+// (nút "✅ Đã in xong" theo đơn) và từ batchDone (xử lý theo lô, có thể chỉ
+// chọn 1 phần sản phẩm của đơn). advancedIds = id các item VỪA được advance
+// trong lượt gọi này — dùng để loại trừ khỏi kiểm tra "còn sản phẩm nào đang
+// chờ in không", vì allTasks cục bộ có thể chưa kịp cập nhật qua onSnapshot.
+async function maybeTriggerPrintDoneAlert(orderId, advancedIds){
+  const advancedSet = new Set(advancedIds);
+  const items = allTasks.filter(t => t.orderId === orderId);
+  if(items.length === 0) return;
+  const stillPrinting = items.some(t => t.status === "cho_in" && !advancedSet.has(t.id));
+  const wantsAlert = items.some(t => t.notifyOnPrintDone);
+  if(stillPrinting || !wantsAlert) return;
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), {
+        printDoneAlertAt: serverTimestamp(),
+        printDoneAcked: false,
+        notifyOnPrintDone: false, // tự tắt lại — lần "in xong" kế tiếp phải tick lại chủ động
+        updatedAt: serverTimestamp()
+      });
+    }
+  }catch(e){ showError("Không ghi được thông báo in xong: " + e.message); }
+}
+
+// Ghi/gỡ cờ "Báo khi in xong" cho 1 đơn — ghi lặp lên mọi item cùng orderId,
+// giống cơ chế orderName/carrier/note đã có.
+async function setOrderNotifyPrintDone(orderId, value){
+  const items = allTasks.filter(t => t.orderId === orderId);
+  try{
+    for(const it of items){
+      await updateDoc(doc(db, "tasks", it.id), { notifyOnPrintDone: value, updatedAt: serverTimestamp() });
+    }
+  }catch(e){ showError("Không đổi được trạng thái báo in xong: " + e.message); }
 }
 
 // ---- Helper: commit an edit (save) either on explicit click or on click-away ----
@@ -712,32 +865,6 @@ onSnapshot(q, snap => {
 }, err => {
   connStatus.textContent = "Lỗi kết nối: " + err.message;
 });
-
-// ---- Nhắc đóng gói (mỗi 5 giây) ----
-// Với mỗi orderId đang bật trong notifyPackIds: nếu đơn đó hiện đã ở trạng
-// thái "cho_dong_goi" (đã in xong, chuyển sang chờ đóng gói) thì bắn 1
-// Notification trình duyệt. Dùng cùng "tag" cho mỗi đơn để trình duyệt tự
-// thay thông báo cũ bằng thông báo mới thay vì chồng chất nhiều thông báo.
-// Nếu đơn đã rời khỏi trạng thái chờ đóng gói (đã đóng gói xong / bị xóa)
-// thì tự tắt nhắc cho đơn đó luôn.
-setInterval(() => {
-  if(notifyPackIds.size === 0) return;
-  if(!("Notification" in window) || Notification.permission !== "granted") return;
-  let changed = false;
-  notifyPackIds.forEach(orderId => {
-    const task = allTasks.find(t => t.orderId === orderId);
-    if(!task || task.status !== "cho_dong_goi"){
-      notifyPackIds.delete(orderId);
-      changed = true;
-      return;
-    }
-    new Notification("📦 Đơn cần đóng gói", {
-      body: "Đơn " + formatDT(task.createdAt) + " đã in xong, sẵn sàng đóng gói.",
-      tag: "pack-reminder-" + orderId
-    });
-  });
-  if(changed) render();
-}, 5000);
 
 // Lưu ý: từ khi chuyển phiếu giao sang lưu ở Cloudinary, việc xóa file PDF
 // không còn thực hiện được an toàn từ trình duyệt nữa (Cloudinary yêu cầu ký
@@ -1083,6 +1210,11 @@ function countOrdersByStatus(status){
 }
 
 function render(){
+  // Đồng bộ chuông "đơn in xong" — không phụ thuộc tab đang xem, vì người
+  // quản lý có thể đang ở tab khác lúc đơn được đánh dấu in xong. Xác nhận
+  // đã thấy làm ngay trên icon chuông của từng đơn (xem renderOrderExpandPanel).
+  syncPrintDoneAlerts();
+
   const badgeIn = countOrdersByStatus("cho_in");
   const badgeDG = countOrdersByStatus("cho_dong_goi");
   const badgeXong = countOrdersByStatus("xong");
@@ -1480,6 +1612,12 @@ function renderItemSummary(t){
 // dùng cho nút hành động chính trên thẻ tóm tắt ở tab "In".
 async function advanceOrderItems(items){
   for(const t of items) await advanceStatus(t);
+  // Sau khi advance (chỉ có ý nghĩa khi đơn đang rời khỏi "chờ in"), kiểm tra
+  // xem đơn này có đang bật "Báo khi in xong" không — nếu có thì kích hoạt
+  // cảnh báo ngay (maybeTriggerPrintDoneAlert tự bỏ qua nếu không phải tab in
+  // hoặc đơn chưa in xong hoàn toàn).
+  const oid = items[0] && (items[0].orderId || items[0].id);
+  if(oid) await maybeTriggerPrintDoneAlert(oid, items.map(t => t.id));
 }
 
 // Lùi cả đơn (mọi sản phẩm đang hiện ở tab hiện tại) về 1 bước trước — dùng
@@ -1536,38 +1674,46 @@ function renderOrderExpandPanel(g){
     rowEl.appendChild(mkIconBtn("⬆️", "attach-btn", "Tải lên phiếu giao", () => fileInput.click()));
   }
 
-  // Nút "nhắc đóng gói" — bấm lần đầu: xin quyền Notification của trình
-  // duyệt (nếu chưa hỏi) rồi bật nhắc cho đơn này; bấm lần nữa: tắt nhắc.
-  // Việc bắn thông báo lặp lại mỗi 5 giây khi đơn chuyển sang tab "Đóng gói"
-  // nằm ở setInterval phía trên (gần onSnapshot).
-  const notifyOn = notifyPackIds.has(g.orderId);
-  const notifyBtn = mkIconBtn(
-    notifyOn ? "🔔" : "🔕",
-    "notify-btn" + (notifyOn ? " active" : ""),
-    notifyOn ? "Đang bật nhắc đóng gói — bấm để tắt" : "Bật nhắc khi đơn chuyển sang đóng gói",
-    async () => {
-      if(notifyPackIds.has(g.orderId)){
-        notifyPackIds.delete(g.orderId);
-        render();
-        return;
+  // Icon chuông — dùng CHUNG 1 icon cho cả 2 việc, đổi ý nghĩa theo tab:
+  //  - Tab "In": TOGGLE ý định báo (notifyOnPrintDone), mặc định TẮT (🔕).
+  //    Bấm để bật (🔔) — báo hiệu "khi đơn này in xong, hãy báo cho tôi".
+  //  - Các tab khác (Đóng gói/Đã xong): KHÔNG còn là toggle chủ động nữa —
+  //    tự động hiện ON (🔔) khi đơn vừa rời tab "In" và cảnh báo đang chờ
+  //    xác nhận (printDoneAcked=false, đang kêu chuông mỗi 5s). Bấm 1 lần
+  //    vào đây = XÁC NHẬN ĐÃ THẤY, tắt chuông ngay.
+  // Trạng thái này ghi thẳng vào Firestore (không phải biến JS tạm) nên
+  // không bị mất khi tải lại trang hoặc mở ở máy/tab khác.
+  if(currentTab === "in"){
+    const isOn = !!g.notifyOnPrintDone;
+    const notifyBtn = mkIconBtn(
+      isOn ? "🔔" : "🔕",
+      "notify-btn" + (isOn ? " active" : ""),
+      isOn ? "Đang bật báo khi in xong — bấm để tắt" : "Bật báo cho tôi khi đơn này in xong",
+      async () => {
+        if(isOn){
+          await setOrderNotifyPrintDone(g.orderId, false);
+          return;
+        }
+        // Lần bấm 🔕→🔔 — đây chính là cú click thật để xin quyền
+        // Notification (nếu chưa hỏi) + mở khóa âm thanh; chỉ bật cờ khi
+        // xin quyền thành công, tránh bật "khống" mà không báo được.
+        const ok = await ensureNotifyPermission();
+        if(!ok) return;
+        await setOrderNotifyPrintDone(g.orderId, true);
       }
-      if(!("Notification" in window)){
-        alert("Trình duyệt này không hỗ trợ thông báo.");
-        return;
-      }
-      if(Notification.permission === "denied"){
-        alert("Trình duyệt đang chặn thông báo cho trang này. Vào cài đặt trình duyệt để bật lại quyền thông báo.");
-        return;
-      }
-      if(Notification.permission === "default"){
-        const perm = await Notification.requestPermission();
-        if(perm !== "granted") return;
-      }
-      notifyPackIds.add(g.orderId);
-      render();
-    }
-  );
-  rowEl.appendChild(notifyBtn);
+    );
+    rowEl.appendChild(notifyBtn);
+  } else {
+    const hasPendingAlert = g.items.some(t => t.printDoneAcked === false);
+    const notifyBtn = mkIconBtn(
+      hasPendingAlert ? "🔔" : "🔕",
+      "notify-btn" + (hasPendingAlert ? " active" : ""),
+      hasPendingAlert ? "Đang chờ xác nhận — bấm để tắt chuông" : "Không có cảnh báo nào đang chờ",
+      () => { if(hasPendingAlert) ackPrintDoneAlert(g.orderId); }
+    );
+    if(!hasPendingAlert) notifyBtn.disabled = true;
+    rowEl.appendChild(notifyBtn);
+  }
 
   // Nút ghi chú — luôn đặt cuối cùng trong hàng icon.
   const noteBtn = mkIconBtn("📝", "note-btn" + (g.note ? " has-note" : ""), "Ghi chú đơn hàng", () => {
@@ -2015,10 +2161,25 @@ document.getElementById("batchShip").addEventListener("click", async () => {
 
 document.getElementById("batchDone").addEventListener("click", async () => {
   const ids = Array.from(selected);
+  // Ghi nhớ trước khi advance: những orderId nào (nếu đang ở tab "in") cần
+  // kiểm tra kích hoạt cảnh báo sau đó — vì chọn theo lô có thể chỉ chọn 1
+  // phần sản phẩm của 1 đơn, maybeTriggerPrintDoneAlert() sẽ tự kiểm tra đơn
+  // đã in xong HOÀN TOÀN chưa trước khi bắn cảnh báo.
+  const wasInTab = currentTab === "in";
+  const affectedOrderIds = new Set();
+  if(wasInTab){
+    ids.forEach(id => {
+      const t = allTasks.find(x => x.id === id);
+      if(t) affectedOrderIds.add(t.orderId || t.id);
+    });
+  }
   try{
     for(const id of ids){
       const t = allTasks.find(x => x.id === id);
       if(t) await advanceStatus(t);
+    }
+    for(const oid of affectedOrderIds){
+      await maybeTriggerPrintDoneAlert(oid, ids);
     }
   }catch(e){ showError("Lỗi khi xử lý theo lô: " + e.message); }
   selected.clear();
