@@ -5,11 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Quản lý danh mục sản phẩm</title>
 <style>
+  /* ---- Hệ thống theme: DARK MODE là mặc định (khai báo trong :root),
+     LIGHT MODE chỉ bật khi <body> có class .light-theme (do nút chuyển
+     chế độ gắn/gỡ). Toàn bộ phần còn lại của file (kể cả khối "CSS
+     OVERRIDE" phía dưới) đều dùng var(--...) nên chỉ cần đổi giá trị biến
+     ở 2 khối này là toàn trang đổi theme, không cần sửa từng rule. ---- */
   :root{
-    --bg:#f5f6f7; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
-    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --gray-bg:#eceef0;
-    --amber:#b45309; --amber-bg:#fef3e0;
+    --bg:#0f1115; --card:#1a1d23; --border:#2d3138; --text:#e8eaed; --muted:#9aa3af;
+    --blue:#3b82f6; --blue-bg:#1e3a5f; --green:#34d399; --green-bg:#123524; --red:#f87171; --red-bg:#3a1a1a; --gray-bg:#262a32;
+    --amber:#fbbf24; --amber-bg:#3a2f14;
+    --input-bg:#20242b; --overlay-bg:rgba(15,17,21,.97);
+    --glass-bg:rgba(26,29,35,.85); --glass-border:rgba(255,255,255,.08); --hover-bg:rgba(255,255,255,.07);
+    --shadow:rgba(0,0,0,.45);
     --maxw:680px;
+  }
+  body.light-theme{
+    --bg:#f0f2f5; --card:#ffffff; --border:#e2e4e7; --text:#1a1d21; --muted:#6b7280;
+    --blue:#2563eb; --blue-bg:#eaf1ff; --green:#15803d; --green-bg:#e8f7ec; --red:#dc2626; --red-bg:#fde8e8; --gray-bg:#eceef0;
+    --amber:#b45309; --amber-bg:#fef3e0;
+    --input-bg:#f9fafb; --overlay-bg:rgba(255,255,255,.97);
+    --glass-bg:rgba(255,255,255,.85); --glass-border:rgba(255,255,255,.3);
+    --hover-bg:rgba(0,0,0,.05);
+    --shadow:rgba(0,0,0,.12);
+  }
+  /* Nút tròn chuyển chế độ sáng/tối — cố định góc trên-phải màn hình, luôn
+     thấy được dù cuộn trang, không chồng lấn lên tiêu đề/tabs vì header
+     canh giữa với --maxw còn nút này neo theo viewport. */
+  .theme-toggle{
+    position:fixed;top:14px;right:14px;z-index:40;
+    width:40px;height:40px;border-radius:50%;
+    background:var(--card);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;line-height:1;cursor:pointer;padding:0;
+    box-shadow:0 2px 10px var(--shadow);
+    transition:transform .2s ease,background-color .2s ease;
+  }
+  @media (hover:hover) and (pointer:fine){
+    .theme-toggle:hover{transform:scale(1.08) rotate(8deg);}
+  }
+  @media (max-width:420px){
+    .theme-toggle{width:34px;height:34px;font-size:15px;top:10px;right:10px;}
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
@@ -30,8 +65,9 @@
   h2{font-size:15px;margin:0 0 10px 0;font-weight:600;}
   input[type=text],textarea,select{
     width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;
+    background:var(--input-bg);color:var(--text);
   }
-  select{margin-bottom:6px;background:#fff;}
+  select{margin-bottom:6px;background:var(--card);color:var(--text);}
   textarea{min-height:130px;resize:vertical;line-height:1.5;}
   .row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
   .row-nowrap{flex-wrap:nowrap;}
@@ -43,27 +79,13 @@
   .searchbox{margin-bottom:10px;}
 
   .errbox{
-    background:#fde8e8;color:var(--red);border:1px solid #f5b8b8;border-radius:8px;
+    background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:8px;
     padding:8px 12px;font-size:13px;margin-bottom:10px;
   }
 
   /* Toolbar nổi trong phần header — dùng chung cho cả 2 tab, không cần tự
      sticky riêng nữa vì đã nằm bên trong thẻ header (header đã sticky top:0). */
   .header-toolbar{margin-top:10px;}
-  #gomRow{margin-bottom:4px;}
-  /* Khi chưa bấm "Gom sản phẩm", nút này đứng 1 mình trong hàng — cho nó
-     chiếm trọn chiều rộng thay vì co lại và lệch sang trái trông mất cân đối.
-     Khi đã kích hoạt (.active) thì trở lại kích thước tự nhiên để chia chỗ
-     với ô nhập tên đơn + nút Xong. */
-  #gomBtn:not(.active){width:100%;}
-  #groupNameInput{flex:1;min-width:160px;}
-  #gomStatusLine{
-    font-size:12.5px;color:var(--blue);margin-bottom:2px;font-weight:600;
-  }
-  #gomBar.active{
-    background:var(--blue-bg);border:1px solid var(--blue);border-radius:10px;
-    padding:10px 10px 6px;
-  }
 
   /* Action bar (giống bảng sản phẩm sàn TMĐT) */
   .action-bar{
@@ -111,11 +133,21 @@
   /* ---- Chế độ xem LƯỚI (chỉ ở tab Thêm việc) ----
      Masonry bằng CSS columns: mỗi thẻ cao theo đúng nội dung của nó, không
      bị kéo giãn theo hàng dài nhất như CSS Grid thường -> không vỡ layout
-     khi sản phẩm có 2 tầng phân loại xen với sản phẩm 1 tầng/không phân loại. */
+     khi sản phẩm có 2 tầng phân loại xen với sản phẩm 1 tầng/không phân loại.
+     Màu sắc/hiệu ứng của thẻ (.gcard) TÁCH RIÊNG theo theme (2 khối bên
+     dưới) — chế độ danh sách và chế độ ảnh KHÔNG bị ảnh hưởng bởi khối
+     này, vẫn giữ nguyên như cũ. */
   .grid-container{column-width:190px;column-gap:8px;}
-  .gcard{break-inside:avoid;margin-bottom:8px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 10px;}
+  .gcard{
+    position:relative;break-inside:avoid;margin-bottom:8px;
+    border-radius:12px;padding:9px 10px;overflow:hidden;
+    transition:transform .4s cubic-bezier(.175,.885,.32,1.275),border-color .4s,box-shadow .4s,background-color .2s,color .2s;
+  }
   .gcard-title{font-size:13px;font-weight:700;margin-bottom:6px;line-height:1.3;}
   .gcard .option-wrap{display:flex;flex-wrap:wrap;gap:5px;}
+  @media (max-width:420px){
+    .gcard .option-wrap{justify-content:flex-end;}
+  }
   /* Mỗi nhóm tầng 1 hiển thị 1 hàng ngang: nhãn bên trái, chip bên phải,
      khít khao thay vì nhãn chiếm hẳn 1 dòng riêng như bên list view. */
   .gsub-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:5px;}
@@ -125,6 +157,87 @@
   .gcard .vchip{font-size:12px;padding:4px 6px 4px 9px;margin:2px 3px 2px 0;}
   .gcard .vchip .qtytag{padding:1px 1px;}
   .gcard .vchip .chipminus,.gcard .vchip .chipx{margin-left:3px;padding:1px 5px;}
+
+  /* --- Xem LƯỚI + DARK MODE (mặc định) ----
+     Vẫn giữ phong cách "high-tech" nhưng đã giảm độ chói của cyan so với
+     bản trước: viền/góc/hiệu ứng quét sáng mờ hơn, glow khi hover nhẹ hơn
+     nhiều (trước: rgba(0,255,255,.6) viền + box-shadow 0.2 độ mờ; nay:
+     .35 và .08). */
+  body:not(.light-theme) .gcard{
+    background:#1a1a1a;color:#fff;
+    border:1px solid rgba(0,255,255,.12);
+  }
+  body:not(.light-theme) .gcard:hover{
+    transform:translateY(-6px) scale(1.015);z-index:3;
+    border-color:rgba(0,255,255,.35);
+    box-shadow:0 8px 20px rgba(0,255,255,.08),0 0 10px rgba(0,255,255,.05);
+  }
+  body:not(.light-theme) .gcard::before{
+    content:"";position:absolute;top:0;left:0;width:15px;height:15px;
+    border-top:2px solid rgba(0,255,255,.45);border-left:2px solid rgba(0,255,255,.45);
+    border-top-left-radius:12px;opacity:.4;z-index:2;pointer-events:none;
+  }
+  body:not(.light-theme) .gcard::after{
+    content:"";position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+    background:linear-gradient(45deg,transparent,rgba(0,255,255,.05),transparent);
+    transform:rotate(45deg);transition:.6s;pointer-events:none;
+  }
+  body:not(.light-theme) .gcard:hover::after{left:100%;top:100%;}
+  body:not(.light-theme) .gcard-title{color:#fff;}
+  body:not(.light-theme) .gcard .gsub-label{color:rgba(255,255,255,.55);} /* var(--muted) quá tối, khó đọc trên nền đen của .gcard */
+  /* Chip màu xanh lá trong lưới tối trước đây dùng thẳng var(--green)
+     (#34d399) trên nền tối -> quá chói. Giảm độ bão hoà/độ sáng bằng
+     color-mix (trộn thêm --muted) để chữ vẫn đọc được nhưng dịu mắt hơn;
+     KHÔNG đổi biến --green toàn cục để không ảnh hưởng nơi khác (list/ảnh). */
+  body:not(.light-theme) .gcard .vchip:not(.selected):not(.static){
+    color:color-mix(in srgb, var(--green) 62%, var(--muted) 38%);
+    background:rgba(52,211,153,.09);
+  }
+  body:not(.light-theme) .gcard .vchip.selected{
+    background:color-mix(in srgb, var(--blue) 82%, #000 18%);
+  }
+
+  /* --- Xem LƯỚI + LIGHT MODE ---- */
+  body.light-theme .gcard::before,
+  body.light-theme .gcard::after{content:none;} /* bỏ góc/quét sáng cyan — không hợp giao diện phẳng, sáng */
+  body.light-theme .grid-container .gcard{
+    background-color:#ffffff !important;
+    color:#334155 !important;
+    border:1px solid #e2e8f0 !important;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.05) !important;
+    border-radius:12px !important;
+    padding:12px !important;
+    transition:transform .2s ease,box-shadow .2s ease !important;
+  }
+  body.light-theme .grid-container .gcard:hover{
+    transform:translateY(-4px);
+    box-shadow:0 10px 15px -3px rgba(0,0,0,.1) !important;
+  }
+  body.light-theme .grid-container .gcard-title{
+    color:#1e293b !important;
+    font-weight:700 !important;
+    margin-bottom:10px !important;
+    font-size:1.05rem !important;
+  }
+  body.light-theme .grid-container .vchip{
+    background-color:#f1f5f9 !important;
+    color:#475569 !important;
+    border:1px solid #cbd5e1 !important;
+    font-weight:500 !important;
+    border-radius:6px !important;
+  }
+  body.light-theme .grid-container .vlabel{
+    color:#64748b !important;
+  }
+  /* Rule .vchip !important ở trên đè luôn cả trạng thái .selected (vì
+     !important thắng bất kể độ đặc thù) -> chip vừa chọn ở Light Mode lưới
+     không đổi màu. Thêm rule riêng cho .selected, đặt SAU nên thắng. */
+  body.light-theme .grid-container .vchip.selected{
+    background-color:var(--blue) !important;
+    color:#fff !important;
+    border-color:var(--blue) !important;
+  }
+
 
   /* ---- Bộ 3 nút chuyển chế độ xem (☰ list / ▦ lưới chip / 🖼 ảnh) ---- */
   .viewSwitch{display:flex;gap:4px;}
@@ -139,28 +252,72 @@
      - Điện thoại (không hover): chạm vào ảnh -> bật class .open bằng JS,
        chạm ra ngoài -> tự đóng (xử lý ở listener click ngoài trang, dùng
        chung cơ chế với việc bỏ ghim chip hiện có). */
-  .img-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
-  @media (max-width:420px){ .img-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
-  .img-card{display:flex;flex-direction:column;}
-  .img-thumb{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:var(--gray-bg);border:1px solid var(--border);cursor:pointer;}
-  .img-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .img-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
+  @media (max-width:420px){ .img-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;} }
+  /* Thẻ card: viền bao toàn bộ + nền theo theme (giống card sàn TMĐT) */
+  .img-card{
+    background:var(--card);border:1px solid var(--border);border-radius:8px;
+    overflow:hidden;display:flex;flex-direction:column;
+    transition:box-shadow .2s ease,border-color .2s ease;
+  }
+  .img-card:hover{box-shadow:0 2px 10px var(--shadow);border-color:var(--blue);}
+  .img-thumb{position:relative;width:100%;aspect-ratio:1/1;border-bottom:1px solid var(--border);background:var(--gray-bg);cursor:pointer;}
+  .img-thumb img{width:100%;height:100%;object-fit:cover;object-position:center;display:block;}
   .img-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--muted);}
-  .img-badge{position:absolute;top:6px;right:6px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;}
-  .img-name{font-size:12.5px;font-weight:600;margin-top:6px;text-align:center;line-height:1.3;}
+  /* Tên sp: căn giữa, rút gọn 1 dòng.
+     - Desktop (có chuột thật): hover -> tooltip hiện tên đầy đủ (::after/::before).
+     - Mobile (không hover): chạm vào tên -> JS gắn class .expanded, tên xuống
+       dòng đầy đủ và thẻ tự giãn chiều cao (không dùng tooltip vì cảm ứng
+       không có "hover" thật). */
+  .img-name{
+    font-size:12.5px;font-weight:600;padding:8px 8px;text-align:center;line-height:1.35;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;cursor:pointer;
+  }
+  .img-name.expanded{white-space:normal;overflow:visible;text-overflow:clip;}
+  @media (hover:hover) and (pointer:fine){
+    .img-name::after{
+      content:attr(title);position:absolute;bottom:100%;left:50%;
+      transform:translateX(-50%) translateY(-6px);
+      background:var(--text);color:var(--bg);
+      padding:7px 10px;border-radius:6px;font-size:12px;font-weight:500;
+      white-space:normal;width:max-content;max-width:220px;
+      box-shadow:0 4px 12px var(--shadow);
+      opacity:0;visibility:hidden;pointer-events:none;
+      transition:opacity .15s,transform .15s;z-index:20;
+    }
+    .img-name::before{
+      content:"";position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+      border:6px solid transparent;border-top-color:var(--text);
+      opacity:0;visibility:hidden;transition:opacity .15s;z-index:20;
+    }
+    .img-name:hover::after,.img-name:hover::before{opacity:1;visibility:visible;}
+    .img-name:hover::after{transform:translateX(-50%) translateY(-2px);}
+  }
   .img-overlay{
-    position:absolute;inset:0;background:rgba(255,255,255,.97);
-    display:flex;align-items:center;justify-content:center;padding:8px;
+    position:absolute;inset:0;background:var(--overlay-bg);
+    display:flex;align-items:center;justify-content:center;padding:10px;
     opacity:0;pointer-events:none;transition:opacity .12s;overflow:auto;
   }
   .img-card.open .img-overlay{opacity:1;pointer-events:auto;}
   @media (hover:hover) and (pointer:fine){
     .img-card:hover .img-overlay{opacity:1;pointer-events:auto;}
   }
-  .img-overlay-inner{width:100%;}
-  .img-overlay .option-wrap{justify-content:center;}
-  .img-overlay .vchip{font-size:11.5px;padding:4px 6px 4px 8px;margin:2px;}
-  .img-overlay .gsub-row{flex-direction:column;align-items:flex-start;gap:2px;margin-top:6px;}
-  .img-overlay .gsub-opts{justify-content:flex-start;}
+  /* Trong overlay ảnh: bỏ hẳn số thứ tự đơn trong chip (chỉ hữu ích ở list/lưới
+     chip, trong overlay nhỏ nó gây rối mắt) và canh chip đều nhau bằng `gap`
+     (thay cho margin lệch trên từng chip) để phân loại nào cũng cách đều nhau,
+     dù có bao nhiêu chip trên 1 hàng hay xuống mấy dòng. */
+  .img-overlay-inner{width:100%;display:flex;flex-direction:column;gap:10px;}
+  .img-overlay .orderNumTag{display:none;}
+  /* .option-wrap chỉ được display:flex ở rule ".gcard .option-wrap" (chế độ
+     lưới chip) — trong overlay ảnh nó vẫn là display:block mặc định, khiến
+     justify-content/gap bị trình duyệt bỏ qua hoàn toàn (đây là nguyên nhân
+     chip bị lệch trái, không đều). Khai báo display:flex riêng ở đây để
+     justify-content/align-items/gap thực sự có hiệu lực. */
+  .img-overlay .option-wrap{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;margin:0;width:100%;}
+  .img-overlay .vchip{display:inline-flex;justify-content:center;font-size:11.5px;padding:4px 8px;margin:0;min-width:38px;}
+  .img-overlay .gsub-row{flex-direction:column;align-items:center;gap:5px;margin-top:0;}
+  .img-overlay .gsub-label{width:100%;text-align:center;}
+  .img-overlay .gsub-opts{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;margin:0;width:100%;}
   .muted{color:var(--muted);font-size:13px;}
 
   .item .linkchip{color:var(--blue);text-decoration:none;font-size:13px;margin-left:2px;}
@@ -170,7 +327,7 @@
   }
   .linkEditBox input{margin-bottom:6px;}
   .imgPreviewBox{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-height:20px;}
-  .imgPreview{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:#fff;}
+  .imgPreview{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);background:var(--card);}
   .imgPreviewMsg{font-size:12px;}
 
   /* Nhiều tầng phân loại (VD: Chủ đề x Kích thước) */
@@ -191,26 +348,76 @@
   .status.ok{color:var(--green);}
   .status.err{color:var(--red);}
 
+  /* Taskbar dạng "floating glassmorphism" — nổi lơ lửng, bo tròn, nền mờ
+     kính. Rộng bằng đúng khối nội dung chính (main, xem override
+     width:800px/max-width:95vw ở khối CSS override bên dưới) — không còn
+     tự co theo nội dung như trước, để 3 khối chia đều nhau và thẳng hàng
+     với 2 mép của main.
+     LƯU Ý QUAN TRỌNG: vẫn dùng SELECTOR CLASS .taskbar (không đổi sang
+     #taskbar) và vẫn giữ display:none / .taskbar.show{display:flex} —
+     nếu khai báo display trong 1 rule #taskbar (id, specificity cao hơn
+     class) sẽ đè luôn display:none mặc định, khiến taskbar HIỆN VĨNH VIỄN
+     bất kể đang ở tab nào (mất hẳn cơ chế ẩn/hiện theo mode ở JS ~dòng 1675). */
   .taskbar{
-    position:fixed;bottom:0;left:0;right:0;background:var(--green);color:#fff;
-    padding:10px 12px;display:none;align-items:center;gap:8px;z-index:30;
-    max-width:var(--maxw);margin:0 auto;border-radius:12px 12px 0 0;
+    position:fixed;bottom:20px;left:50%;
+    transform:translateX(-50%);
+    width:800px;max-width:95vw;
+    background-color:var(--glass-bg);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    color:var(--text);
+    padding:8px 12px;display:none;align-items:stretch;gap:4px;z-index:1000;
+    margin:0;border-radius:24px;
+    border:1px solid var(--glass-border);
+    box-shadow:0 8px 32px var(--shadow),0 1px 2px var(--shadow);
   }
   .taskbar.show{display:flex;}
-  .taskbar button{border:none;border-radius:8px;padding:11px 12px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:var(--green);}
-  /* Nút "Xem đã chọn": chỉ icon + số lượng, kích thước cố định theo nội dung
-     (không flex:1) — để nút hành động chính bên cạnh luôn có đủ chỗ, tránh
-     bị bóp chữ xuống nhiều dòng xấu khi màn hình hẹp (xem góp ý thiết kế). */
-  .taskbar .viewBtn{
-    flex:0 0 auto;display:flex;align-items:center;gap:6px;white-space:nowrap;
-    background:transparent;border:1px solid rgba(255,255,255,.65);color:#fff;
+  /* 3 khối (Xem danh sách / Thêm vào index / Gom sản phẩm) chia đều chiều
+     rộng bằng flex:1 — không còn co theo nội dung như bản pill trước đây. */
+  .taskbar .tbItem{
+    flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;
+    background:transparent;border:none;padding:10px 8px;font-size:13px;font-weight:600;
+    border-radius:16px;color:var(--text);cursor:pointer;position:relative;
+    transition:background-color .2s ease,transform .2s ease;
   }
-  .taskbar .viewBtn .countBadge{
-    background:rgba(255,255,255,.25);border-radius:999px;
-    min-width:22px;height:22px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:13px;
+  @media (hover:hover) and (pointer:fine){
+    .taskbar .tbItem:hover{background-color:var(--hover-bg);transform:translateY(-2px);}
   }
-  .taskbar #sendToIndexBtn{flex:1;min-width:0;}
+  .taskbar .tbIcon{font-size:16px;line-height:1;flex-shrink:0;}
+  .taskbar .tbLabel{
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;line-height:1.2;
+  }
+  .taskbar .countBadge{
+    background:var(--blue-bg);color:var(--blue);border-radius:999px;
+    min-width:20px;height:20px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:12px;flex-shrink:0;
+  }
+  /* Khối "Gom sản phẩm": bình thường là 1 nút icon+chữ như 2 khối kia.
+     Khi bật gom (gomMode) -> nút Gom đổi chữ thành "Hủy" (vẫn icon 📦, đổi
+     màu xanh dương báo hiệu đang active — xem .tbGomBtn.active) và nút
+     "✅ Xong" hiện ra cạnh nó — cả 2 chia đôi phần chiều rộng của khối thứ 3
+     (vẫn giữ tổng 3 khối bằng nhau). */
+  .taskbar .tbGomGroup{
+    flex:1;min-width:0;display:flex;align-items:stretch;gap:2px;padding:0;
+  }
+  .taskbar .tbGomBtn{
+    flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;
+    background:transparent;border:none;padding:10px 6px;font-size:13px;font-weight:600;
+    border-radius:16px;color:var(--green);cursor:pointer;position:relative;
+    transition:background-color .2s ease,transform .2s ease;
+  }
+  @media (hover:hover) and (pointer:fine){
+    .taskbar .tbGomBtn:hover{background-color:var(--hover-bg);}
+  }
+  .taskbar .tbGomBtn.active{background:var(--blue-bg);color:var(--blue);}
+  .taskbar #gomDoneBtn{color:var(--green);}
+  /* Điện thoại / màn hẹp: không đủ chỗ cho chữ + icon trên cả 3 khối cùng
+     lúc -> ẩn hẳn phần chữ (.tbLabel), chỉ giữ icon (+ badge số lượng) để
+     tránh vỡ layout hoặc chữ bị bóp/xuống dòng chồng nhau. */
+  @media (max-width:420px){
+    .taskbar .tbLabel{display:none;}
+    .taskbar .tbItem, .taskbar .tbGomBtn{padding:10px 4px;gap:0;}
+  }
+
 
   /* Modal xem danh sách đã chọn */
   .selgroup{margin-bottom:14px;}
@@ -221,7 +428,7 @@
   .selrow .selremove{background:var(--gray-bg);color:var(--red);font-size:12px;padding:5px 9px;flex-shrink:0;}
 
   .editor-overlay{
-    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:50;
+    position:fixed;top:0;bottom:0;left:0;right:0;background:var(--bg);z-index:1001;
     display:none;flex-direction:column;padding:14px;
     max-width:var(--maxw);margin:0 auto;
   }
@@ -232,10 +439,282 @@
   .editor-overlay .editor-actions{display:flex;gap:8px;margin-top:12px;}
   .editor-overlay .editor-actions button{flex:1;padding:13px;font-size:15px;}
 
+  /* 3 mốc điểm ngắt cho khối "Sản phẩm đã chọn" (#selectedOverlay):
+     - Mobile (<768px): overlay che toàn màn hình như cũ (rule .editor-overlay gốc).
+     - Tablet (768px–1249px): panel trượt ra từ mép trái khi rê chuột vào,
+       thụt vào khi rê chuột ra ngoài (xem khối @media ngay dưới đây) —
+       tránh chiếm nguyên màn hình rộng mà trông trống trải.
+     - Desktop (≥1250px): panel ghim cố định góc dưới-trái, đứng yên khi cuộn
+       (position:fixed, không nằm trong cột nội dung --maxw căn giữa) —
+       không đè lên khu vực danh sách sản phẩm chính vì ở độ rộng này
+       khoảng trống 2 bên cột nội dung đã đủ chỗ cho panel. */
+  @media (min-width:768px) and (max-width:1249px){
+    #selectedOverlay.show{
+      top:0;left:0;right:auto;bottom:0;margin:0;
+      width:60%;max-width:420px;min-width:300px;
+      max-height:none;height:100vh;
+      border-radius:0 16px 16px 0;
+      background:var(--card);border:1px solid var(--border);border-left:none;
+      box-shadow:0 8px 28px rgba(0,0,0,.18);
+      transform:translateX(calc(-100% + 16px));
+      transition:transform .22s ease;
+    }
+    #selectedOverlay.show:hover{
+      transform:translateX(0);
+    }
+    /* Tay nắm hình tròn ló ra ở mép trái màn hình để báo hiệu có thể rê
+       chuột vào mở panel — nằm đè lên đúng phần 16px còn lộ ra khi thu gọn. */
+    #selectedOverlay.show::after{
+      content:"📋";
+      position:absolute;top:50%;right:0;
+      transform:translate(50%,-50%);
+      width:34px;height:34px;line-height:34px;text-align:center;
+      background:var(--blue);color:#fff;border-radius:50%;
+      box-shadow:0 2px 8px rgba(0,0,0,.25);font-size:16px;
+    }
+    #selectedOverlay.show #selectedListBody{max-height:calc(100vh - 140px);}
+  }
+
+  @media (min-width:1250px){
+    #selectedOverlay{
+      top:auto;left:16px;right:auto;bottom:16px;
+      width:280px;max-width:280px;margin:0;
+      max-height:70vh;border-radius:14px;
+      background:var(--card);border:1px solid var(--border);
+      box-shadow:0 8px 28px rgba(0,0,0,.16);
+      padding:14px 14px 12px;
+    }
+    #selectedOverlay #selectedListBody{max-height:calc(70vh - 120px);}
+    #selectedOverlay .editor-actions{margin-top:10px;}
+  }
+
   footer{text-align:center;padding:18px 14px 28px;max-width:var(--maxw);margin:0 auto;}
+
+/* ============================================================
+   ---- KHỐI CSS OVERRIDE (thử nghiệm từ AI ngoài — glassmorphism
+   & bố cục 800px căn giữa + responsive mobile) ----
+   Đặt SAU cùng và dùng !important để đảm bảo đè lên toàn bộ CSS
+   gốc phía trên, không cần sửa các rule gốc.
+   ============================================================ */
+/* --- 1. Reset & Cấu trúc căn giữa --- */
+body {
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+  line-height: 1.6 !important;
+  transition: background-color .2s ease,color .2s ease !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* --- 2. Header hiện đại (tĩnh — không sticky/nổi, cuộn cùng trang như main) --- */
+header {
+  width: 800px !important;
+  max-width: 95vw !important;
+  margin: 0 auto 24px !important;
+  padding: 16px 20px !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  background: var(--card) !important;
+  border-bottom: none !important;
+  box-shadow: 0 4px 6px -1px var(--shadow) !important;
+  border-radius: 16px !important;
+  transition: background-color .2s ease !important;
+}
+
+header h1 {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  text-align: center !important;
+  margin: 0 0 12px 0 !important;
+}
+
+/* --- 3. Bố cục nội dung chính (Main & Cards) ---
+   LƯU Ý: không đặt padding ngang ở đây — main > section đã có width:100%
+   nên nếu main có padding trái/phải, mọi section bên trong sẽ bị hẹp hơn
+   header 1 khoảng đúng bằng 2 lần padding đó, làm mép trái/phải của card
+   header và card danh sách sản phẩm KHÔNG thẳng hàng (lỗi đã gặp — xem
+   ảnh chụp màn hình người dùng gửi). Khoảng cách 2 bên section tự lo bằng
+   padding riêng của .section (24px) là đủ. */
+main {
+  width: 800px !important;
+  max-width: 95vw !important;
+  margin: 24px auto !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+main > section {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 6px -1px var(--shadow) !important;
+  border-radius: 16px !important;
+  margin-bottom: 24px !important;
+  padding: 24px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transition: background-color .2s ease,border-color .2s ease !important;
+}
+
+/* --- 4. Thành phần giao diện (chỉ áp cho .tabs — KHÔNG áp chung cho mọi
+   <button>, vì .vchip/.orderBtn/.editBtn/.delBtn/.vswBtn/.groupImgBtn...
+   đều là <button> và có hệ màu riêng (xanh lá=chưa chọn, xanh dương=đã
+   chọn, xám=tĩnh/icon) — nếu ép !important lên "button" nói chung sẽ xóa
+   sạch mọi phân biệt màu đó. Xem thảo luận trong hội thoại.) --- */
+.tabs > * {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tabs > *:hover {
+  background-color: #2563eb !important;
+  transform: translateY(-1px) !important;
+}
+
+.tabs {
+  display: flex !important;
+  gap: 10px !important;
+  justify-content: center !important;
+  margin-top: 10px !important;
+}
+
+.tab.active{ background-color:#2563eb !important; }
+
+/* Toolbar quản lý (Sắp xếp / Xóa / Chọn tất cả) — nay nằm trong section
+   danh sách sản phẩm thay vì header, nhóm lại thành 1 khối có khung riêng
+   cho rõ ngữ cảnh. Xếp DỌC (không dùng display:flex hàng ngang) vì bên
+   trong là 3 hàng chức năng khác nhau (sắp xếp / xóa hàng loạt / chọn tất
+   cả), ép thành 1 hàng ngang sẽ bị bóp chật trên màn hình hẹp. */
+#modern-manage-toolbar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 12px 0 !important;
+  margin-bottom: 4px !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+#modern-manage-toolbar .header-toolbar { margin-top: 0 !important; }
+
+textarea, input.searchbox {
+  width: 100% !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  font-size: 14px !important;
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+  box-sizing: border-box !important;
+}
+
+textarea:focus, input.searchbox:focus {
+  outline: none !important;
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+.muted {
+  color: var(--muted) !important;
+  font-size: 0.875rem !important;
+}
+
+/* --- 5. Tối ưu hóa cho MOBILE (Dưới 800px) --- */
+@media (max-width: 800px) {
+  body {
+    align-items: stretch !important;
+  }
+
+  header, main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    border-radius: 0 !important;
+  }
+
+  header h1 { font-size: 1.1rem !important; }
+
+  .tabs {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .tabs > * { font-size: 13px !important; }
+
+  main > section {
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  textarea, input.searchbox {
+    font-size: 16px !important; /* Tránh auto-zoom iOS */
+  }
+
+  /* Màn hẹp hơn (≤800px, gồm cả điện thoại): bớt padding/cỡ chữ cho đỡ chật.
+     Việc ẩn hẳn chữ khi quá hẹp đã xử lý riêng ở @media(max-width:420px)
+     cạnh rule gốc .taskbar. */
+  .taskbar{ max-width:calc(100% - 16px); }
+  .taskbar .tbItem, .taskbar .tbGomBtn{ padding:9px 8px;font-size:12.5px; }
+
+  #modern-manage-toolbar {
+    padding: 10px 0 !important;
+  }
+  #modern-manage-toolbar .action-bar {
+    /* Trên mobile, khối "Đã chọn N — Xóa" nổi cố định đáy màn hình để luôn
+       thao tác được dù đã cuộn xa xuống danh sách. KHÔNG ép display:flex
+       !important ở đây — để JS (dòng cập nhật manageActionBar.style.display)
+       toàn quyền ẩn/hiện theo đúng tab/mode; nếu ép flex, thanh này sẽ luôn
+       nổi kể cả ở tab "Thêm việc", che mất nút liên quan đến tab đó. */
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: var(--card) !important;
+    padding: 12px !important;
+    box-shadow: 0 -2px 10px var(--shadow) !important;
+    z-index: 999 !important;
+    border-radius: 12px 12px 0 0 !important;
+    justify-content: space-between !important;
+    margin-bottom: 0 !important;
+  }
+}
+
+/* ---- State machine theo tab: body[data-current-mode] do applyModeUI() cập
+   nhật (JS chỉ set 1 thuộc tính duy nhất), CSS tự quyết định ẩn/hiện —
+   không cần JS can thiệp style.display riêng cho từng phần tử này nữa. ---- */
+#sortModeBtn, #productListHeading, #viewSwitch { display: none !important; }
+body[data-current-mode="manage"] #sortModeBtn { display: inline-flex !important; }
+body[data-current-mode="manage"] #productListHeading { display: block !important; }
+/* #viewSwitch chỉ có tác dụng ở tab "Thêm việc" (chọn list/lưới/ảnh để
+   thêm sản phẩm) — tab "Quản lý" luôn cố định list view nên không cần nút
+   này, giữ đúng hành vi cũ, chỉ đổi cách cài đặt sang CSS. */
+body[data-current-mode="task"] #viewSwitch { display: flex !important; }
 </style>
 </head>
 <body>
+
+<button class="theme-toggle" id="themeToggleBtn" type="button" title="Chuyển chế độ sáng/tối" aria-label="Chuyển chế độ sáng/tối">🌙</button>
 
 <header>
   <a class="back" href="index.html">← Về trang chính</a>
@@ -245,27 +724,6 @@
     <div class="tab" data-mode="manage">🗂 Quản lý danh mục</div>
   </div>
 
-  <div id="gomBar" class="header-toolbar">
-    <div class="row" id="gomRow">
-      <button class="btn-outline" id="gomBtn" type="button">📦 Gom sản phẩm</button>
-      <input type="text" id="groupNameInput" placeholder="Tên đơn (bỏ trống dùng mã tự sinh)" style="display:none;">
-      <button class="btn-green" id="gomDoneBtn" type="button" style="display:none;">✅ Xong</button>
-    </div>
-    <div id="gomStatusLine" style="display:none;"></div>
-  </div>
-
-  <div class="row header-toolbar" id="sortModeRow" style="display:none;">
-    <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
-  </div>
-
-  <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
-    <span id="selCount">Đã chọn 0 sản phẩm</span>
-    <button class="del-btn" id="topDelBtn">Xóa</button>
-  </div>
-  <div class="selectall header-toolbar" id="selectAllRow" style="display:none;">
-    <input type="checkbox" id="selectAllBox">
-    <span>Chọn tất cả</span>
-  </div>
 </header>
 
 <main>
@@ -277,7 +735,8 @@
       1) Không phân loại: <b>Tên sản phẩm</b><br>
       2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
       3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
-      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.
+      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.<br>
+      ⚠️ Dấu <b>|</b> và <b>,</b> luôn được hiểu là dấu phân cách — không dùng chúng bên trong tên sản phẩm hay tên 1 lựa chọn (kể cả số thập phân, vd viết "21.5" thay vì "21,5" để tránh bị tách thành 2 lựa chọn riêng).
     </p>
     <textarea id="bulkInput" placeholder="Bút chì màu 12 màu&#10;Lược sử Việt Nam | A0, A1, A2, A3&#10;Bộ tranh kỹ năng an toàn | An toàn trong nhà, An toàn ngoài trời | A2 (60x42 cm), A3 (42x30 cm)"></textarea>
     <div class="row row-nowrap" style="margin-top:8px;">
@@ -289,17 +748,34 @@
 
   <section>
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h2 style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
-      <div class="row row-nowrap" style="gap:6px;margin:0;">
-        <div class="viewSwitch" id="viewSwitch">
-          <button class="vswBtn" data-view="list" type="button" title="Xem danh sách">☰</button>
-          <button class="vswBtn" data-view="grid" type="button" title="Xem lưới">▦</button>
-          <button class="vswBtn" data-view="image" type="button" title="Xem ảnh">🖼</button>
-        </div>
-        <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
+      <div class="viewSwitch" id="viewSwitch">
+        <button class="vswBtn" data-view="list" type="button" title="Xem danh sách">☰</button>
+        <button class="vswBtn" data-view="grid" type="button" title="Xem lưới">▦</button>
+        <button class="vswBtn" data-view="image" type="button" title="Xem ảnh">🖼</button>
       </div>
+      <h2 id="productListHeading" style="margin:0;">Danh sách sản phẩm hiện có (<span id="totalCount">0</span>)</h2>
+      <button class="btn-outline" id="exportBtn" type="button" style="padding:6px 12px;font-size:13px;">📤 Xuất</button>
     </div>
     <input type="text" class="searchbox" id="searchBox" placeholder="Tìm theo tên hoặc phân loại...">
+
+    <!-- Toolbar chức năng quản lý (Sắp xếp / Xóa hàng loạt / Chọn tất cả) —
+         chỉ hiển thị khi ở tab "Quản lý danh mục", do applyModeUI() điều
+         khiển hiển thị từng #id con y hệt như khi còn nằm trong <header>,
+         không cần JS mới. Đặt tại đây (thay vì trong header) để nhóm đúng
+         ngữ cảnh với danh sách sản phẩm mà nó thao tác. -->
+    <div id="modern-manage-toolbar">
+      <div class="row header-toolbar" id="sortModeRow" style="display:none;">
+        <button class="btn-outline" id="sortModeBtn" type="button">🔀 Sắp xếp</button>
+      </div>
+      <div class="action-bar header-toolbar" id="manageActionBar" style="display:none;">
+        <span id="selCount">Đã chọn 0 sản phẩm</span>
+        <button class="del-btn" id="topDelBtn">Xóa</button>
+      </div>
+      <div class="selectall header-toolbar" id="selectAllRow" style="display:none;">
+        <input type="checkbox" id="selectAllBox">
+        <span>Chọn tất cả</span>
+      </div>
+    </div>
 
     <div id="errArea"></div>
 
@@ -309,10 +785,25 @@
 </main>
 
 <div class="taskbar" id="taskbar">
-  <button class="viewBtn" id="viewSelectedBtn" type="button" title="Xem đã chọn">
-    📋 <span class="countBadge" id="taskCount">0</span>
+  <button class="tbItem" id="viewSelectedBtn" type="button" title="Xem đã chọn">
+    <span class="tbIcon">📋</span>
+    <span class="countBadge" id="taskCount">0</span>
+    <span class="tbLabel">Xem danh sách</span>
   </button>
-  <button id="sendToIndexBtn">Thêm vào danh sách hôm nay</button>
+  <button class="tbItem" id="sendToIndexBtn" type="button">
+    <span class="tbIcon">➕</span>
+    <span class="tbLabel">Thêm vào index</span>
+  </button>
+  <div class="tbGomGroup" id="gomGroup">
+    <button class="tbGomBtn" id="gomBtn" type="button" title="Gom sản phẩm">
+      <span class="tbIcon">📦</span>
+      <span class="tbLabel">Gom sản phẩm</span>
+    </button>
+    <button class="tbGomBtn" id="gomDoneBtn" type="button" title="Xong" style="display:none;">
+      <span class="tbIcon">✅</span>
+      <span class="tbLabel">Xong</span>
+    </button>
+  </div>
 </div>
 
 <div class="editor-overlay" id="editorOverlay">
@@ -338,6 +829,52 @@
   <a class="back" href="index.html">← Về trang chính</a>
   <a class="back" href="huong-dan.html">📖 Xem hướng dẫn sử dụng</a>
 </footer>
+
+<script>
+// ---- Chuyển chế độ sáng/tối ----
+// Mặc định là DARK MODE. Bấm nút sẽ gắn/gỡ class "light-theme" trên <body>
+// để đổi toàn bộ biến màu var(--...) sang bảng màu sáng (xem khối :root /
+// body.light-theme ở đầu <style>).
+// Lựa chọn của người dùng được ghi vào localStorage và áp dụng LẠI ngay khi
+// script này chạy (trước cả khi trang hiển thị) -> giữ đúng chế độ đã chọn
+// qua các lần tải lại trang / mở lại tab, không tự nhảy về mặc định.
+// Nếu môi trường chặn localStorage (một số khung xem trước), try/catch sẽ
+// bỏ qua việc lưu, trang vẫn hoạt động bình thường (chỉ là không nhớ được
+// giữa các lần tải).
+(function(){
+  var STORAGE_KEY = 'theme-preference';
+  var body = document.body;
+  var btn = document.getElementById('themeToggleBtn');
+
+  function readStored(){
+    try{ return localStorage.getItem(STORAGE_KEY); }catch(e){ return null; }
+  }
+  function writeStored(val){
+    try{ localStorage.setItem(STORAGE_KEY, val); }catch(e){ /* bỏ qua nếu bị chặn */ }
+  }
+
+  // Áp lại lựa chọn đã lưu (nếu có) trước khi render nút, để không bị
+  // "chớp" sai theme rồi mới đổi lại.
+  var stored = readStored();
+  if(stored === 'light') body.classList.add('light-theme');
+  else if(stored === 'dark') body.classList.remove('light-theme');
+  // Nếu chưa từng chọn (stored === null) -> giữ mặc định dark mode hiện có
+  // trên <body>, không ghi gì xuống localStorage cho tới khi người dùng
+  // chủ động bấm nút.
+
+  function render(){
+    var isLight = body.classList.contains('light-theme');
+    btn.textContent = isLight ? '☀️' : '🌙';
+    btn.title = isLight ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng';
+  }
+  btn.addEventListener('click', function(){
+    body.classList.toggle('light-theme');
+    writeStored(body.classList.contains('light-theme') ? 'light' : 'dark');
+    render();
+  });
+  render();
+})();
+</script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -367,11 +904,24 @@ let pinnedKey = null; // ngoài chế độ gom: chỉ 1 phân loại được "
 let editorSaveHandler = null;
 // Danh sách sản phẩm đang mở form "chèn link file in" ở tab Thêm việc.
 let editingLinkIds = new Set();
-// Danh sách sản phẩm đang mở form gán ảnh riêng cho 1 nhãn tầng 1 (dạng
-// key: productId__tenTang1) — chỉ dùng cho sản phẩm có ĐÚNG 2 tầng phân loại,
-// vì thực tế chỉ tầng 1 mới cần ảnh riêng biệt (giống cách Shopee gán ảnh
-// theo "Phân loại 1", xem ảnh 2 người dùng gửi).
+// Danh sách sản phẩm đang mở form gán ảnh riêng cho 1 tổ hợp các tầng ngoài
+// (dạng key: productId__nhãn, với nhãn = tổ hợp mọi tầng trừ tầng cuối cùng,
+// nối bằng " - " nếu có nhiều hơn 1 tầng ngoài) — áp dụng cho sản phẩm có
+// TỪ 2 TẦNG phân loại trở lên (không giới hạn đúng 2 tầng), vì logic dùng
+// cartesianProduct() để gộp mọi tầng ngoài thành 1 nhãn duy nhất trước khi
+// gán ảnh, giống cách Shopee gán ảnh theo "Phân loại 1".
 let editingGroupImageIds = new Set();
+
+// Dọn mọi trạng thái đang "treo" theo id sản phẩm khi sản phẩm đó bị xoá —
+// tránh các Set (editingLinkIds, editingGroupImageIds...) tích tụ id "chết"
+// vô thời hạn qua nhiều lượt sửa/xoá.
+function cleanupProductState(productId){
+  editingLinkIds.delete(productId);
+  for(const key of Array.from(editingGroupImageIds)){
+    if(key.startsWith(productId + "__")) editingGroupImageIds.delete(key);
+  }
+  if(openImageCardId === productId) openImageCardId = null;
+}
 
 // ---- Chế độ giao diện: 'task' = thêm danh sách công việc (mặc định),
 // 'manage' = quản lý danh mục (thêm/sửa/xóa sản phẩm) ----
@@ -433,31 +983,23 @@ document.querySelectorAll(".tab").forEach(t => {
 });
 
 const gomBtn = document.getElementById("gomBtn");
-const groupNameInput = document.getElementById("groupNameInput");
-const gomStatusLine = document.getElementById("gomStatusLine");
 const gomDoneBtn = document.getElementById("gomDoneBtn");
-
-function updateGomStatusLine(){
-  if(mode === "manage" || !gomMode){ gomStatusLine.style.display = "none"; return; }
-  const name = groupNameInput.value.trim();
-  gomStatusLine.style.display = "block";
-  gomStatusLine.textContent = "Đang gom vào: " + (name || "(sẽ dùng mã tự sinh khi gửi)");
-}
 
 // ---- Chế độ sắp xếp thủ công (chỉ trong tab quản lý) — bật lên mới hiện
 // nút ▲▼ trên từng item, vì đây là thao tác không thường xuyên (chủ yếu dùng
 // lúc mới nhập danh sách hoặc thỉnh thoảng dọn lại thứ tự sau này). ----
 let sortMode = false;
 
-// ---- Chế độ xem: 'list' (mặc định, đầy đủ nút chức năng — gán ảnh/link,
-// ảnh riêng theo phân loại...) hoặc 'grid' (lưới, chỉ để chọn nhanh, KHÔNG
-// có các nút chức năng — chỉ dùng ở tab "Thêm việc"). Tab "Quản lý danh mục"
+// ---- Chế độ xem: 'list' (đầy đủ nút chức năng — gán ảnh/link, ảnh riêng
+// theo phân loại...), 'grid' (lưới, chỉ để chọn nhanh) hoặc 'image' (mặc
+// định — lưới ảnh sản phẩm). 'grid' và 'image' KHÔNG có các nút chức năng
+// và chỉ dùng ở tab "Thêm việc". Tab "Quản lý danh mục"
 // luôn dùng list view vì cần checkbox + nút sửa/xóa/sắp xếp cùng lúc.
 // Khai báo NGAY TẠI ĐÂY (trước applyModeUI()/updateViewSwitch() bên dưới)
 // — để ở cuối file từng gây lỗi "Cannot access 'viewMode' before
 // initialization" vì hàm cập nhật nút đọc biến này sớm hơn lúc nó
 // được khai báo (temporal dead zone của let). ----
-let viewMode = "grid";
+let viewMode = "image";
 // Ở chế độ xem ảnh: id sản phẩm đang mở overlay chọn phân loại trên điện
 // thoại (chạm để bật/tắt, vì không có hover thật như máy tính).
 let openImageCardId = null;
@@ -465,6 +1007,11 @@ let openImageCardId = null;
 function applyModeUI(){
   const isManage = mode === "manage";
   if(!isManage) sortMode = false; // rời tab quản lý thì tự thoát chế độ sắp xếp
+  // State machine: mọi CSS ẩn/hiện theo tab (xem #sortModeBtn,
+  // #productListHeading, #viewSwitch trong <style>) đọc trực tiếp từ
+  // thuộc tính này trên <body> — JS chỉ cần cập nhật đúng 1 chỗ này, không
+  // phải set style.display riêng cho từng phần tử nữa.
+  document.body.dataset.currentMode = mode;
   document.getElementById("pageTitle").textContent = isManage ? "Quản lý danh mục sản phẩm" : "Thêm danh sách công việc";
   document.getElementById("manageSection").style.display = isManage ? "block" : "none";
   document.getElementById("sortModeRow").style.display = isManage ? "flex" : "none";
@@ -474,17 +1021,46 @@ function applyModeUI(){
   const sortModeBtn = document.getElementById("sortModeBtn");
   sortModeBtn.textContent = sortMode ? "✅ Xong sắp xếp" : "🔀 Sắp xếp";
   sortModeBtn.classList.toggle("active", sortMode);
-  document.getElementById("viewSwitch").style.display = isManage ? "none" : "flex";
-  document.getElementById("gomRow").style.display = isManage ? "none" : "flex";
-  document.getElementById("gomBar").style.display = isManage ? "none" : "block";
-  if(isManage){
-    document.getElementById("gomStatusLine").style.display = "none";
-  } else {
-    updateGomStatusLine();
-  }
+  document.getElementById("gomGroup").style.display = isManage ? "none" : "flex";
 }
 applyModeUI();
 updateViewSwitch();
+
+// ---- Tái cấu trúc toolbar quản lý danh mục (chỉ đổi vị trí trong DOM +
+// vài style trực tiếp bằng JS, không đổi logic hiển thị/ẩn theo mode đã có
+// ở applyModeUI() phía trên — các phần tử được dời đi vẫn giữ đúng id, nên
+// mọi getElementById()/style.display ở nơi khác vẫn hoạt động bình thường). ----
+(function reorganizeManageToolbar(){
+  // 1. Dời nút "Sắp xếp" lên ngay trước <h2> chứa #totalCount.
+  const sortModeBtn = document.getElementById("sortModeBtn");
+  const totalCountSpan = document.getElementById("totalCount");
+  const h2 = totalCountSpan ? totalCountSpan.closest("h2") : null;
+  if(sortModeBtn && h2 && h2.parentNode){
+    sortModeBtn.style.marginRight = "10px";
+    h2.parentNode.insertBefore(sortModeBtn, h2);
+  }
+
+  const selectAllRow = document.getElementById("selectAllRow");
+  const topDelBtn = document.getElementById("topDelBtn");
+  const manageActionBar = document.getElementById("manageActionBar");
+
+  // 2. Dời nút "Xóa" vào làm con cuối cùng của #selectAllRow, đẩy sang phải.
+  if(selectAllRow && topDelBtn){
+    selectAllRow.style.display = "flex";
+    selectAllRow.style.alignItems = "center";
+    selectAllRow.appendChild(topDelBtn);
+    topDelBtn.style.marginLeft = "auto";
+  }
+
+  // 3. Dời #manageActionBar vào trong #selectAllRow, ngay trước nút Xóa —
+  // margin-left:auto để cả cụm (manageActionBar + nút Xóa) dồn về bên phải,
+  // margin-right nhỏ để tạo khoảng cách với nút Xóa đứng cạnh nó.
+  if(selectAllRow && manageActionBar && topDelBtn){
+    selectAllRow.insertBefore(manageActionBar, topDelBtn);
+    manageActionBar.style.marginLeft = "auto";
+    manageActionBar.style.marginRight = "8px";
+  }
+})();
 
 document.getElementById("sortModeBtn").addEventListener("click", () => {
   sortMode = !sortMode;
@@ -496,13 +1072,14 @@ document.getElementById("sortModeBtn").addEventListener("click", () => {
 function exitGomMode(){
   gomMode = false;
   currentGroupId = null;
-  groupNameInput.value = "";
-  groupNameInput.style.display = "none";
+  // Thoát gom (Xong hoặc Hủy) luôn quên hẳn pinnedKey — pinnedKey chỉ có ý
+  // nghĩa "tạm thời trong khi gom dở" ở trong này, không để sót lại khiến
+  // 1 dòng vừa gom xong bị coi là đang ghim (có thể bấm +/- ngoài ý muốn).
+  pinnedKey = null;
   gomDoneBtn.style.display = "none";
-  gomBtn.textContent = "📦 Gom sản phẩm";
+  gomBtn.title = "Gom sản phẩm";
+  gomBtn.querySelector(".tbLabel").textContent = "Gom sản phẩm";
   gomBtn.classList.remove("active");
-  gomStatusLine.style.display = "none";
-  document.getElementById("gomBar").classList.remove("active");
 }
 
 gomBtn.addEventListener("click", () => {
@@ -519,13 +1096,10 @@ gomBtn.addEventListener("click", () => {
     } else {
       currentGroupId = newOrderId();
     }
-    groupNameInput.style.display = "block";
-    groupNameInput.value = "";
-    gomDoneBtn.style.display = "inline-block";
-    gomBtn.textContent = "📦 Đang gom (bấm để hủy)";
+    gomDoneBtn.style.display = "flex";
+    gomBtn.title = "Đang gom (bấm để hủy)";
+    gomBtn.querySelector(".tbLabel").textContent = "Hủy";
     gomBtn.classList.add("active");
-    document.getElementById("gomBar").classList.add("active");
-    updateGomStatusLine();
     renderList();
   } else {
     // Hủy gom: tách các sản phẩm đã chọn trong đơn đang gom về thành các đơn lẻ riêng
@@ -541,17 +1115,19 @@ gomBtn.addEventListener("click", () => {
 
 gomDoneBtn.addEventListener("click", () => {
   // Xong: chốt các sp đã chọn trong nhóm này thành 1 đơn, thoát chế độ gom
-  // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ
+  // (không tách lẻ) — có thể bấm "Gom sản phẩm" để gom tiếp đơn mới, hoặc chọn sp đơn lẻ.
+  // Không còn bước đặt tên ở đây nữa — tên đơn (nếu cần) đặt sau ở trang
+  // chính (nút bút chì "Đổi tên đơn"), hoặc tự động điền khi quét được mã
+  // vận đơn từ phiếu giao.
   if(currentGroupId){
-    const nm = groupNameInput.value.trim();
     const itemsInGroup = Array.from(taskSelections.values()).filter(v => v.orderId === currentGroupId).length;
-    if(nm || itemsInGroup > 1){
-      // Có đặt tên, hoặc thực sự gộp từ 2 sp trở lên -> ghi nhận là đơn có tên/gộp.
-      groupNames.set(currentGroupId, nm || null);
+    if(itemsInGroup > 1){
+      // Thực sự gộp từ 2 sp trở lên -> ghi nhận là đơn gộp (chưa có tên).
+      groupNames.set(currentGroupId, null);
     } else {
-      // Chỉ đúng 1 sp và không đặt tên -> coi như chưa từng bấm gom, để nó
-      // vẫn hiển thị và hoạt động y hệt 1 sản phẩm lẻ bình thường (không bị
-      // gắn nhãn "Đơn gộp" một cách không cần thiết).
+      // Chỉ đúng 1 sp -> coi như chưa từng bấm gom, để nó vẫn hiển thị và
+      // hoạt động y hệt 1 sản phẩm lẻ bình thường (không bị gắn nhãn "Đơn
+      // gộp" một cách không cần thiết).
       groupNames.delete(currentGroupId);
     }
   }
@@ -559,13 +1135,16 @@ gomDoneBtn.addEventListener("click", () => {
   renderList();
 });
 
-groupNameInput.addEventListener("input", updateGomStatusLine);
-
 // ---- Thứ tự hiển thị tùy chỉnh (field "order" trên mỗi sản phẩm) ----
 // Dùng bước nhảy 10 đơn vị (10, 20, 30...) thay vì 1, 2, 3... để sau này có
 // thể chèn 1 sản phẩm vào giữa 2 sản phẩm khác mà không phải renumber toàn bộ.
 const ORDER_STEP = 10;
 let orderMigrationDone = false;
+// Promise của lượt migrate order đang chạy (hoặc đã chạy xong) — cho phép
+// các thao tác khác chờ nó hoàn tất trước khi tự tính order mới (vd nhập
+// hàng loạt ngay sau khi trang vừa tải), tránh 2 việc cùng ghi order dẫm
+// lên nhau (race condition hiếm khi timing trùng nhau).
+let migrationPromise = null;
 
 function sortProductsInPlace(){
   allProducts.sort((a, b) => {
@@ -589,20 +1168,29 @@ function getMaxOrder(){
 // làm mốc ban đầu, để không làm xáo trộn danh sách người dùng đang quen mắt.
 // Nếu đã có ít nhất 1 sản phẩm có order (đã từng sắp xếp) thì bỏ qua, không
 // đụng vào bất kỳ sản phẩm nào.
-async function maybeMigrateOrder(){
+function maybeMigrateOrder(){
   if(orderMigrationDone) return;
   if(allProducts.length === 0) return;
   const noneHasOrder = allProducts.every(p => typeof p.order !== "number");
   orderMigrationDone = true;
   if(!noneHasOrder) return;
-  const sortedByName = [...allProducts].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  for(let i = 0; i < sortedByName.length; i++){
-    const p = sortedByName[i];
-    const ord = (i + 1) * ORDER_STEP;
-    p.order = ord;
-    try{ await updateDoc(doc(db, "catalog", p.id), { order: ord }); }
-    catch(e){ showError("Lỗi khởi tạo thứ tự sản phẩm: " + e.message); }
-  }
+  migrationPromise = (async () => {
+    const sortedByName = [...allProducts].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    for(let i = 0; i < sortedByName.length; i++){
+      const p = sortedByName[i];
+      const ord = (i + 1) * ORDER_STEP;
+      p.order = ord;
+      try{ await updateDoc(doc(db, "catalog", p.id), { order: ord }); }
+      catch(e){ showError("Lỗi khởi tạo thứ tự sản phẩm: " + e.message); }
+    }
+  })();
+}
+
+// Các thao tác cần tính order mới (vd nhập hàng loạt) gọi hàm này trước —
+// nếu migrate đang chạy dở thì đợi xong hẳn rồi mới đọc getMaxOrder(), tránh
+// tính toán trên dữ liệu order còn dang dở giữa chừng.
+async function ensureOrderMigration(){
+  if(migrationPromise) await migrationPromise;
 }
 
 const q = query(catalogCol);
@@ -619,7 +1207,6 @@ onSnapshot(q, snap => {
     };
   });
   sortProductsInPlace();
-  document.getElementById("totalCount").textContent = allProducts.length;
   renderList();
   maybeMigrateOrder();
 }, err => {
@@ -833,25 +1420,66 @@ document.querySelectorAll(".vswBtn").forEach(b => {
   });
 });
 
+// ---- Hỗ trợ nhiều "dòng" độc lập cho cùng 1 phân loại ----
+// "baseKey" (productId__variant) chỉ định danh 1 PHÂN LOẠI trên giao diện
+// (dùng để tô sáng chip, gắn sự kiện...), KHÔNG còn là key lưu trong
+// taskSelections nữa. Mỗi lần 1 phân loại được chọn "mới" (không phải đang
+// ghim/đang gom dở) sẽ sinh ra 1 storageKey riêng = baseKey + "@@" + orderId
+// (orderId luôn là 1 chuỗi mới, duy nhất) — nhờ vậy nhiều lượt chọn độc lập
+// của cùng 1 phân loại (mô phỏng nhiều khách khác nhau) không bao giờ đè lên
+// nhau, dù chúng trùng baseKey.
+function baseKeyOfEntry(e){
+  return e.variant ? (e.productId + "__" + e.variant) : e.productId;
+}
+
+function storageKeyOf(baseKey, orderId){
+  return baseKey + "@@" + orderId;
+}
+
+// Tìm mọi "dòng" trong taskSelections thuộc về 1 phân loại (baseKey) —
+// có thể có nhiều dòng nếu phân loại đó đã được chọn độc lập nhiều lần.
+function findEntriesByBaseKey(baseKey){
+  const result = [];
+  for(const [k, v] of taskSelections.entries()){
+    if(baseKeyOfEntry(v) === baseKey) result.push([k, v]);
+  }
+  return result;
+}
+
+// Dòng đang "sống" (còn sửa được qua chip) của 1 phân loại, nếu có:
+// - Trong chế độ gom: dòng thuộc đơn đang gom (currentGroupId).
+// - Ngoài chế độ gom: dòng đang được ghim (pinnedKey).
+// Mọi dòng KHÁC của cùng phân loại này (đã "chốt" từ trước) không tính —
+// chúng chỉ có thể bị xoá qua modal "Sản phẩm đã chọn".
+function getActiveStorageKey(baseKey){
+  if(gomMode){
+    const sKey = storageKeyOf(baseKey, currentGroupId);
+    return taskSelections.has(sKey) ? sKey : null;
+  }
+  if(pinnedKey && taskSelections.has(pinnedKey)){
+    const e = taskSelections.get(pinnedKey);
+    if(baseKeyOfEntry(e) === baseKey) return pinnedKey;
+  }
+  return null;
+}
+
 // Tạo 1 nút chip lựa chọn — dùng chung giữa list view và grid view để logic
 // chọn/số lượng/ghim (isChipActive, taskSelections...) luôn nhất quán ở cả 2
 // nơi, không phải viết/khớp tay 2 lần.
 function chipHtml(p, variant, displayText){
-  const key = variant ? (p.id + "__" + variant) : p.id;
-  const activePinned = isChipActive(key); // đang ghim / đang gom dở (logic gốc)
-  const cur = taskSelections.get(key);
-  const isGrouped = !!(cur && groupNames.has(cur.orderId)); // thuộc 1 đơn đã "Xong" (gộp hoặc đặt tên)
-  const showSelected = activePinned || isGrouped; // đơn đã gộp thì KHÔNG ẩn sau khi bấm Xong
+  const baseKey = variant ? (p.id + "__" + variant) : p.id;
+  const activeKey = getActiveStorageKey(baseKey); // dòng đang ghim (ngoài gom) / đang gom dở (trong gom)
+  // CHỈ dòng đang active mới được hiển thị ở đây. Mọi dòng khác của cùng
+  // phân loại này — kể cả đã "chốt" vào 1 đơn gộp (isGrouped) — coi như
+  // KHÔNG tồn tại trên chip này nữa: không tô màu, không badge, không selected,
+  // giống hệt 1 sản phẩm lẻ sau khi bỏ ghim (nhấn "Xong" = quên hoàn toàn,
+  // không khác gì rời khỏi 1 sp đơn lẻ để chọn sp khác). Muốn xem/sửa/xoá
+  // các dòng đã chốt thì dùng modal "Sản phẩm đã chọn".
+  const cur = activeKey ? taskSelections.get(activeKey) : null;
+  const showSelected = !!activeKey;
   const qty = cur ? cur.qty : 0;
-  let colorAttr = "";
-  let orderBadge = "";
-  if(isGrouped){
-    const c = getOrderColor(cur.orderId);
-    colorAttr = ` style="background:${c.color};color:#fff;"`;
-    orderBadge = `<span class="orderNumTag" title="Cùng đơn #${c.num}">${c.num}</span>`;
-  }
-  return `<button type="button" class="vchip${showSelected ? " selected" : ""}" data-key="${escapeHtml(key)}"${colorAttr}>
-      ${orderBadge}<span class="vlabel" data-act="add">${escapeHtml(displayText)}</span>
+  return `<button type="button" class="vchip${showSelected ? " selected" : ""}" data-basekey="${escapeHtml(baseKey)}" data-storagekey="${escapeHtml(activeKey || "")}">
+      <span class="vlabel" data-act="add">${escapeHtml(displayText)}</span>
       ${showSelected ? `<span class="qtytag">×${qty}</span><span class="chipminus" data-act="minus">−</span><span class="chipx" data-act="remove">×</span>` : ""}
     </button>`;
 }
@@ -861,28 +1489,51 @@ function chipHtml(p, variant, displayText){
 function attachVchipListeners(container, p){
   container.querySelectorAll(".vchip").forEach(chip => {
     chip.addEventListener("click", e => {
-      const key = chip.dataset.key;
-      const variant = key.slice(p.id.length + 2);
+      const baseKey = chip.dataset.basekey;
+      const storageKey = chip.dataset.storagekey; // dòng đang hiển thị trên chip này (nếu có)
+      const variant = baseKey.slice(p.id.length + 2);
       const act = e.target.dataset.act;
-      let cur = taskSelections.get(key);
       if(act === "remove"){
-        taskSelections.delete(key);
-        if(pinnedKey === key) pinnedKey = null;
+        if(storageKey && taskSelections.has(storageKey)){
+          taskSelections.delete(storageKey);
+          if(pinnedKey === storageKey) pinnedKey = null;
+        }
       } else if(act === "minus"){
-        if(cur){
+        if(storageKey && taskSelections.has(storageKey)){
+          const cur = taskSelections.get(storageKey);
           cur.qty -= 1;
           if(cur.qty <= 0){
-            taskSelections.delete(key);
-            if(pinnedKey === key) pinnedKey = null;
+            taskSelections.delete(storageKey);
+            if(pinnedKey === storageKey) pinnedKey = null;
           }
         }
-      } else {
+      } else if(gomMode){
+        // Đang gom: mọi lượt bấm vào cùng 1 phân loại trong lúc gom dở đều
+        // cộng dồn vào CÙNG 1 dòng của đơn đang gom — giữ nguyên như trước.
+        const sKey = storageKeyOf(baseKey, currentGroupId);
+        let cur = taskSelections.get(sKey);
         if(!cur){
-          cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
-          taskSelections.set(key, cur);
+          cur = { productName: p.name, variant, qty: 0, orderId: currentGroupId, productId: p.id };
+          taskSelections.set(sKey, cur);
         }
         cur.qty += 1;
-        if(!gomMode) pinnedKey = key;
+      } else if(storageKey && taskSelections.has(storageKey)){
+        // storageKey (nếu có) luôn = dòng đang active thật (đang ghim ngoài
+        // gom / đang gom dở) — chipHtml không còn gán storagekey cho bất kỳ
+        // dòng đã "chốt" nào khác nữa. Bấm tiếp chỉ cộng số lượng dòng đang
+        // ghim, giống hành vi gốc.
+        taskSelections.get(storageKey).qty += 1;
+        pinnedKey = storageKey;
+      } else {
+        // Không có dòng active nào cho phân loại này (chưa chọn lần nào,
+        // hoặc phân loại này đang chỉ hiển thị "trắng" vì dòng cũ đã bị
+        // chốt cứng vào 1 đơn đã Xong / bị bỏ ghim trước đó) -> luôn tạo 1
+        // dòng/đơn HOÀN TOÀN MỚI, độc lập, không đụng tới các dòng cũ đã
+        // chốt trước đó của cùng phân loại này.
+        const orderId = newOrderId();
+        const sKey = storageKeyOf(baseKey, orderId);
+        taskSelections.set(sKey, { productName: p.name, variant, qty: 1, orderId, productId: p.id });
+        pinnedKey = sKey;
       }
       renderList();
     });
@@ -927,17 +1578,6 @@ function renderGrid(filtered){
   return wrap;
 }
 
-// Tổng số lượng đã chọn của 1 sản phẩm, gộp mọi phân loại — dùng để hiện
-// badge số trên ảnh (chế độ xem ảnh), giúp lướt mắt biết ngay sản phẩm nào
-// đã chọn mà không cần bấm mở overlay.
-function countSelectedForProduct(p){
-  let n = 0;
-  for(const val of taskSelections.values()){
-    if(val.productId === p.id) n += val.qty;
-  }
-  return n;
-}
-
 function renderImageGrid(filtered){
   const wrap = document.createElement("div");
   wrap.className = "img-grid";
@@ -952,17 +1592,15 @@ function renderImageGrid(filtered){
     } else {
       inner = `<div class="option-wrap">${chipHtml(p, "", isChipActive(p.id) ? "Đã chọn" : "➕ Chọn sản phẩm này")}</div>`;
     }
-    const count = countSelectedForProduct(p);
     const card = document.createElement("div");
     card.className = "img-card" + (openImageCardId === p.id ? " open" : "");
     card.dataset.id = p.id;
     card.innerHTML = `
       <div class="img-thumb">
         ${p.image ? `<img src="${escapeHtml(p.image)}" alt="">` : `<div class="img-placeholder">🖼</div>`}
-        ${count > 0 ? `<span class="img-badge">${count}</span>` : ""}
         <div class="img-overlay"><div class="img-overlay-inner">${inner}</div></div>
       </div>
-      <div class="img-name">${escapeHtml(p.name)}</div>
+      <div class="img-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
     `;
     attachVchipListeners(card, p);
     // Chạm vào ảnh (điện thoại không có hover) -> bật/tắt overlay. Chạm
@@ -973,6 +1611,13 @@ function renderImageGrid(filtered){
       openImageCardId = (openImageCardId === p.id) ? null : p.id;
       renderList();
     });
+    // Chạm/click vào tên (chủ yếu cho di động, nơi không có hover thật) ->
+    // hiện đầy đủ tên và giãn chiều cao ô, bấm lại để thu gọn về 1 dòng.
+    // Không đụng tới việc mở/đóng overlay phân loại ở trên.
+    card.querySelector(".img-name").addEventListener("click", e => {
+      e.stopPropagation();
+      e.currentTarget.classList.toggle("expanded");
+    });
     wrap.appendChild(card);
   });
   return wrap;
@@ -982,6 +1627,11 @@ function renderList(){
   const list = document.getElementById("list");
   const filtered = getFiltered();
   const isManage = mode === "manage";
+  // Số hiển thị = số sau khi lọc theo từ khóa tìm kiếm; nếu đang lọc (ít hơn
+  // tổng số) thì ghi rõ "đang hiển thị/tổng" để không gây hiểu lầm là tìm
+  // kiếm không hoạt động (trước đây luôn hiện tổng số toàn danh mục dù đang lọc).
+  document.getElementById("totalCount").textContent =
+    (filtered.length === allProducts.length) ? allProducts.length : `${filtered.length}/${allProducts.length}`;
   const isSortMode = isManage && sortMode;
   const useGrid = !isManage && (viewMode === "grid" || viewMode === "image");
   list.innerHTML = "";
@@ -1069,6 +1719,7 @@ function renderList(){
         try{
           await deleteDoc(doc(db, "catalog", p.id));
           selected.delete(p.id);
+          cleanupProductState(p.id);
         }catch(e){
           showError("Không xóa được sản phẩm: " + e.message);
         }
@@ -1214,34 +1865,10 @@ function renderList(){
           renderList();
         });
       });
-      div.querySelectorAll(".vchip").forEach(chip => {
-        chip.addEventListener("click", e => {
-          const key = chip.dataset.key;
-          const variant = key.slice(p.id.length + 2);
-          const act = e.target.dataset.act;
-          let cur = taskSelections.get(key);
-          if(act === "remove"){
-            taskSelections.delete(key);
-            if(pinnedKey === key) pinnedKey = null;
-          } else if(act === "minus"){
-            if(cur){
-              cur.qty -= 1;
-              if(cur.qty <= 0){
-                taskSelections.delete(key);
-                if(pinnedKey === key) pinnedKey = null;
-              }
-            }
-          } else {
-            if(!cur){
-              cur = { productName: p.name, variant, qty: 0, orderId: gomMode ? currentGroupId : newOrderId(), productId: p.id };
-              taskSelections.set(key, cur);
-            }
-            cur.qty += 1;
-            if(!gomMode) pinnedKey = key; // ghim phân loại vừa chọn, tự bỏ ghim cái trước đó
-          }
-          renderList();
-        });
-      });
+      // Dùng chung đúng 1 bản logic add/minus/remove/ghim với grid/image view
+      // (attachVchipListeners) — trước đây bị chép tay 1 bản y hệt ở đây,
+      // dễ lệch hành vi giữa 2 nơi nếu sau này chỉ sửa 1 chỗ.
+      attachVchipListeners(div, p);
     }
     list.appendChild(div);
   });
@@ -1254,11 +1881,8 @@ function renderList(){
 // - Trong chế độ gom: mọi sp thuộc nhóm đang gom đều tô sáng (giữ nguyên như trước).
 // - Ngoài chế độ gom: chỉ phân loại vừa chọn gần nhất (đang ghim) mới tô sáng;
 //   các đơn lẻ đã chốt trước đó vẫn nằm trong giỏ hàng nhưng không còn tô sáng.
-function isChipActive(key){
-  const cur = taskSelections.get(key);
-  if(!cur) return false;
-  if(gomMode) return cur.orderId === currentGroupId;
-  return key === pinnedKey;
+function isChipActive(baseKey){
+  return getActiveStorageKey(baseKey) !== null;
 }
 
 // Nhấp ra ngoài 1 chip phân loại (nút/chỗ khác trên trang) cũng tự bỏ ghim,
@@ -1278,21 +1902,43 @@ document.addEventListener("click", e => {
   if(needsRerender) renderList();
 });
 
+// Ngưỡng bề rộng màn hình để panel "Sản phẩm đã chọn" chuyển từ overlay
+// toàn màn hình (điện thoại) sang panel ghim góc dưới-trái (laptop/desktop).
+// Phải khớp với @media (min-width:1250px) trong CSS ở trên.
+function isDesktopPanel(){
+  return window.matchMedia("(min-width:1250px)").matches;
+}
+
+let prevSelCount = 0;
+
 function updateTaskBar(){
   const bar = document.getElementById("taskbar");
   const n = taskSelections.size;
   document.getElementById("taskCount").textContent = n;
-  bar.classList.toggle("show", mode === "task" && n > 0);
-  if(n === 0) closeSelectedModal();
+  bar.classList.toggle("show", mode === "task");
+  const overlay = document.getElementById("selectedOverlay");
+
+  if(n === 0){
+    closeSelectedModal();
+  } else if(overlay.classList.contains("show")){
+    // Panel đang mở (trên desktop panel luôn mở, hoặc trên điện thoại
+    // người dùng đang xem overlay) -> cập nhật nội dung ngay khi có thay
+    // đổi lựa chọn ở nơi khác trên trang.
+    renderSelectedModal();
+  } else if(prevSelCount === 0 && isDesktopPanel()){
+    // Trên desktop: panel mặc định tự mở ngay khi chọn sản phẩm đầu tiên.
+    renderSelectedModal();
+    overlay.classList.add("show");
+  }
+  prevSelCount = n;
 }
 
 function getOrderLabel(orderId){
   if(gomMode && orderId === currentGroupId){
-    const nm = groupNameInput.value.trim();
-    return (nm || "chưa đặt tên") + " (đang gom)";
+    return "Đang gom";
   }
   if(groupNames.has(orderId)){
-    return groupNames.get(orderId) || "Đơn gộp (chưa đặt tên)";
+    return groupNames.get(orderId) || "Đơn gộp";
   }
   return "Sản phẩm lẻ";
 }
@@ -1304,7 +1950,11 @@ function renderSelectedModal(){
     return;
   }
   const groups = new Map();
-  for(const [key, val] of taskSelections.entries()){
+  // Duyệt NGƯỢC thứ tự thêm vào (mới nhất trước) — để phân loại vừa chọn
+  // luôn hiện ngay ở đầu danh sách (cả vị trí nhóm đơn lẫn vị trí dòng
+  // trong nhóm), không cần cuộn xuống mới thấy khi danh sách dài.
+  const reversedEntries = Array.from(taskSelections.entries()).reverse();
+  for(const [key, val] of reversedEntries){
     if(!groups.has(val.orderId)) groups.set(val.orderId, []);
     groups.get(val.orderId).push({ key, ...val });
   }
@@ -1338,8 +1988,13 @@ function closeSelectedModal(){
 }
 
 document.getElementById("viewSelectedBtn").addEventListener("click", () => {
-  renderSelectedModal();
-  document.getElementById("selectedOverlay").classList.add("show");
+  // Nút này giờ đóng/mở (toggle) thay vì chỉ mở, cả trên điện thoại và
+  // desktop — trên desktop panel có thể đã tự mở sẵn, bấm nút sẽ đóng lại,
+  // bấm lần nữa sẽ mở lại.
+  const overlay = document.getElementById("selectedOverlay");
+  const willOpen = !overlay.classList.contains("show");
+  if(willOpen) renderSelectedModal();
+  overlay.classList.toggle("show", willOpen);
 });
 document.getElementById("selectedCloseBtn").addEventListener("click", closeSelectedModal);
 
@@ -1353,7 +2008,7 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
     if(!orderNames.has(e.orderId)){
       let nm = null;
       if(gomMode && e.orderId === currentGroupId){
-        nm = groupNameInput.value.trim() || null;
+        nm = null; // đơn đang gom dở, chưa đặt tên (không còn ô nhập ở đây nữa)
       } else if(groupNames.has(e.orderId)){
         nm = groupNames.get(e.orderId);
       }
@@ -1371,9 +2026,10 @@ document.getElementById("sendToIndexBtn").addEventListener("click", async () => 
         note: "",
         link: (prod && prod.link) ? prod.link : "",
         image: (() => {
-          // Ảnh riêng theo phân loại CHỈ áp dụng cho sản phẩm 2 tầng, và chỉ
-          // gán theo TẦNG 1 (vd "Biển Báo Cấm"), không theo cả tổ hợp
-          // "tầng1: tầng2" — đúng thực tế Shopee chỉ cho gán ảnh ở Phân loại 1.
+          // Ảnh riêng theo phân loại được gán theo TỔ HỢP CÁC TẦNG NGOÀI (mọi
+          // tầng trừ tầng cuối, vd với sản phẩm 2 tầng thì chính là tầng 1 —
+          // "Biển Báo Cấm"), không theo cả chuỗi đầy đủ "tầng1: tầng2" —
+          // đúng thực tế Shopee chỉ cho gán ảnh ở Phân loại 1.
           if(prod && prod.variantImages && e.variant && e.variant.includes(": ")){
             const tier1 = e.variant.split(": ")[0];
             if(prod.variantImages[tier1]) return prod.variantImages[tier1];
@@ -1414,14 +2070,19 @@ document.getElementById("selectAllBox").addEventListener("change", e => {
 function updateActionBar(){
   const n = selected.size;
   document.getElementById("selCount").textContent = `Đã chọn ${n} sản phẩm`;
-  document.getElementById("topDelBtn").classList.toggle("enabled", n > 0);
+  const delBtn = document.getElementById("topDelBtn");
+  delBtn.classList.toggle("enabled", n > 0);
+  delBtn.disabled = n === 0;
 }
 
 document.getElementById("topDelBtn").addEventListener("click", async () => {
   if(selected.size === 0) return;
   if(!confirm(`Xóa ${selected.size} sản phẩm đã chọn?`)) return;
   try{
-    for(const id of Array.from(selected)) await deleteDoc(doc(db, "catalog", id));
+    for(const id of Array.from(selected)){
+      await deleteDoc(doc(db, "catalog", id));
+      cleanupProductState(id);
+    }
     selected.clear();
   }catch(e){
     showError("Không xóa được sản phẩm đã chọn: " + e.message);
@@ -1438,6 +2099,7 @@ document.getElementById("bulkBtn").addEventListener("click", async () => {
     return;
   }
   let created = 0, merged = 0, skipped = 0, mismatched = 0;
+  await ensureOrderMigration();
   let nextOrder = getMaxOrder() + ORDER_STEP;
   // Bản sao làm việc trong bộ nhớ: allProducts chỉ được cập nhật qua onSnapshot
   // (bất đồng bộ), nên nếu không theo dõi riêng, 2 dòng trùng tên sản phẩm MỚI
@@ -1508,7 +2170,8 @@ const BULK_FORMAT_HELP = `Mỗi dòng 1 sản phẩm, hỗ trợ 3 kiểu:<br>
       1) Không phân loại: <b>Tên sản phẩm</b><br>
       2) 1 tầng phân loại: <b>Tên sản phẩm | lựa chọn 1, lựa chọn 2</b><br>
       3) 2 tầng phân loại: <b>Tên sản phẩm | giá trị tầng 1a, giá trị tầng 1b | giá trị tầng 2a, giá trị tầng 2b</b><br>
-      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.`;
+      Sản phẩm đã có sẽ được gộp thêm lựa chọn mới vào đúng tầng, không tạo trùng.<br>
+      ⚠️ Dấu <b>|</b> và <b>,</b> luôn được hiểu là dấu phân cách — không dùng chúng bên trong tên sản phẩm hay tên 1 lựa chọn (kể cả số thập phân, vd viết "21.5" thay vì "21,5" để tránh bị tách thành 2 lựa chọn riêng).`;
 
 document.getElementById("exportBtn").addEventListener("click", () => {
   if(allProducts.length === 0){
@@ -1520,7 +2183,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   // xuống Firestore, tránh nhầm lẫn với việc sửa từng sản phẩm.
   openEditorRaw("Xuất danh sách hiện có (chỉ để xem/sao chép)", text, async () => true,
     `Đây là toàn bộ danh mục hiện có, mỗi dòng 1 sản phẩm theo đúng định dạng nhập liệu.<br>
-     Chỉ để xem và sao chép ra ngoài lưu trữ — bấm "Lưu" ở đây sẽ không ghi gì xuống hệ thống.`);
+     Chỉ để xem và sao chép ra ngoài lưu trữ.`, "Đóng");
 });
 
 const bulkTextarea = document.getElementById("bulkInput");
@@ -1528,18 +2191,24 @@ document.getElementById("expandBtn").addEventListener("click", () => {
   openEditorRaw("Nhập / sửa danh sách", bulkTextarea.value, async (text) => {
     bulkTextarea.value = text;
     return true;
-  }, BULK_FORMAT_HELP);
+  }, BULK_FORMAT_HELP, "Dùng nội dung này");
 });
 
 function closeFullscreen(){
   document.getElementById("editorOverlay").classList.remove("show");
+  editorSaveHandler = null;
 }
 
-function openEditorRaw(title, initialText, onSave, descriptionHtml){
+function openEditorRaw(title, initialText, onSave, descriptionHtml, saveLabel){
   document.getElementById("editorTitle").textContent = title;
   document.getElementById("editorDesc").innerHTML = descriptionHtml;
   document.getElementById("editorTextarea").value = initialText;
   document.getElementById("editorOverlay").classList.add("show");
+  // Nhãn nút mặc định "Lưu" chỉ đúng khi thao tác thực sự ghi xuống Firestore
+  // (sửa sản phẩm). Với ô Xuất (chỉ để xem/copy) hay ô Mở rộng (chỉ chuyển
+  // text về lại ô nhập, chưa lưu gì) — dùng nhãn khác để tránh gây hiểu lầm
+  // là dữ liệu đã được lưu vào hệ thống.
+  document.getElementById("editorSave").textContent = saveLabel || "Lưu";
   editorSaveHandler = onSave;
 }
 
@@ -1564,7 +2233,7 @@ function openEditor(product){
       showError("Không lưu được sản phẩm: " + e.message);
       return false;
     }
-  }, 'Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)');
+  }, 'Định dạng: <b>Tên</b> (không phân loại) · <b>Tên | a, b</b> (1 tầng) · <b>Tên | a, b | c, d</b> (2 tầng)', "Lưu");
 }
 
 document.getElementById("editorCancel").addEventListener("click", closeFullscreen);
