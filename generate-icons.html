@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Tạo icon PWA (chạy 1 lần rồi xoá)</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;color:#1a1d21;}
+  h1{font-size:18px;}
+  button{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:12px 18px;font-size:15px;cursor:pointer;margin-top:12px;}
+  .row{display:flex;gap:16px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  .row div{text-align:center;font-size:12px;color:#6b7280;}
+  canvas{border:1px solid #e2e4e7;border-radius:8px;background:#fff;}
+  p{font-size:14px;line-height:1.5;color:#374151;}
+</style>
+</head>
+<body>
+<h1>🖨️ Tạo icon PWA từ icon.svg</h1>
+<p>
+  Trang này vẽ <code>icon.svg</code> lên &lt;canvas&gt; rồi xuất trực tiếp thành
+  3 file PNG cần cho <code>manifest.json</code>. Đặt file này CÙNG THƯ MỤC với
+  <code>icon.svg</code>, mở bằng trình duyệt (double-click hoặc kéo vào tab),
+  bấm nút bên dưới, 3 file sẽ tự tải về — copy chúng vào cùng thư mục với
+  <code>index.html</code> trên GitHub Pages. Sau đó có thể xoá file này đi.
+</p>
+<button id="genBtn">Tạo & tải xuống 3 icon</button>
+<div class="row" id="preview"></div>
+
+<script>
+const sizes = [
+  { name: "icon-192.png", size: 192 },
+  { name: "icon-512.png", size: 512 },
+  { name: "apple-touch-icon.png", size: 180 } // Apple không hỗ trợ nền trong suốt tốt, nhưng SVG đã có nền kín màu nên vẫn ổn.
+];
+
+function loadSvg(){
+  return fetch("icon.svg")
+    .then(res => {
+      if(!res.ok) throw new Error("Không tìm thấy icon.svg cùng thư mục với trang này.");
+      return res.text();
+    })
+    .then(svgText => {
+      const blob = new Blob([svgText], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { resolve(img); URL.revokeObjectURL(url); };
+        img.onerror = reject;
+        img.src = url;
+      });
+    });
+}
+
+async function generateAll(){
+  const preview = document.getElementById("preview");
+  preview.innerHTML = "";
+  try{
+    const img = await loadSvg();
+    for(const { name, size } of sizes){
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, size, size);
+
+      // Xem trước (thu nhỏ hiển thị 72px cho gọn)
+      const thumb = document.createElement("canvas");
+      thumb.width = 72; thumb.height = 72;
+      thumb.getContext("2d").drawImage(canvas, 0, 0, 72, 72);
+      const wrap = document.createElement("div");
+      wrap.appendChild(thumb);
+      const label = document.createElement("div");
+      label.textContent = name;
+      wrap.appendChild(label);
+      preview.appendChild(wrap);
+
+      // Tải file về
+      await new Promise(resolve => {
+        canvas.toBlob(blob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(resolve, 300); // giãn cách nhẹ để trình duyệt không chặn tải hàng loạt
+        }, "image/png");
+      });
+    }
+  }catch(e){
+    alert("Lỗi: " + e.message);
+  }
+}
+
+document.getElementById("genBtn").addEventListener("click", generateAll);
+</script>
+</body>
+</html>

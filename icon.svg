@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Nền: fill kín 512x512 (không bo góc) để an toàn cho icon "maskable" —
+       hệ điều hành sẽ tự bo góc/tròn theo mask riêng của nó. -->
+  <rect width="512" height="512" fill="#2563eb"/>
+
+  <!-- Mọi chi tiết bên dưới nằm trong vùng an toàn (đường tròn ~80% ở giữa)
+       để không bị cắt mất khi hệ thống áp mask tròn/bo góc. -->
+
+  <!-- Thân máy in -->
+  <rect x="126" y="216" width="260" height="120" rx="16" fill="#ffffff"/>
+  <!-- Khe giấy phía trên thân máy in -->
+  <rect x="156" y="184" width="200" height="48" rx="8" fill="#eaf1ff"/>
+  <!-- Đèn báo nhỏ trên máy in -->
+  <circle cx="346" cy="252" r="9" fill="#15803d"/>
+  <!-- Khay ra giấy / kiện hàng phía dưới -->
+  <rect x="150" y="336" width="212" height="18" fill="#eaf1ff"/>
+
+  <!-- Kiện hàng (thùng carton) đang được "in ra" phía dưới máy in -->
+  <g>
+    <rect x="176" y="354" width="160" height="104" rx="10" fill="#fef3e0" stroke="#b45309" stroke-width="6"/>
+    <!-- Băng keo dán hộp theo chiều dọc -->
+    <rect x="246" y="354" width="20" height="104" fill="#fcdca0"/>
+    <!-- Nắp hộp hình chữ V -->
+    <path d="M176 372 L256 402 L336 372" fill="none" stroke="#b45309" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Tờ phiếu giao vừa in xong, nhô lên trên khe giấy -->
+  <rect x="196" y="146" width="120" height="54" rx="4" fill="#ffffff" stroke="#e2e4e7" stroke-width="4"/>
+  <line x1="210" y1="162" x2="302" y2="162" stroke="#6b7280" stroke-width="6" stroke-linecap="round"/>
+  <line x1="210" y1="178" x2="278" y2="178" stroke="#6b7280" stroke-width="6" stroke-linecap="round"/>
+</svg>
